@@ -1,0 +1,17 @@
+# Sim Node (Linux 仿真服务器) 依赖
+# 安装：pip install -r requirements_simnode.txt
+
+# Web 框架
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# 数据模型
+pydantic>=2.0.0
+
+# 配置
+pyyaml>=6.0
+
+# 数值处理 + 计算机视觉（学生代码的白名单导入项）
+# 在 Linux headless 服务器上用 opencv-python-headless，不含 GUI 依赖
+numpy>=1.24.0
+opencv-python-headless>=4.8.0

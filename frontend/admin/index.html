@@ -585,6 +585,20 @@ html, body {
   font-size: 13px;
 }
 
+/* Live monitor */
+.live-split { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.live-cars-wrap { flex: 1; min-width: 180px; }
+.live-canvas-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.live-sub-label {
+  font-size: 11px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+#live-overhead-img {
+  border-radius: 6px; display: block;
+  width: 320px; height: 240px;
+  object-fit: contain; background: #111827;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -687,6 +701,28 @@ html, body {
             </div>
           </div>
           <div id="replay-link-container" style="display:none;margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- Live race monitor (shown only when running) -->
+      <div id="live-monitor-card" class="card" style="display:none">
+        <div class="card-header">
+          <span class="card-title">实时赛况</span>
+          <div class="refresh-hint">
+            <span class="auto-refresh-dot"></span> 每 3 秒更新
+          </div>
+        </div>
+        <div class="card-body" style="padding:16px">
+          <div class="live-split">
+            <div class="live-cars-wrap">
+              <div class="live-sub-label">车辆状态</div>
+              <div id="live-cars-table"></div>
+            </div>
+            <div class="live-canvas-wrap">
+              <div class="live-sub-label">俯视实况</div>
+              <img id="live-overhead-img" alt="overhead view" src="">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -946,7 +982,7 @@ function handleSimStatus(msg) {
   document.getElementById('sim-pid').textContent = msg.webots_pid != null ? String(msg.webots_pid) : '—';
   document.getElementById('sim-rec-path').textContent = msg.recording_path || '—';
   document.getElementById('sim-time').textContent =
-    msg.sim_time_approx != null ? formatSimTime(msg.sim_time_approx) : '—';
+    msg.sim_time_approx ? formatSimTime(msg.sim_time_approx) : '00:00';
 
   // Replay link when recording ready
   const replayContainer = document.getElementById('replay-link-container');
@@ -959,6 +995,85 @@ function handleSimStatus(msg) {
   } else {
     replayContainer.style.display = 'none';
   }
+
+  // Live monitor card
+  const liveCard = document.getElementById('live-monitor-card');
+  if (state === 'running') {
+    liveCard.style.display = 'block';
+    if (msg.live_cars && msg.live_cars.length > 0) {
+      updateLiveCars(msg.live_cars);
+    }
+    if (msg.session_id) startFramePolling(msg.session_id);
+  } else {
+    liveCard.style.display = 'none';
+    stopFramePolling();
+  }
+}
+
+// ── Live cars ─────────────────────────────────────
+const CAR_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b'];
+
+function updateLiveCars(cars) {
+  const sorted = [...cars].sort((a, b) => {
+    if (b.lap !== a.lap) return b.lap - a.lap;
+    return b.lap_progress - a.lap_progress;
+  });
+  const rows = sorted.map((car, rank) => {
+    const origIdx = cars.indexOf(car);
+    const color = CAR_COLORS[origIdx % CAR_COLORS.length];
+    const sCls = car.status === 'disqualified' ? 'color:#ef4444;font-weight:700'
+               : car.status === 'stopped'      ? 'color:#f59e0b'
+               : 'color:#22c55e';
+    return `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};vertical-align:middle;margin-right:5px"></span>${rank+1}</td>
+      <td class="mono" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(car.team_id)}">${escHtml(car.team_id)}</td>
+      <td class="mono">${car.lap}</td>
+      <td class="mono">${car.speed != null ? car.speed.toFixed(1) : '—'}</td>
+      <td style="font-size:11px;${sCls}">${car.status}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('live-cars-table').innerHTML = `
+    <table class="data-table" style="font-size:12px">
+      <thead><tr><th>#</th><th>队伍</th><th>圈</th><th>速度</th><th>状态</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Overhead frame polling ─────────────────────────
+let _frameTimer = null;
+let _frameSession = null;
+
+function startFramePolling(sessionId) {
+  if (_frameSession === sessionId && _frameTimer) return; // already polling this session
+  stopFramePolling();
+  _frameSession = sessionId;
+  _pollFrame();
+  _frameTimer = setInterval(_pollFrame, 1000);
+}
+
+function stopFramePolling() {
+  if (_frameTimer) { clearInterval(_frameTimer); _frameTimer = null; }
+  _frameSession = null;
+  const img = document.getElementById('live-overhead-img');
+  if (img) img.src = '';
+}
+
+async function _pollFrame() {
+  if (!_frameSession) return;
+  const img = document.getElementById('live-overhead-img');
+  if (!img) return;
+  try {
+    const resp = await fetch(
+      `/api/admin/live-frame/${encodeURIComponent(_frameSession)}`,
+      { headers: { 'Authorization': 'Basic ' + btoa('admin:' + adminPwd) }, cache: 'no-store' }
+    );
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    const newUrl = URL.createObjectURL(blob);
+    if (img._blobUrl) URL.revokeObjectURL(img._blobUrl);
+    img._blobUrl = newUrl;
+    img.src = newUrl;
+  } catch (_) {}
 }
 
 function formatSimTime(t) {

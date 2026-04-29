@@ -1,0 +1,21 @@
+# Backend (Windows) 依赖
+# 安装：pip install -r requirements.txt
+
+# Web 框架
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0   # 包含 websockets、watchfiles（--reload 用）
+
+# 数据模型
+pydantic>=2.0.0
+
+# 配置
+pyyaml>=6.0
+
+# HTTP 客户端（调用 Sim Node REST API）
+httpx>=0.27.0
+
+# 密码哈希（队伍登录、提交鉴权）
+bcrypt>=4.1.0
+
+# 数值处理（validation：对 control() 接口做 numpy 数组测试）
+numpy>=1.24.0

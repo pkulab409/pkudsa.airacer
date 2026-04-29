@@ -1,0 +1,14 @@
+# Backend 配置
+
+DB_PATH:          "server/database/race.db"
+RECORDINGS_DIR:   "recordings"
+SUBMISSIONS_DIR:  "submissions"
+ADMIN_PASSWORD:   "admin123"
+SERVER_HOST:      "0.0.0.0"
+SERVER_PORT:      8000
+
+# 本地 demo：Backend 和 Sim Node 同机运行，使用 localhost
+SIMNODE_URL:      "http://localhost:8001"
+
+# 生产部署时替换为 Linux 服务器实际 IP：
+# SIMNODE_URL:    "http://192.168.1.100:8001"

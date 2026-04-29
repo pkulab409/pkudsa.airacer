@@ -1,0 +1,23 @@
+# Sim Node 配置
+# Linux 服务器生产部署时使用注释掉的 Linux 路径
+# Windows 本地 demo 时使用下方 Windows 路径
+
+SIMNODE_HOST:         "0.0.0.0:8001"
+RECORDINGS_DIR:       "recordings"
+RACE_TIMEOUT_SECONDS: 600
+LOG_LEVEL:            "INFO"
+
+# --- Webots 路径 ---
+# Windows 本地 demo（按实际安装路径修改）
+WEBOTS_BINARY:        "D:/Webots/msys64/mingw64/bin/webotsw.exe"
+WEBOTS_WORLD:         "simnode/webots/worlds/airacer.wbt"
+
+# Linux 服务器部署时替换为：
+# WEBOTS_BINARY:      "/usr/bin/webots"
+# WEBOTS_WORLD:       "/opt/airacer/simnode/webots/worlds/airacer.wbt"
+# RECORDINGS_DIR:     "/data/airacer/recordings"
+
+# --- 渲染模式 ---
+# false = 显示 Webots 仿真窗口（本地 demo 用）
+# true  = 无窗口服务器部署
+WEBOTS_HEADLESS:      false
