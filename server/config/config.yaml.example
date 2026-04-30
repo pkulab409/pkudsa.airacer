@@ -1,0 +1,16 @@
+# Backend 配置模板
+# 复制此文件并重命名为 config.yaml，填入实际值后使用
+# config.yaml 已加入 .gitignore，不会被提交
+
+DB_PATH:          "server/database/race.db"
+RECORDINGS_DIR:   "recordings"
+SUBMISSIONS_DIR:  "submissions"
+ADMIN_PASSWORD:   "请修改为自定义密码"
+SERVER_HOST:      "0.0.0.0"
+SERVER_PORT:      8000
+
+# 本地 demo：Backend 和 Sim Node 同机运行
+SIMNODE_URL:      "http://localhost:5000"
+
+# 生产部署时替换为 Linux 服务器实际 IP：
+# SIMNODE_URL:    "http://192.168.1.100:5000"

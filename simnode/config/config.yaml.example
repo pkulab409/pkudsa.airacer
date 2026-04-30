@@ -1,0 +1,26 @@
+# Sim Node 配置模板
+# 复制此文件并重命名为 config.yaml，填入实际值后使用
+# config.yaml 已加入 .gitignore，不会被提交
+
+SIMNODE_HOST:         "0.0.0.0:5000"
+RECORDINGS_DIR:       "recordings"
+RACE_TIMEOUT_SECONDS: 600
+LOG_LEVEL:            "INFO"
+
+# --- Webots 路径（按实际安装路径修改）---
+# Windows 本地 demo：
+WEBOTS_BINARY:        "D:/Webots/msys64/mingw64/bin/webotsw.exe"
+WEBOTS_WORLD:         "simnode/webots/worlds/airacer.wbt"
+
+# Linux 服务器部署时替换为：
+# WEBOTS_BINARY:      "/usr/bin/webots"
+# WEBOTS_WORLD:       "/opt/airacer/simnode/webots/worlds/airacer.wbt"
+# RECORDINGS_DIR:     "/data/airacer/recordings"
+
+# --- 渲染模式 ---
+# false = 显示 Webots 窗口（本地 demo 用）
+# true  = 无窗口服务器部署
+WEBOTS_HEADLESS:      false
+
+# --- 并发限制 ---
+MAX_CONCURRENT_RACES: 4
