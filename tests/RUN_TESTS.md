@@ -22,8 +22,8 @@ source .venv/bin/activate
 如果需要重新安装依赖：
 
 ```bash
-pip install -r test_requirements.txt
-pip install pytest pytest-asyncio pytest-playwright requests
+pip install -r requirements.txt
+pip install -r tests/test_requirements.txt
 ```
 
 前端单元测试会调用 Node.js：

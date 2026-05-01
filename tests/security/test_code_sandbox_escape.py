@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 import os
+import shutil
 import tempfile
 
 
@@ -41,6 +42,8 @@ def client():
 
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
+    shutil.rmtree(os.environ["SUBMISSIONS_DIR"], ignore_errors=True)
+    shutil.rmtree(os.environ["RECORDINGS_DIR"], ignore_errors=True)
 
 
 def submit_code(client, code_str):

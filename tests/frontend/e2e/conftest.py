@@ -1,4 +1,5 @@
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -11,12 +12,16 @@ import requests
 
 @pytest.fixture(scope="module")
 def server():
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+    submissions_dir = tempfile.mkdtemp()
+    recordings_dir = tempfile.mkdtemp()
+
     env = os.environ.copy()
     env["DB_PATH"] = tempfile.mktemp(suffix=".db")
-    env["SUBMISSIONS_DIR"] = tempfile.mkdtemp()
-    env["RECORDINGS_DIR"] = tempfile.mkdtemp()
+    env["SUBMISSIONS_DIR"] = submissions_dir
+    env["RECORDINGS_DIR"] = recordings_dir
     env["ADMIN_PASSWORD"] = "12345"
-    env["PYTHONPATH"] = os.getcwd()
+    env["PYTHONPATH"] = project_root
 
     process = subprocess.Popen(
         [
@@ -30,7 +35,7 @@ def server():
             "8002",
         ],
         env=env,
-        cwd=os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")),
+        cwd=project_root,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -69,3 +74,5 @@ def server():
         process.wait()
     if os.path.exists(env["DB_PATH"]):
         os.remove(env["DB_PATH"])
+    shutil.rmtree(submissions_dir, ignore_errors=True)
+    shutil.rmtree(recordings_dir, ignore_errors=True)
