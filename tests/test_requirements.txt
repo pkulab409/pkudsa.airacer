@@ -1,0 +1,15 @@
+# AI Racer test-only Python dependencies
+#
+# Install from the project root after installing runtime dependencies:
+#   pip install -r requirements.txt
+#   pip install -r tests/test_requirements.txt
+#
+# Playwright browser binaries are installed separately:
+#   python -m playwright install chromium
+#
+# Frontend unit tests also require Node.js on PATH.
+
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-playwright>=0.5.0
+requests>=2.31.0
