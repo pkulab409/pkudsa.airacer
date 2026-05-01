@@ -42,7 +42,7 @@ def server():
     )
 
     base_url = "http://127.0.0.1:8002"
-    deadline = time.time() + 10
+    deadline = time.time() + 60
     while time.time() < deadline:
         if process.poll() is not None:
             stdout, stderr = process.communicate()

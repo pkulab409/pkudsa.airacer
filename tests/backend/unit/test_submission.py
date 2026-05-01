@@ -9,6 +9,9 @@ def test_password_hashing():
     assert _verify_password(pwd, hashed) is True
     assert _verify_password("wrong_password", hashed) is False
 
+def test_invalid_password_hash_returns_false():
+    assert _verify_password("password", "not-a-bcrypt-hash") is False
+
 def test_validate_code_valid():
     valid_code = """
 def control(img_front, img_rear, speed):
