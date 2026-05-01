@@ -9,26 +9,35 @@ from enum import Enum
 
 
 class RaceState(str, Enum):
-    IDLE                 = "IDLE"
-    QUALIFYING_RUNNING   = "QUALIFYING_RUNNING"
-    QUALIFYING_FINISHED  = "QUALIFYING_FINISHED"
-    QUALIFYING_ABORTED   = "QUALIFYING_ABORTED"
-    QUALIFYING_DONE      = "QUALIFYING_DONE"
-    GROUP_RACE_RUNNING   = "GROUP_RACE_RUNNING"
-    GROUP_RACE_FINISHED  = "GROUP_RACE_FINISHED"
-    GROUP_RACE_ABORTED   = "GROUP_RACE_ABORTED"
-    GROUP_DONE           = "GROUP_DONE"
-    SEMI_RUNNING         = "SEMI_RUNNING"
-    SEMI_FINISHED        = "SEMI_FINISHED"
-    SEMI_ABORTED         = "SEMI_ABORTED"
-    SEMI_DONE            = "SEMI_DONE"
-    FINAL_RUNNING        = "FINAL_RUNNING"
-    FINAL_FINISHED       = "FINAL_FINISHED"
-    CLOSED               = "CLOSED"
+    """赛事状态机，以Zone为单位"""
+
+    # 空闲待命
+    IDLE = "IDLE"
+    # 资格赛
+    QUALIFYING_RUNNING = "QUALIFYING_RUNNING"  # 正在进行比赛（仿真运行中）
+    QUALIFYING_FINISHED = "QUALIFYING_FINISHED"  # 某场比赛结束
+    QUALIFYING_ABORTED = "QUALIFYING_ABORTED"  # 某场比赛被终止
+    QUALIFYING_DONE = "QUALIFYING_DONE"  # 当前赛程所有比赛结束
+    # 小组赛
+    GROUP_RACE_RUNNING = "GROUP_RACE_RUNNING"
+    GROUP_RACE_FINISHED = "GROUP_RACE_FINISHED"
+    GROUP_RACE_ABORTED = "GROUP_RACE_ABORTED"
+    GROUP_DONE = "GROUP_DONE"
+    # 半决赛
+    SEMI_RUNNING = "SEMI_RUNNING"
+    SEMI_FINISHED = "SEMI_FINISHED"
+    SEMI_ABORTED = "SEMI_ABORTED"
+    SEMI_DONE = "SEMI_DONE"
+    # 决赛
+    FINAL_RUNNING = "FINAL_RUNNING"
+    FINAL_FINISHED = "FINAL_FINISHED"
+    # 已关闭
+    CLOSED = "CLOSED"
 
 
 # Any state can transition to IDLE (reset-track).
 # The dict below lists non-IDLE legal targets from each source.
+# 状态转换规则（IDLE 状态可以转换到任何其他状态）
 _ALLOWED_NON_IDLE: dict[RaceState, set[RaceState]] = {
     RaceState.IDLE: {
         RaceState.QUALIFYING_RUNNING,
@@ -50,7 +59,7 @@ _ALLOWED_NON_IDLE: dict[RaceState, set[RaceState]] = {
     },
     RaceState.QUALIFYING_DONE: {
         RaceState.GROUP_RACE_RUNNING,
-        RaceState.SEMI_RUNNING,   # small zones may skip group_race
+        RaceState.SEMI_RUNNING,  # small zones may skip group_race
         RaceState.FINAL_RUNNING,  # tiny zones go straight to final
     },
     RaceState.GROUP_RACE_RUNNING: {
@@ -92,9 +101,9 @@ _ALLOWED_NON_IDLE: dict[RaceState, set[RaceState]] = {
     RaceState.CLOSED: set(),
 }
 
+"""追加IDLE规则"""
 ALLOWED: dict[RaceState, set[RaceState]] = {
-    state: targets | {RaceState.IDLE}
-    for state, targets in _ALLOWED_NON_IDLE.items()
+    state: targets | {RaceState.IDLE} for state, targets in _ALLOWED_NON_IDLE.items()
 }
 
 _RUNNING_STATES = {
@@ -108,7 +117,7 @@ _RUNNING_STATES = {
 class StateMachine:
     def __init__(self) -> None:
         self._state = RaceState.IDLE
-        self._lock  = threading.Lock()
+        self._lock = threading.Lock()  # 线程安全
 
     @property
     def state(self) -> RaceState:
@@ -153,11 +162,7 @@ def get_zone_sm(zone_id: str) -> StateMachine:
 def all_running_zones() -> list[tuple[str, StateMachine]]:
     """Return [(zone_id, sm), ...] for all zones currently in a running state."""
     with _zone_registry_lock:
-        return [
-            (zid, sm)
-            for zid, sm in _zone_machines.items()
-            if sm.is_running()
-        ]
+        return [(zid, sm) for zid, sm in _zone_machines.items() if sm.is_running()]
 
 
 def remove_zone_sm(zone_id: str) -> None:
@@ -167,4 +172,5 @@ def remove_zone_sm(zone_id: str) -> None:
 
 
 # Backward-compatible singleton (zone "default")
+# 状态机单例
 state_machine = get_zone_sm("default")

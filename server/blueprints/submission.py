@@ -119,6 +119,7 @@ class ActivateRequest(BaseModel):
 # Shared: validate and save code bytes
 # ---------------------------------------------------------------------------
 
+# todo: 与SDK代码审查部分保持一致
 def _validate_code(code_str: str) -> None:
     """Run syntax + import + signature checks. Raises HTTPException on failure."""
     with tempfile.NamedTemporaryFile(

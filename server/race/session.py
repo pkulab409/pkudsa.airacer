@@ -8,22 +8,25 @@ Responsibilities:
 - Expose global state for the currently-running session.
 """
 
+import datetime
 import json
 import os
 import pathlib
 import subprocess
 import threading
-import datetime
 from typing import Callable, Optional
-
 
 # ---------------------------------------------------------------------------
 # Global state for the currently-running Webots process
 # ---------------------------------------------------------------------------
 
-_lock               = threading.Lock()
-_current_proc:       Optional[subprocess.Popen] = None
-_current_session_id: Optional[str]              = None
+"""
+根据架构，当前仅支持单Webots模拟进程
+todo: 多线程支持
+"""
+_lock = threading.Lock()
+_current_proc: Optional[subprocess.Popen] = None
+_current_session_id: Optional[str] = None
 
 
 def get_current_proc() -> Optional[subprocess.Popen]:
@@ -36,10 +39,12 @@ def get_current_session_id() -> Optional[str]:
         return _current_session_id
 
 
-def set_current_proc(proc: Optional[subprocess.Popen], session_id: Optional[str]) -> None:
+def set_current_proc(
+    proc: Optional[subprocess.Popen], session_id: Optional[str]
+) -> None:
     global _current_proc, _current_session_id
     with _lock:
-        _current_proc       = proc
+        _current_proc = proc
         _current_session_id = session_id
 
 
@@ -58,12 +63,13 @@ def kill_current_proc() -> None:
 # Race config writer
 # ---------------------------------------------------------------------------
 
+
 def write_race_config(
-    session_id:       str,
-    session_type:     str,
-    total_laps:       int,
-    cars:             list[dict],
-    recording_path:   str,
+    session_id: str,
+    session_type: str,
+    total_laps: int,
+    cars: list[dict],
+    recording_path: str,
     race_config_path: str,
 ) -> None:
     """
@@ -79,12 +85,12 @@ def write_race_config(
     recording_path_fwd = recording_path.replace("\\", "/")
 
     config = {
-        "session_id":     session_id,
-        "session_type":   session_type,
-        "total_laps":     total_laps,
+        "session_id": session_id,
+        "session_type": session_type,
+        "total_laps": total_laps,
         "recording_path": recording_path_fwd,
-        "cars":           cars,
-        "created_at":     datetime.datetime.now().isoformat(),
+        "cars": cars,
+        "created_at": datetime.datetime.now().isoformat(),
     }
 
     # Ensure the per-session recordings directory exists
@@ -99,11 +105,12 @@ def write_race_config(
 # Webots launcher
 # ---------------------------------------------------------------------------
 
+
 def start_webots(
-    webots_binary:    str,
-    world_file:       str,
+    webots_binary: str,
+    world_file: str,
     race_config_path: str,
-    minimize:         bool = False,
+    minimize: bool = False,
 ) -> subprocess.Popen:
     """
     Launch Webots with RACE_CONFIG_PATH set in the environment.
@@ -126,12 +133,13 @@ def start_webots(
 # Process monitor
 # ---------------------------------------------------------------------------
 
+
 def monitor_webots(
-    proc:           subprocess.Popen,
-    session_id:     str,
+    proc: subprocess.Popen,
+    session_id: str,
     recordings_dir: str,
-    on_finished:    Callable[[str], None],
-    on_aborted:     Callable[[str], None],
+    on_finished: Callable[[str], None],
+    on_aborted: Callable[[str], None],
 ) -> threading.Thread:
     """
     Start a daemon thread that waits for *proc* to exit, then calls either
@@ -140,6 +148,7 @@ def monitor_webots(
 
     Returns the thread (already started).
     """
+
     def _watch() -> None:
         proc.wait()
         metadata_path = pathlib.Path(recordings_dir) / session_id / "metadata.json"
@@ -148,6 +157,8 @@ def monitor_webots(
         else:
             on_aborted(session_id)
 
-    t = threading.Thread(target=_watch, daemon=True, name=f"webots-monitor-{session_id}")
+    t = threading.Thread(
+        target=_watch, daemon=True, name=f"webots-monitor-{session_id}"
+    )
     t.start()
     return t
