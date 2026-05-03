@@ -1,0 +1,413 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/CurvedRoadSegment.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/Road.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/GenericTrafficLight.proto"
+EXTERNPROTO "../protos/CarFrost.proto"
+EXTERNPROTO "../protos/CarNova.proto"
+EXTERNPROTO "../protos/CarPhoenix.proto"
+EXTERNPROTO "../protos/CarShadow.proto"
+EXTERNPROTO "../protos/CarThunder.proto"
+EXTERNPROTO "../protos/CarViper.proto"
+
+WorldInfo {
+  title "AI Racer - Basic Oval Track (track_basic_oval)"
+}
+Viewpoint {
+  orientation -0.13503544989547778 0.9554848283017147 0.2623245511894929 0.988346599608358
+  position -122.21507268377759 -18.405964045215626 182.3083929058336
+}
+Background {
+  skyColor [
+    0.4 0.7 1
+  ]
+}
+DirectionalLight {
+  direction 1 1 -2
+  intensity 1.5
+}
+Solid {
+  translation 40 125 -0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.15 0.35 0.15
+        roughness 0.95
+        metalness 0
+      }
+      geometry Box {
+        size 200 400 0.2
+      }
+    }
+  ]
+  name "ground"
+  boundingObject Box {
+    size 200 400 0.2
+  }
+}
+Road {
+  translation -20 125 0.1
+  rotation 0 0 1 1.5708
+  name "road_south_straight"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -125 0 0
+    125 0 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 42 259 0.1
+  name "road_ne_curve"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  wayPoints [
+    -55 0 0
+    0 30 0
+    55 0 0
+  ]
+  splineSubdivision 8
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 100 125 0.1
+  rotation 0 0 1 -1.5708
+  name "road_north_straight"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -125 0 0
+    125 0 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 41 -10 0.1
+  name "road_sw_curve"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -55 0 0
+    0 -30 0
+    55 0 0
+  ]
+  splineSubdivision 8
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -9.3 -1 0.1
+  rotation 0 0 1 2.8797996938995745
+  name "curved_seg1"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 10.5
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 90 -1 0.1
+  rotation 0 0 1 -1.3089996938995747
+  name "curved_seg2"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 10.5
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -10 249 0.1
+  rotation 0 0 1 1.7016996938995748
+  name "curved_seg3"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 10.5
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 90 250 0.1
+  rotation 0 0 1 -0.3926996938995747
+  name "curved_seg4"
+  width 10
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 10.5
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Solid {
+  translation -20 125 0.1005
+  rotation 0 0 1 -1.5707996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.05 0.05
+        roughness 0.9
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 10 0.001
+      }
+    }
+  ]
+  name "start_finish_line"
+}
+GenericTrafficLight {
+  translation -13.5 130 0.1
+  rotation 0 0 1 -1.5707950010791611
+  state "green"
+}
+Solid {
+  translation -23 123.7 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_1"
+}
+Solid {
+  translation -17 123.7 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_2"
+}
+Solid {
+  translation -17 116 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_3"
+}
+Solid {
+  translation -23 116 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_4"
+}
+Solid {
+  translation -17 108 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_5"
+}
+Solid {
+  translation -23 108 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 4 2 0.001
+      }
+    }
+  ]
+  name "pre_grid_6"
+}
+Solid {
+  translation -20 125 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 10 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_1"
+}
+Solid {
+  translation 40 279 0.1005
+  rotation 0 0 1 1.7016996938995748
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 10 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_2"
+}
+Solid {
+  translation 100 125 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 10 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_3"
+}
+Solid {
+  translation 40 -30 0.1005
+  rotation 0 0 1 1.4398996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 10 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_4"
+}
+Robot {
+  children [
+    Camera {
+      translation 40 125 80
+      rotation 0 1 0 0
+      name "overhead_cam"
+      fieldOfView 1.1
+      width 640
+      height 480
+    }
+  ]
+  name "supervisor"
+  controller "supervisor"
+  supervisor TRUE
+}
+DEF car_1 CarPhoenix {
+  name "car_1"
+  translation -23 122.6 0.302
+  rotation 0 0 1 1.5707996938995747
+}
+DEF car_2 CarThunder {
+  name "car_2"
+  translation -17 122.7 0.302
+  rotation 0 0 1 1.5707996938995747
+}
+DEF car_3 CarViper {
+  name "car_3"
+  translation -17 114.7 0.302
+  rotation 0 0 1 1.5707996938995747
+}
+DEF car_4 CarNova {
+  name "car_4"
+  translation -23 115 0.302
+  rotation 0 0 1 1.5707996938995747
+}
+DEF car_5 CarFrost {
+  name "car_5"
+  translation -17 106.7 0.302
+  rotation 0 0 1 1.5707996938995747
+}
+DEF car_6 CarShadow {
+  name "car_6"
+  translation -23 107 0.302
+  rotation 0 0 1 1.5707996938995747
+}

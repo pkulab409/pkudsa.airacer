@@ -1,0 +1,535 @@
+#VRML_SIM R2023b utf8
+# license: MIT
+# licenseUrl: https://opensource.org/licenses/MIT
+# tags: static
+# Airacer Car Model - Thunder (电光蓝肌肉车) - Enhanced Version
+
+PROTO CarThunder [
+  field SFString name "car_thunder"
+  field SFVec3f translation 0 0 0.302
+  field SFRotation rotation 0 0 1 0
+  field SFString controller "car"
+  field SFString customData ""
+  field SFVec3f bodySize 4.2 1.8 0.12
+  field SFFloat mass 800.0
+  field SFColor bodyColor 0.12 0.56 1.0  # 电光蓝 #1E90FF
+]
+{
+  Robot {
+    name IS name
+    translation IS translation
+    rotation IS rotation
+    controller IS controller
+    customData IS customData
+
+    children [
+      # Main body - wide muscle car
+      Transform {
+        translation 0 0 0
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor IS bodyColor
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size IS bodySize
+            }
+          }
+        ]
+      }
+
+      # Upper body - cabin
+      Transform {
+        translation -0.3 0 0.25
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor IS bodyColor
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size 2.2 1.4 0.35
+            }
+          }
+        ]
+      }
+
+      # Wide fenders - front left
+      Transform {
+        translation 1.5 -0.95 0
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.12 0.56 1.0
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size 0.8 0.2 0.1
+            }
+          }
+        ]
+      }
+
+      # Wide fenders - front right
+      Transform {
+        translation 1.5 0.95 0
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.12 0.56 1.0
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size 0.8 0.2 0.1
+            }
+          }
+        ]
+      }
+
+      # Front hood (muscle car style)
+      Transform {
+        translation 1.2 0 0.12
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor IS bodyColor
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size 1.2 1.6 0.08
+            }
+          }
+        ]
+      }
+
+      # Windshield (front)
+      Transform {
+        translation 0.4 0 0.35
+        rotation 0 1 0 -0.4
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.6 0.75 0.85
+              roughness 0.05
+              metalness 0.1
+              transparency 0.3
+            }
+            geometry Box {
+              size 0.15 1.2 0.4
+            }
+          }
+        ]
+      }
+
+      # Rear window
+      Transform {
+        translation -1.0 0 0.35
+        rotation 0 1 0 0.5
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.6 0.75 0.85
+              roughness 0.05
+              metalness 0.1
+              transparency 0.3
+            }
+            geometry Box {
+              size 0.12 1.2 0.35
+            }
+          }
+        ]
+      }
+
+      # Side windows (left)
+      Transform {
+        translation -0.3 -0.71 0.25
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.6 0.75 0.85
+              roughness 0.05
+              metalness 0.1
+              transparency 0.3
+            }
+            geometry Box {
+              size 1.8 0.02 0.28
+            }
+          }
+        ]
+      }
+
+      # Side windows (right)
+      Transform {
+        translation -0.3 0.71 0.25
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.6 0.75 0.85
+              roughness 0.05
+              metalness 0.1
+              transparency 0.3
+            }
+            geometry Box {
+              size 1.8 0.02 0.28
+            }
+          }
+        ]
+      }
+
+      # White lightning bolt stripe on side
+      Transform {
+        translation 0 -0.92 0.02
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 1.0 1.0 1.0
+              roughness 0.2
+              metalness 0.1
+            }
+            geometry Box {
+              size 3.0 0.06 0.08
+            }
+          }
+        ]
+      }
+
+      # White lightning bolt stripe on other side
+      Transform {
+        translation 0 0.92 0.02
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 1.0 1.0 1.0
+              roughness 0.2
+              metalness 0.1
+            }
+            geometry Box {
+              size 3.0 0.06 0.08
+            }
+          }
+        ]
+      }
+
+      # Headlights (ice blue) - left
+      Transform {
+        translation 2.05 -0.55 0.01
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.8 0.9 1.0
+              emissiveColor 0.7 0.85 1.0
+              roughness 0.1
+              metalness 0.0
+            }
+            geometry Box {
+              size 0.12 0.2 0.03
+            }
+          }
+        ]
+      }
+
+      # Headlights (ice blue) - right
+      Transform {
+        translation 2.05 0.55 0.01
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.8 0.9 1.0
+              emissiveColor 0.7 0.85 1.0
+              roughness 0.1
+              metalness 0.0
+            }
+            geometry Box {
+              size 0.12 0.2 0.03
+            }
+          }
+        ]
+      }
+
+      # Taillights (red) - left
+      Transform {
+        translation -2.1 -0.6 0.01
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 1.0 0.1 0.1
+              emissiveColor 0.8 0.0 0.0
+              roughness 0.1
+              metalness 0.0
+            }
+            geometry Box {
+              size 0.08 0.12 0.03
+            }
+          }
+        ]
+      }
+
+      # Taillights (red) - right
+      Transform {
+        translation -2.1 0.6 0.01
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 1.0 0.1 0.1
+              emissiveColor 0.8 0.0 0.0
+              roughness 0.1
+              metalness 0.0
+            }
+            geometry Box {
+              size 0.08 0.12 0.03
+            }
+          }
+        ]
+      }
+
+      # Side mirrors - left
+      Transform {
+        translation 0.8 -0.95 0.2
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.2 0.2 0.2
+              roughness 0.3
+              metalness 0.6
+            }
+            geometry Box {
+              size 0.12 0.08 0.08
+            }
+          }
+        ]
+      }
+
+      # Side mirrors - right
+      Transform {
+        translation 0.8 0.95 0.2
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.2 0.2 0.2
+              roughness 0.3
+              metalness 0.6
+            }
+            geometry Box {
+              size 0.12 0.08 0.08
+            }
+          }
+        ]
+      }
+
+      # Hood scoop
+      Transform {
+        translation 1.2 0 0.08
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.45 0.9
+              roughness 0.4
+              metalness 0.3
+            }
+            geometry Box {
+              size 0.6 0.4 0.04
+            }
+          }
+        ]
+      }
+
+      # Rear diffuser
+      Transform {
+        translation -2.0 0 -0.04
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.08 0.4 0.8
+              roughness 0.5
+              metalness 0.2
+            }
+            geometry Box {
+              size 0.3 1.0 0.04
+            }
+          }
+        ]
+      }
+
+      # Door lines - left
+      Transform {
+        translation -0.3 -0.9 0.12
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+              roughness 0.5
+              metalness 0.3
+            }
+            geometry Box {
+              size 2.0 0.01 0.02
+            }
+          }
+        ]
+      }
+
+      # Door lines - right
+      Transform {
+        translation -0.3 0.9 0.12
+        children [
+          Shape {
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+              roughness 0.5
+              metalness 0.3
+            }
+            geometry Box {
+              size 2.0 0.01 0.02
+            }
+          }
+        ]
+      }
+
+      # Wheels - larger appearance
+      HingeJoint {
+        jointParameters HingeJointParameters {
+          axis 0 1 0
+          anchor -1.4 -0.9 0
+        }
+        device [
+          RotationalMotor {
+            name "left_motor"
+            maxVelocity 40
+          }
+        ]
+        endPoint Solid {
+          name "rl_wheel"
+          translation -1.4 -0.9 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance { 
+                baseColor 0.15 0.15 0.15 
+                roughness 0.6
+              }
+              geometry Cylinder { radius 0.3 height 0.25 }
+            }
+          ]
+          boundingObject Cylinder { radius 0.3 height 0.25 }
+          physics Physics {}
+        }
+      }
+
+      HingeJoint {
+        jointParameters HingeJointParameters {
+          axis 0 1 0
+          anchor -1.4 0.9 0
+        }
+        device [
+          RotationalMotor {
+            name "right_motor"
+            maxVelocity 40
+          }
+        ]
+        endPoint Solid {
+          name "rr_wheel"
+          translation -1.4 0.9 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance { 
+                baseColor 0.15 0.15 0.15 
+                roughness 0.6
+              }
+              geometry Cylinder { radius 0.3 height 0.25 }
+            }
+          ]
+          boundingObject Cylinder { radius 0.3 height 0.25 }
+          physics Physics {}
+        }
+      }
+
+      HingeJoint {
+        jointParameters HingeJointParameters {
+          axis 0 1 0
+          anchor 1.4 -0.9 0
+        }
+        endPoint Solid {
+          name "fl_wheel"
+          translation 1.4 -0.9 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance { 
+                baseColor 0.15 0.15 0.15 
+                roughness 0.6
+              }
+              geometry Cylinder { radius 0.3 height 0.25 }
+            }
+          ]
+          boundingObject Cylinder { radius 0.3 height 0.25 }
+          physics Physics {}
+        }
+      }
+
+      HingeJoint {
+        jointParameters HingeJointParameters {
+          axis 0 1 0
+          anchor 1.4 0.9 0
+        }
+        endPoint Solid {
+          name "fr_wheel"
+          translation 1.4 0.9 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance { 
+                baseColor 0.15 0.15 0.15 
+                roughness 0.6
+              }
+              geometry Cylinder { radius 0.3 height 0.25 }
+            }
+          ]
+          boundingObject Cylinder { radius 0.3 height 0.25 }
+          physics Physics {}
+        }
+      }
+
+      # Camera - left side
+      Camera {
+        name "left_camera"
+        translation 2.1 -0.3 0.08
+        rotation 0 0 1 -0.1
+        width 640
+        height 480
+        fieldOfView 1.047
+      }
+
+      # Camera - right side
+      Camera {
+        name "right_camera"
+        translation 2.1 0.3 0.08
+        rotation 0 0 1 0.1
+        width 640
+        height 480
+        fieldOfView 1.047
+      }
+
+      # InertialUnit
+      InertialUnit {
+        name "imu"
+        translation 0 0 0
+      }
+    ]
+
+    boundingObject Box {
+      size IS bodySize
+    }
+
+    physics Physics {
+      density -1
+      mass IS mass
+      centerOfMass [ 0 0 -0.02 ]
+    }
+  }
+}
