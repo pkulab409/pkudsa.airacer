@@ -1,21 +1,42 @@
-# team_controller.py — 官方默认模板（直行算法，用于无提交队伍）
+"""Official team controller template.
+
+This file is intended as the minimal, ready-to-run template shipped with the
+course. It shows the required function signature and documents image formats,
+value ranges and performance constraints.
+
+Notes for students:
+- Your module must expose a callable `control(left_img, right_img, timestamp)`.
+- `left_img` / `right_img` are NumPy arrays with shape (480, 640, 3), dtype=uint8,
+  in BGR channel order (row-major). Do not rely on extra channels.
+- `timestamp` is a read-only float (seconds).
+- The function must return `(steering, speed)` where steering ∈ [-1.0, 1.0]
+  (negative = left, positive = right) and speed ∈ [0.0, 1.0].
+- Each call is expected to complete fast (the Webots-side sandbox uses a
+  20 ms read timeout; excessive CPU or blocking calls will cause penalties).
+
+Allowed libraries in the sandbox: numpy, cv2 (optional), math, collections,
+heapq, functools, itertools. Network / filesystem / threading and other
+dangerous modules are blocked by the sandbox import hook.
+
+Use `sdk/validate_controller.py` to run a local pre-submission check that mirrors
+the server-side validation.
+"""
+
 import numpy as np
 
-def control(left_img: np.ndarray,
-            right_img: np.ndarray,
-            timestamp: float) -> tuple[float, float]:
-    """
-    参数：
-        left_img:  左目图像，shape=(480, 640, 3)，dtype=uint8，BGR 通道顺序
-        right_img: 右目图像，shape=(480, 640, 3)，dtype=uint8，BGR 通道顺序
-        timestamp: 仿真时间（秒），只读
 
-    返回值：
-        steering: float，范围 [-1.0, 1.0]，负值左转，正值右转
-        speed:    float，范围 [0.0, 1.0]，0.0 停止，1.0 最大速度
+def control(left_img: np.ndarray, right_img: np.ndarray, timestamp: float) -> tuple[float, float]:
+    """Minimal straight-driving controller.
 
-    每次调用时限：20ms
+    This template returns a small constant forward speed and zero steering so
+    that an empty submission behaves reasonably in the simulator.
+
+    Implement more advanced logic in `sdk/example_controller.py` or your own
+    file and validate it with `python sdk/validate_controller.py --code-path <path>`.
     """
+
+    # left_img and right_img are available as (480, 640, 3) uint8 BGR arrays.
+    # Keep logic lightweight — avoid heavy allocations every frame.
     steering = 0.0
     speed = 0.5
     return steering, speed

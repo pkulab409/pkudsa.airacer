@@ -31,3 +31,4 @@ Thumbs.db
 
 # Tests
 server/tests
+.pytest_cache/

@@ -1,0 +1,97 @@
+# AI Racer 本地校验规则（SDK 作用域）
+# ---------------------------------------------------------------------------
+# 仅 sdk/validate_controller.py 读取；不影响 Backend / Sim Node。
+# 若要从源码层面对齐线上沙箱行为，请同步检查：
+#   - simnode/car_sandbox.py           （运行时受限 importer）
+#   - simnode/webots/controllers/car/sandbox_runner.py  （meta_path 黑名单）
+#   - server/blueprints/submission.py  （上传时校验）
+# ---------------------------------------------------------------------------
+
+file:
+  max_size_kb: 100
+  encoding: utf-8
+
+imports:
+  # 白名单——允许 import 的顶层模块（与沙箱 _ALLOWED_MODULES 对齐）
+  allow:
+    - numpy
+    - cv2
+    - math
+    - collections
+    - heapq
+    - functools
+    - itertools
+    - typing          # 纯注解，允许
+    - __future__      # 语法 future 声明，编译期处理，不是真正的 import
+
+  # 黑名单——显式拒绝（优先级高于 allow）
+  # 与 simnode/car_sandbox.py::_BLOCKED_PREFIXES 对齐 + Windows 特定项
+  deny:
+    - os
+    - sys
+    - socket
+    - subprocess
+    - multiprocessing
+    - threading
+    - time
+    - datetime
+    - io
+    - builtins
+    - ctypes
+    - pathlib
+    - shutil
+    - tempfile
+    - requests
+    - urllib
+    - http
+    - ftplib
+    - smtplib
+    - signal
+    - gc
+    - inspect
+    - importlib
+    - glob
+    - fnmatch
+    - winreg
+    - nt
+
+  # 非黑名单且不在白名单——warn 提示"线上可能加载失败"
+  warn_on_unknown: true
+
+builtins:
+  # 禁止调用的内置函数/名字（AST Call 匹配）
+  deny_calls:
+    - eval
+    - exec
+    - compile
+    - open
+    - globals
+    - locals
+    - input
+    - breakpoint
+    - __import__
+    - vars
+  # 可疑属性访问（用于侦测逃逸技巧，级别 warn）
+  suspicious_attrs:
+    - __globals__
+    - __builtins__
+    - __subclasses__
+    - __code__
+    - __closure__
+    - __mro__
+    - func_globals
+    - __loader__
+    - __spec__
+
+interface:
+  entry: control          # 模块必须提供的可调用名
+  arity: 3                # 形参数量（left_img, right_img, timestamp）
+  return_ranges:
+    steering: [-1.0, 1.0]
+    speed:    [0.0,  1.0]
+
+runtime:
+  soft_timeout_ms: 20     # 单帧软上限（与线上 sandbox read_line_timeout 一致）
+  mock_calls: 10          # mock 调用次数（取平均耗时）
+  image_shape: [480, 640, 3]
+  image_dtype: uint8
