@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Racer Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    /* ── Layout ── */
+    html, body { height: 100%; margin: 0; }
+    /* override style.css body flex-direction:column for admin layout */
+    body { flex-direction: row !important; background: #f0f2f5; overflow: hidden; }
+    #app { display: flex; height: 100vh; width: 100%; }
+
+    /* ── Login Overlay ── */
+    #login-overlay {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #991b1b 50%, #dc2626 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    #login-overlay.hidden { display: none !important; }
+    .login-card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 2.5rem 2rem;
+      width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    .login-card .brand-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #dc2626, #d97706);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+      margin-bottom: .2rem;
+    }
+    .login-card .brand-sub { text-align: center; color: #6b7280; font-size: .875rem; margin-bottom: 1.75rem; }
+    #login-error { font-size: .8rem; margin-top: .5rem; display: none; }
+
+    /* ── Sidebar ── */
+    .admin-sidebar {
+      position: relative;
+      width: 240px;
+      min-height: 100vh;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    /* push footer to bottom */
+    .sidebar-inner { display: flex; flex-direction: column; min-height: 100%; }
+    .sidebar-spacer { flex: 1; }
+    .admin-sidebar .sidebar-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid rgba(255,255,255,.07);
+    }
+    .admin-sidebar .user-label { font-size: .75rem; color: #64748b; margin-bottom: .4rem; }
+
+    /* ── Main content ── */
+    #main-content { flex: 1; overflow-y: auto; background: #f0f2f5; }
+    .content-inner { padding: 2rem; }
+
+    /* ── Section title ── */
+    .section-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: .6rem;
+    }
+
+    /* ── Overview grid ── */
+    .zone-overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+    .zone-card {
+      background: #fff;
+      border-radius: .875rem;
+      padding: 1.25rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      transition: box-shadow .2s;
+    }
+    .zone-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+    .zone-card-name { font-family: 'Rajdhani', sans-serif; font-size: 1.15rem; font-weight: 700; color: #1e293b; }
+
+    /* ── Control panel cards ── */
+    .ctrl-card {
+      background: #fff;
+      border-radius: .875rem;
+      padding: 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      margin-bottom: 1.25rem;
+    }
+    .ctrl-card h5 {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700; font-size: 1.05rem; color: #334155; margin-bottom: 1rem;
+    }
+    .action-btn-group { display: flex; flex-wrap: wrap; gap: .75rem; }
+    .action-btn-group .btn { min-width: 140px; font-weight: 600; }
+
+    /* ── Bracket flow ── */
+    .bracket-flow { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+
+    /* ── Live status card ── */
+    .live-card {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: .875rem;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .live-card .lbl {
+      font-size: .7rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: #64748b; margin-bottom: .15rem;
+    }
+    .live-card .val { font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; font-weight: 700; }
+    .pulse-ring {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: #10b981;
+      animation: pulse-dot 1.5s infinite; margin-right: 6px;
+    }
+
+    /* ── Standings ── */
+    .standings-table th {
+      background: linear-gradient(135deg, #991b1b, #dc2626);
+      color: #fff; font-size: .82rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+
+    /* ── Toast ── */
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1090; }
+
+    /* ── Danger zone ── */
+    .danger-zone {
+      border: 2px solid #dc2626; border-radius: .875rem;
+      padding: 1.25rem; background: #fff5f5;
+    }
+    .danger-zone-title {
+      font-family: 'Rajdhani', sans-serif; font-size: 1rem;
+      font-weight: 700; color: #991b1b; margin-bottom: .75rem;
+    }
+
+    /* ── Vehicles table inside dark card ── */
+    .live-card table { color: #e2e8f0; }
+    .live-card th { background: transparent !important; color: #94a3b8 !important; border-bottom: 1px solid #334155 !important; }
+    .live-card td { border-color: #1e293b !important; }
+
+    @media (max-width: 768px) {
+      .admin-sidebar { width: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ================================================================
+     LOGIN OVERLAY
+================================================================ -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="brand-title">AI RACER</div>
+    <div class="brand-sub">Admin Dashboard</div>
+    <div class="mb-3">
+      <label class="form-label" for="pwd-input">管理员密码</label>
+      <input type="password" id="pwd-input" class="form-control" placeholder="输入密码"
+             onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn btn-primary w-100" onclick="doLogin()">登录</button>
+    <div id="login-error" class="text-danger text-center">密码错误，请重试</div>
+  </div>
+</div>
+
+<!-- ================================================================
+     MAIN APP (hidden until auth)
+================================================================ -->
+<div id="app" style="display:none;">
+
+  <!-- ── Left Sidebar ── -->
+  <nav class="admin-sidebar">
+    <div class="sidebar-inner">
+
+      <!-- Brand -->
+      <div class="brand px-3 pt-3 pb-3">AI Racer Admin</div>
+
+      <!-- Nav -->
+      <div class="section-label" style="margin-top:.5rem;">导航</div>
+      <ul class="list-unstyled mb-0" id="main-nav">
+        <li class="nav-item">
+          <a class="nav-link active" href="#" onclick="nav('overview',this);return false;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+              <path d="M0 1.5A1.5 1.5 0 0 1 1.5 0h13A1.5 1.5 0 0 1 16 1.5v3A1.5 1.5 0 0 1 14.5 6h-13A1.5 1.5 0 0 1 0 4.5zm0 7A1.5 1.5 0 0 1 1.5 7h13A1.5 1.5 0 0 1 16 8.5v3A1.5 1.5 0 0 1 14.5 13h-13A1.5 1.5 0 0 1 0 11.5z"/>
+            </svg>总览
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="nav('control',this);return false;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+              <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/>
+            </svg>比赛控制
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="nav('standings',this);return false;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+              <path d="M2.5 0a.5.5 0 0 1 .5.5v13.5l-.5.5-.5-.5V.5a.5.5 0 0 1 .5-.5zm3 2a.5.5 0 0 1 .5.5v11.5l-.5.5-.5-.5V2.5a.5.5 0 0 1 .5-.5zm3-2a.5.5 0 0 1 .5.5v13.5l-.5.5-.5-.5V.5a.5.5 0 0 1 .5-.5zm3 2a.5.5 0 0 1 .5.5v11.5l-.5.5-.5-.5V2.5a.5.5 0 0 1 .5-.5z"/>
+            </svg>积分榜
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="nav('teams',this);return false;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+              <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/>
+            </svg>队伍管理
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#" onclick="nav('recordings',this);return false;">
+            <svg width="14" height="14" fill="currentColor" class="me-1" viewBox="0 0 16 16">
+              <path d="M0 12V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm6.79-6.907A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814l-3.5-2.5z"/>
+            </svg>录像
+          </a>
+        </li>
+      </ul>
+
+      <!-- Zone list -->
+      <div class="section-label" style="margin-top:1.25rem;">赛区列表</div>
+      <div id="zone-list" class="px-1 mb-1">
+        <div class="px-3 py-2" style="font-size:.8rem;color:#64748b;">加载中...</div>
+      </div>
+
+      <div class="sidebar-spacer"></div>
+
+      <!-- Footer -->
+      <div class="sidebar-footer">
+        <div class="user-label">当前用户</div>
+        <div style="font-size:.85rem;color:#e2e8f0;font-weight:600;margin-bottom:.6rem;">admin</div>
+        <button class="btn btn-sm w-100"
+                style="background:rgba(255,255,255,.08);color:#94a3b8;border:1px solid rgba(255,255,255,.1);"
+                onclick="doLogout()">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main Content ── -->
+  <div id="main-content">
+    <div class="content-inner">
+
+      <!-- =====================================================
+           SECTION: 总览
+      ===================================================== -->
+      <div id="sec-overview" class="sec-panel">
+        <div class="section-title">赛区总览</div>
+        <div id="overview-grid" class="zone-overview-grid">
+          <div class="text-secondary">加载中...</div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           SECTION: 比赛控制
+      ===================================================== -->
+      <div id="sec-control" class="sec-panel" style="display:none;">
+        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+          <div class="section-title mb-0" id="ctrl-title">选择赛区</div>
+          <span id="ctrl-badge" class="badge fs-6 px-3 py-2 badge-state-idle">idle</span>
+        </div>
+
+        <!-- Bracket -->
+        <div class="ctrl-card">
+          <h5>赛制阶段</h5>
+          <div class="bracket-flow">
+            <span class="bracket-stage" id="bs-qualifying">资格赛</span>
+            <span class="bracket-arrow">›</span>
+            <span class="bracket-stage" id="bs-group_race">小组赛</span>
+            <span class="bracket-arrow">›</span>
+            <span class="bracket-stage" id="bs-semi">半决赛</span>
+            <span class="bracket-arrow">›</span>
+            <span class="bracket-stage" id="bs-final">决赛</span>
+          </div>
+        </div>
+
+        <!-- Session config -->
+        <div class="ctrl-card">
+          <h5>场次配置</h5>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">场次类型</label>
+              <select id="f-type" class="form-select">
+                <option value="qualifying">qualifying — 资格赛</option>
+                <option value="group_race">group_race — 小组赛</option>
+                <option value="semi">semi — 半决赛</option>
+                <option value="final">final — 决赛</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">场次 ID</label>
+              <input type="text" id="f-sid" class="form-control" placeholder="如 q1、gA…">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">圈数</label>
+              <input type="number" id="f-laps" class="form-control" placeholder="留空=默认" min="1">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">
+                参赛队伍
+                <small class="text-muted fw-normal">每行一个 team_id，留空=全部</small>
+              </label>
+              <textarea id="f-teams" class="form-control" rows="3" placeholder="team_001&#10;team_002"></textarea>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary" onclick="doSetSession()">配置场次</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="ctrl-card">
+          <h5>操作</h5>
+          <div class="action-btn-group">
+            <button class="btn btn-success" onclick="doZoneAction('start-race')">&#9654; 开始比赛</button>
+            <button class="btn btn-danger"  onclick="doZoneAction('stop-race')">&#9632; 停止比赛</button>
+            <button class="btn btn-secondary" style="background:#6b7280;border:none;" onclick="doZoneAction('reset')">&#8617; 重置赛区</button>
+            <button class="btn btn-warning"  onclick="doZoneAction('finalize')">&#8594; 推进阶段</button>
+          </div>
+        </div>
+
+        <!-- Live status -->
+        <div class="live-card">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="pulse-ring" id="live-pulse" style="display:none;"></span>
+            <span style="font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;">实时状态</span>
+            <span id="live-state-badge" class="badge badge-state-idle ms-auto">idle</span>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="lbl">Session ID</div>
+              <div class="val" id="live-session-id">--</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="lbl">仿真时间</div>
+              <div class="val" id="live-sim-time">--</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="lbl">当前阶段</div>
+              <div class="val" id="live-stage">--</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="lbl">车辆数</div>
+              <div class="val" id="live-vehicle-count">--</div>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-5">
+              <div class="lbl mb-1">俯视摄像头</div>
+              <img id="live-overhead-img" src="" alt="overhead">
+            </div>
+            <div class="col-md-7">
+              <div class="lbl mb-1">车辆状态</div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead>
+                    <tr>
+                      <th>队伍</th><th>圈</th><th>速度</th><th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="live-vehicles-tbody">
+                    <tr><td colspan="4" class="text-center py-2" style="color:#64748b;">无数据</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           SECTION: 积分榜
+      ===================================================== -->
+      <div id="sec-standings" class="sec-panel" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="section-title mb-0">积分榜</div>
+          <button class="btn btn-sm btn-outline-danger" onclick="loadStandings()">刷新</button>
+        </div>
+        <div class="card">
+          <div class="card-header gradient-red">
+            <span id="standings-label">-- 赛区</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table standings-table mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-3">名次</th>
+                    <th>队伍 ID</th>
+                    <th>总分</th>
+                    <th>最佳圈速</th>
+                    <th>完赛场次</th>
+                  </tr>
+                </thead>
+                <tbody id="standings-tbody">
+                  <tr><td colspan="5" class="text-center py-4 text-muted">请先选择赛区</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           SECTION: 队伍管理
+      ===================================================== -->
+      <div id="sec-teams" class="sec-panel" style="display:none;">
+        <div class="section-title">队伍管理</div>
+
+        <!-- Teams list -->
+        <div class="card mb-4">
+          <div class="card-header gradient-dark d-flex align-items-center justify-content-between">
+            <span id="teams-label">-- 赛区</span>
+            <button class="btn btn-sm btn-light" onclick="loadTeams()">刷新</button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-3">队伍 ID</th>
+                    <th>姓名</th>
+                    <th>注册时间</th>
+                    <th>激活槽位</th>
+                    <th>版本</th>
+                  </tr>
+                </thead>
+                <tbody id="teams-tbody">
+                  <tr><td colspan="5" class="text-center py-4 text-muted">请先选择赛区</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create zone -->
+        <div class="ctrl-card mb-4">
+          <h5>创建赛区</h5>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">赛区 ID</label>
+              <input type="text" id="nz-id" class="form-control" placeholder="如 zone_a">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">名称</label>
+              <input type="text" id="nz-name" class="form-control" placeholder="赛区名称">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">描述</label>
+              <input type="text" id="nz-desc" class="form-control" placeholder="简短描述">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">圈数</label>
+              <input type="number" id="nz-laps" class="form-control" placeholder="5" min="1">
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary" onclick="doCreateZone()">创建赛区</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delete zone -->
+        <div class="ctrl-card mb-4">
+          <h5>删除赛区</h5>
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">赛区 ID</label>
+              <input type="text" id="dz-id" class="form-control" placeholder="输入要删除的赛区 ID">
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-danger" onclick="doDeleteZone()">删除赛区</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="danger-zone">
+          <div class="danger-zone-title">危险区域</div>
+          <p class="text-danger mb-3" style="font-size:.875rem;">
+            以下操作不可逆，请谨慎确认后执行。
+          </p>
+          <button class="btn btn-danger btn-lg px-4" onclick="doLockSubmissions()">
+            锁定所有队伍提交
+          </button>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           SECTION: 录像
+      ===================================================== -->
+      <div id="sec-recordings" class="sec-panel" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="section-title mb-0">录像</div>
+          <button class="btn btn-sm btn-outline-danger" onclick="loadRecordings()">刷新</button>
+        </div>
+        <div class="card">
+          <div class="card-header gradient-dark">
+            <span id="rec-label">-- 赛区录像</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table mb-0">
+                <thead style="background:#1e293b;">
+                  <tr>
+                    <th class="ps-3" style="background:#1e293b;color:#e2e8f0;">Session ID</th>
+                    <th style="background:#1e293b;color:#e2e8f0;">类型</th>
+                    <th style="background:#1e293b;color:#e2e8f0;">时间</th>
+                    <th style="background:#1e293b;color:#e2e8f0;">完成原因</th>
+                    <th style="background:#1e293b;color:#e2e8f0;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="rec-tbody">
+                  <tr><td colspan="5" class="text-center py-4 text-muted">请先选择赛区</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-inner -->
+  </div><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- Toast container -->
+<div class="toast-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ================================================================
+   STATE
+================================================================ */
+var adminPwd    = '';
+var currentZone = null;
+var _zones      = [];
+var _lastMsg    = {};
+var _ws         = null;
+var _standingsTmr  = null;
+var _overheadTmr   = null;
+
+/* ================================================================
+   AUTH HELPER
+================================================================ */
+function authHdr() {
+  return { 'Authorization': 'Basic ' + btoa('admin:' + adminPwd) };
+}
+
+async function api(method, url, body) {
+  var opts = { method: method, headers: Object.assign({}, authHdr()) };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(url, opts);
+}
+
+/* ================================================================
+   LOGIN / LOGOUT
+================================================================ */
+async function doLogin() {
+  var pwd = document.getElementById('pwd-input').value.trim();
+  if (!pwd) return;
+  var err = document.getElementById('login-error');
+  err.style.display = 'none';
+
+  var res;
+  try {
+    res = await fetch('/api/admin/zones', {
+      headers: { 'Authorization': 'Basic ' + btoa('admin:' + pwd) }
+    });
+  } catch(e) {
+    err.textContent = '无法连接服务器';
+    err.style.display = 'block';
+    return;
+  }
+
+  if (res.status === 401) {
+    err.textContent = '密码错误，请重试';
+    err.style.display = 'block';
+    return;
+  }
+
+  adminPwd = pwd;
+  localStorage.setItem('adminPwd', pwd);
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('app').style.display = 'flex';
+  bootApp();
+}
+
+function doLogout() {
+  adminPwd = '';
+  localStorage.removeItem('adminPwd');
+  location.reload();
+}
+
+/* ================================================================
+   BOOT
+================================================================ */
+async function bootApp() {
+  await loadZones();
+  nav('overview', document.querySelector('#main-nav .nav-link.active'));
+  connectWS();
+}
+
+/* ================================================================
+   WEBSOCKET
+================================================================ */
+function connectWS() {
+  if (_ws) { try { _ws.close(); } catch(e) {} }
+  try { _ws = new WebSocket('ws://' + location.host + '/ws/admin'); }
+  catch(e) { console.warn('WS unavailable'); return; }
+
+  _ws.onmessage = function(ev) {
+    var msg; try { msg = JSON.parse(ev.data); } catch(e) { return; }
+    if (msg.type !== 'sim_status') return;
+    var zid = msg.zone_id;
+    _lastMsg[zid] = msg;
+    updateSidebarDot(zid, msg.state);
+    if (zid === currentZone) applyLiveStatus(msg);
+  };
+  _ws.onclose = function() { setTimeout(connectWS, 3000); };
+}
+
+/* ================================================================
+   ZONES — load + render
+================================================================ */
+async function loadZones() {
+  try {
+    var r = await api('GET', '/api/admin/zones');
+    _zones = r.ok ? await r.json() : [];
+  } catch(e) { _zones = []; }
+  renderSidebar();
+  renderOverview();
+}
+
+function renderSidebar() {
+  var c = document.getElementById('zone-list');
+  if (!_zones.length) {
+    c.innerHTML = '<div class="px-3 py-2" style="font-size:.8rem;color:#64748b;">暂无赛区</div>';
+    return;
+  }
+  c.innerHTML = _zones.map(function(z) {
+    var dc = dotCls(z.state);
+    var ac = z.zone_id === currentZone ? 'active' : '';
+    return '<div class="zone-item"><button class="zone-btn ' + ac + '" '
+      + 'id="zb-' + z.zone_id + '" onclick="selZone(\'' + z.zone_id + '\')">'
+      + '<span>' + (z.name || z.zone_id) + '</span>'
+      + '<span class="status-dot ' + dc + '"></span>'
+      + '</button></div>';
+  }).join('');
+}
+
+function renderOverview() {
+  var g = document.getElementById('overview-grid');
+  if (!_zones.length) { g.innerHTML = '<div class="text-muted">暂无赛区数据</div>'; return; }
+  g.innerHTML = _zones.map(function(z) {
+    var bc = 'badge-state-' + (z.state || 'idle');
+    return '<div class="zone-card">'
+      + '<div class="zone-card-name mb-2">' + esc(z.name || z.zone_id) + '</div>'
+      + '<div class="d-flex gap-2 mb-2">'
+      + '<span class="badge ' + bc + ' px-2">' + (z.state || 'idle') + '</span>'
+      + '<span class="badge bg-secondary px-2">' + (z.current_stage || '--') + '</span>'
+      + '</div>'
+      + '<div class="text-muted mb-3" style="font-size:.82rem;">队伍数：' + (z.team_count != null ? z.team_count : '--') + '</div>'
+      + '<button class="btn btn-sm btn-primary w-100" onclick="selZone(\'' + z.zone_id + '\');nav(\'control\',null)">'
+      + '进入管理</button></div>';
+  }).join('');
+}
+
+function updateSidebarDot(zid, state) {
+  var b = document.getElementById('zb-' + zid);
+  if (!b) return;
+  var d = b.querySelector('.status-dot');
+  if (d) d.className = 'status-dot ' + dotCls(state);
+}
+
+function dotCls(s) {
+  if (s === 'running')   return 'status-dot-running';
+  if (s === 'aborted')   return 'status-dot-aborted';
+  if (s === 'completed') return 'status-dot-done';
+  return 'status-dot-idle';
+}
+
+/* ================================================================
+   ZONE SELECTION
+================================================================ */
+function selZone(zid) {
+  currentZone = zid;
+  document.querySelectorAll('.zone-btn').forEach(function(b) { b.classList.remove('active'); });
+  var b = document.getElementById('zb-' + zid);
+  if (b) b.classList.add('active');
+
+  var z = _zones.find(function(x) { return x.zone_id === zid; });
+  var lbl = z ? (z.name || zid) : zid;
+
+  setText('ctrl-title', lbl);
+  setText('standings-label', lbl + ' 赛区');
+  setText('teams-label', lbl + ' 赛区');
+  setText('rec-label', lbl + ' 赛区录像');
+
+  var dz = document.getElementById('dz-id');
+  if (dz) dz.value = zid;
+
+  if (_lastMsg[zid]) { applyLiveStatus(_lastMsg[zid]); }
+  else if (z) { setCtrlBadge(z.state); highlightStage(z.current_stage); }
+}
+
+/* ================================================================
+   SECTION SWITCHING
+================================================================ */
+function nav(name, linkEl) {
+  document.querySelectorAll('.sec-panel').forEach(function(el) { el.style.display = 'none'; });
+  document.querySelectorAll('#main-nav .nav-link').forEach(function(a) { a.classList.remove('active'); });
+
+  var sec = document.getElementById('sec-' + name);
+  if (sec) sec.style.display = 'block';
+
+  if (linkEl) {
+    linkEl.classList.add('active');
+  } else {
+    // find by text fragment
+    document.querySelectorAll('#main-nav .nav-link').forEach(function(a) {
+      if ((a.getAttribute('onclick') || '').indexOf("'" + name + "'") !== -1) a.classList.add('active');
+    });
+  }
+
+  // timers
+  clearInterval(_standingsTmr);
+  stopOverhead();
+
+  if (name === 'overview')   loadZones();
+  if (name === 'control')    startOverhead();
+  if (name === 'standings')  { loadStandings(); _standingsTmr = setInterval(loadStandings, 30000); }
+  if (name === 'teams')      loadTeams();
+  if (name === 'recordings') loadRecordings();
+}
+
+/* ================================================================
+   RACE CONTROL
+================================================================ */
+async function doSetSession() {
+  if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
+  var type = document.getElementById('f-type').value;
+  var sid  = document.getElementById('f-sid').value.trim();
+  var laps = document.getElementById('f-laps').value;
+  var raw  = document.getElementById('f-teams').value.trim();
+  var teams = raw ? raw.split('\n').map(function(t){ return t.trim(); }).filter(Boolean) : [];
+
+  var body = { session_type: type };
+  if (sid)        body.session_id = sid;
+  if (laps)       body.laps = parseInt(laps);
+  if (teams.length) body.teams = teams;
+
+  try {
+    var r = await api('POST', '/api/admin/zones/' + currentZone + '/set-session', body);
+    var d = await r.json();
+    toast(r.ok ? (d.message || '场次已配置') : (d.detail || d.message || '配置失败'), r.ok ? 'success' : 'danger');
+  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+async function doZoneAction(action) {
+  if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
+  try {
+    var r = await api('POST', '/api/admin/zones/' + currentZone + '/' + action);
+    var d = await r.json();
+    toast(r.ok ? (d.message || '操作成功') : (d.detail || d.message || '操作失败'), r.ok ? 'success' : 'danger');
+  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+/* ── Live status update ── */
+function applyLiveStatus(msg) {
+  setCtrlBadge(msg.state);
+  highlightStage(msg.session_type || msg.current_stage);
+
+  var pulse = document.getElementById('live-pulse');
+  if (pulse) pulse.style.display = msg.state === 'running' ? 'inline-block' : 'none';
+
+  var sb = document.getElementById('live-state-badge');
+  if (sb) { sb.className = 'badge badge-state-' + (msg.state || 'idle') + ' ms-auto'; sb.textContent = msg.state || '--'; }
+
+  setText('live-session-id', msg.session_id || '--');
+  setText('live-sim-time',   msg.sim_time != null ? msg.sim_time.toFixed(1) + 's' : '--');
+  setText('live-stage',      msg.session_type || msg.current_stage || '--');
+  setText('live-vehicle-count', msg.vehicles ? Object.keys(msg.vehicles).length : '--');
+
+  renderVehicles(msg.vehicles);
+}
+
+function setCtrlBadge(state) {
+  var b = document.getElementById('ctrl-badge');
+  if (!b) return;
+  b.className = 'badge fs-6 px-3 py-2 badge-state-' + (state || 'idle');
+  b.textContent = state || '--';
+}
+
+function highlightStage(stage) {
+  var order = ['qualifying','group_race','semi','final'];
+  var idx = order.indexOf(stage);
+  order.forEach(function(s, i) {
+    var el = document.getElementById('bs-' + s);
+    if (!el) return;
+    el.classList.remove('active','done');
+    if (i < idx) el.classList.add('done');
+    else if (i === idx) el.classList.add('active');
+  });
+}
+
+function renderVehicles(vehicles) {
+  var tbody = document.getElementById('live-vehicles-tbody');
+  if (!tbody) return;
+  if (!vehicles || !Object.keys(vehicles).length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-2" style="color:#64748b;">无数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = Object.entries(vehicles).map(function(e) {
+    var tid = e[0], v = e[1];
+    return '<tr>'
+      + '<td>' + esc(tid) + '</td>'
+      + '<td>' + (v.lap != null ? v.lap : '--') + '</td>'
+      + '<td>' + (v.speed != null ? v.speed.toFixed(1) : '--') + '</td>'
+      + '<td><span class="badge badge-state-' + (v.status||'idle') + '">' + (v.status||'--') + '</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+/* ── Overhead polling ── */
+function startOverhead() {
+  stopOverhead();
+  _overheadTmr = setInterval(pollOverhead, 1000);
+}
+function stopOverhead() { clearInterval(_overheadTmr); _overheadTmr = null; }
+
+async function pollOverhead() {
+  if (!currentZone) return;
+  var sid = document.getElementById('live-session-id').textContent;
+  if (!sid || sid === '--') return;
+  var img = document.getElementById('live-overhead-img');
+  if (!img) return;
+  try {
+    var r = await fetch('/api/admin/live-frame/' + encodeURIComponent(sid), { headers: authHdr(), cache: 'no-store' });
+    if (!r.ok) return;
+    var blob = await r.blob();
+    var old = img.src;
+    img.src = URL.createObjectURL(blob);
+    if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+  } catch(e) {}
+}
+
+/* ================================================================
+   STANDINGS
+================================================================ */
+async function loadStandings() {
+  if (!currentZone) return;
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/standings');
+    var d = r.ok ? await r.json() : [];
+    var tbody = document.getElementById('standings-tbody');
+    if (!d.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">暂无积分数据</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.map(function(row, i) {
+      var rc = '', medal = (i+1)+'';
+      if (i===0){ rc='rank-gold';   medal='<span class="medal-gold">&#127949;</span>'; }
+      if (i===1){ rc='rank-silver'; medal='<span class="medal-silver">&#127950;</span>'; }
+      if (i===2){ rc='rank-bronze'; medal='<span class="medal-bronze">&#127951;</span>'; }
+      return '<tr class="' + rc + '">'
+        + '<td class="ps-3">' + medal + '</td>'
+        + '<td>' + esc(row.team_id||'--') + '</td>'
+        + '<td>' + (row.total_score != null ? row.total_score : '--') + '</td>'
+        + '<td>' + (row.best_lap_time != null ? row.best_lap_time.toFixed(3)+'s' : '--') + '</td>'
+        + '<td>' + (row.finished_sessions != null ? row.finished_sessions : '--') + '</td>'
+        + '</tr>';
+    }).join('');
+  } catch(e) { console.warn('standings', e); }
+}
+
+/* ================================================================
+   TEAMS
+================================================================ */
+async function loadTeams() {
+  if (!currentZone) return;
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/teams');
+    var d = r.ok ? await r.json() : [];
+    var tbody = document.getElementById('teams-tbody');
+    if (!d.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">暂无队伍</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.map(function(t) {
+      var ts = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '--';
+      return '<tr>'
+        + '<td class="ps-3 fw-semibold">' + esc(t.id) + '</td>'
+        + '<td>' + esc(t.name||'--') + '</td>'
+        + '<td>' + ts + '</td>'
+        + '<td>' + (t.active_slot != null ? t.active_slot : '--') + '</td>'
+        + '<td><code>' + esc(t.active_version||'--') + '</code></td>'
+        + '</tr>';
+    }).join('');
+  } catch(e) { console.warn('teams', e); }
+}
+
+async function doCreateZone() {
+  var zid  = document.getElementById('nz-id').value.trim();
+  var name = document.getElementById('nz-name').value.trim();
+  var desc = document.getElementById('nz-desc').value.trim();
+  var laps = document.getElementById('nz-laps').value;
+  if (!zid || !name) { toast('赛区 ID 和名称不能为空', 'warning'); return; }
+  var body = { id: zid, name: name, description: desc };
+  if (laps) body.total_laps = parseInt(laps);
+  try {
+    var r = await api('POST', '/api/admin/zones', body);
+    var d = await r.json();
+    if (r.ok) {
+      toast(d.message || '赛区已创建', 'success');
+      ['nz-id','nz-name','nz-desc','nz-laps'].forEach(function(id){ document.getElementById(id).value=''; });
+      await loadZones();
+    } else { toast(d.detail || d.message || '创建失败', 'danger'); }
+  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+async function doDeleteZone() {
+  var zid = document.getElementById('dz-id').value.trim();
+  if (!zid) { toast('请输入赛区 ID', 'warning'); return; }
+  if (!confirm('确认删除赛区 "' + zid + '"？此操作不可撤销。')) return;
+  try {
+    var r = await api('DELETE', '/api/admin/zones/' + zid);
+    var d = await r.json();
+    if (r.ok) {
+      toast(d.message || '赛区已删除', 'success');
+      document.getElementById('dz-id').value = '';
+      if (currentZone === zid) currentZone = null;
+      await loadZones();
+    } else { toast(d.detail || d.message || '删除失败', 'danger'); }
+  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+async function doLockSubmissions() {
+  if (!confirm('确认锁定所有队伍的代码提交？锁定后队伍将无法上传新版本，此操作不可逆。')) return;
+  try {
+    var r = await api('POST', '/api/admin/lock-submissions');
+    var d = await r.json();
+    toast(r.ok ? (d.message||'提交已锁定') : (d.detail||d.message||'操作失败'), r.ok ? 'success' : 'danger');
+  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+/* ================================================================
+   RECORDINGS
+================================================================ */
+async function loadRecordings() {
+  try {
+    var r = await api('GET', '/api/recordings');
+    var all = r.ok ? await r.json() : [];
+    var list = currentZone ? all.filter(function(x){ return x.zone_id === currentZone; }) : all;
+    var tbody = document.getElementById('rec-tbody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">暂无录像</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(function(rec) {
+      var ts = rec.recorded_at ? new Date(rec.recorded_at).toLocaleString('zh-CN') : '--';
+      var typeBadge = '<span class="badge badge-session-' + (rec.session_type||'qualifying') + '">' + (rec.session_type||'--') + '</span>';
+      var link = rec.session_id
+        ? '<a href="/race/?session=' + encodeURIComponent(rec.session_id) + '" target="_blank" class="btn btn-sm btn-outline-danger">播放</a>'
+        : '--';
+      return '<tr>'
+        + '<td class="ps-3"><code>' + esc(rec.session_id||'--') + '</code></td>'
+        + '<td>' + typeBadge + '</td>'
+        + '<td>' + ts + '</td>'
+        + '<td>' + esc(rec.finish_reason||'--') + '</td>'
+        + '<td>' + link + '</td>'
+        + '</tr>';
+    }).join('');
+  } catch(e) { console.warn('recordings', e); }
+}
+
+/* ================================================================
+   TOAST
+================================================================ */
+function toast(msg, type) {
+  type = type || 'info';
+  var c = document.querySelector('.toast-container');
+  var id = 't' + Date.now();
+  var hcls = { success:'bg-success', danger:'bg-danger', warning:'bg-warning', info:'bg-info' };
+  var titles = { success:'成功', danger:'错误', warning:'警告', info:'通知' };
+  var html = '<div id="' + id + '" class="toast show fade" role="alert" aria-atomic="true">'
+    + '<div class="toast-header ' + (hcls[type]||'bg-info') + ' text-white">'
+    + '<strong class="me-auto">' + (titles[type]||'通知') + '</strong>'
+    + '<button type="button" class="btn-close btn-close-white" onclick="this.closest(\'.toast\').remove()"></button>'
+    + '</div><div class="toast-body">' + msg + '</div></div>';
+  c.insertAdjacentHTML('beforeend', html);
+  setTimeout(function(){ var el=document.getElementById(id); if(el) el.remove(); }, 4000);
+}
+
+/* ================================================================
+   UTILITIES
+================================================================ */
+function setText(id, val) { var el=document.getElementById(id); if(el) el.textContent=val; }
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ================================================================
+   AUTO-LOGIN ON LOAD
+================================================================ */
+window.addEventListener('DOMContentLoaded', function() {
+  var saved = localStorage.getItem('adminPwd');
+  if (saved) {
+    document.getElementById('pwd-input').value = saved;
+    doLogin();
+  }
+});
+</script>
+</body>
+</html>
