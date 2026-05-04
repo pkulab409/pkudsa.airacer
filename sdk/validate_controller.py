@@ -134,7 +134,7 @@ DEFAULT_RULES: dict[str, Any] = {
             "ctypes", "pathlib", "shutil", "tempfile",
             "requests", "urllib", "http", "ftplib", "smtplib",
             "signal", "gc", "inspect", "importlib",
-            "glob", "fnmatch", "winreg", "nt",
+            "glob", "fnmatch", "winreg", "nt", "_winapi",
         ],
         "warn_on_unknown": True,
     },
@@ -143,10 +143,14 @@ DEFAULT_RULES: dict[str, Any] = {
             "eval", "exec", "compile", "open", "globals", "locals",
             "input", "breakpoint", "__import__", "vars",
         ],
-        "suspicious_attrs": [
+        # 真·沙箱逃逸属性 —— 访问即 error（E007），线上 RESTRICTED_BUILTINS 会失败
+        "escape_attrs": [
             "__globals__", "__builtins__", "__subclasses__",
-            "__code__", "__closure__", "__mro__", "func_globals",
-            "__loader__", "__spec__",
+            "__mro__", "__code__", "__closure__", "func_globals",
+        ],
+        # 一般可疑 dunder —— 仅 warn（W007），仅做提示
+        "suspicious_attrs": [
+            "__loader__", "__spec__", "__import__",
         ],
     },
     "interface": {
@@ -156,7 +160,7 @@ DEFAULT_RULES: dict[str, Any] = {
     },
     "runtime": {
         "soft_timeout_ms": 20,
-        "mock_calls": 10,
+        "mock_calls": 30,
         "image_shape": [480, 640, 3],
         "image_dtype": "uint8",
     },
@@ -359,20 +363,31 @@ class Validator:
 
     def _check_suspicious_attrs_ast(self, tree: ast.AST,
                                     report: ValidationReport) -> None:
-        attrs = set(self.rules.get("builtins", {}).get("suspicious_attrs", []))
-        if not attrs:
+        """扫描 ast.Attribute，区分真·逃逸属性（E007）与一般可疑 dunder（W007）。
+
+        注意：仅扫描 ast.Attribute 节点，不扫描 ast.Name——因为模块顶层作用域里
+        Python 会隐式定义 `__spec__`、`__loader__` 等名字，把这些当作可疑
+        `ast.Name` 会产生误报。
+        """
+        cfg = self.rules.get("builtins", {})
+        escape_attrs = set(cfg.get("escape_attrs", []))
+        warn_attrs = set(cfg.get("suspicious_attrs", []))
+        if not (escape_attrs or warn_attrs):
             return
         for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in attrs:
+            if not isinstance(node, ast.Attribute):
+                continue
+            if node.attr in escape_attrs:
+                report.add(Finding(
+                    "E007", SEVERITY_ERROR,
+                    f"禁止访问沙箱逃逸属性 '{node.attr}'"
+                    f"（线上 RESTRICTED_BUILTINS 会失败）",
+                    lineno=node.lineno,
+                ))
+            elif node.attr in warn_attrs:
                 report.add(Finding(
                     "W007", SEVERITY_WARN,
                     f"访问了可疑属性 '{node.attr}'（常用于沙箱逃逸）",
-                    lineno=node.lineno,
-                ))
-            elif isinstance(node, ast.Name) and node.id in attrs:
-                report.add(Finding(
-                    "W007", SEVERITY_WARN,
-                    f"引用了可疑名字 '{node.id}'",
                     lineno=node.lineno,
                 ))
 
@@ -405,7 +420,16 @@ class Validator:
 
     def _load_module(self, path: pathlib.Path,
                      report: ValidationReport) -> Optional[Any]:
-        """用受限 meta_path 加载，模拟线上沙箱的 ImportError 行为。"""
+        """用受限 meta_path 加载，模拟线上沙箱的 ImportError 行为。
+
+        副作用管理：
+        * 进入前 snapshot ``sys.modules`` 的 key set；退出时剔除**本次加载新增的
+          key**，避免多次调用 ``Validator().check()`` 彼此污染（例如学生代码在
+          模块顶层做全局状态初始化）。
+        * ``sys.meta_path`` 里的 hook 在 finally 中被移除。
+        * numpy / cv2 等白名单模块首次导入的副作用保留（重新加载代价高且它们
+          本身与学生代码隔离）。
+        """
         deny = set(self.rules.get("imports", {}).get("deny", []))
 
         class _SandboxHook(importlib.abc.MetaPathFinder):
@@ -417,9 +441,14 @@ class Validator:
                     )
                 return None
 
+        # 白名单模块（numpy / cv2 等）不在清理名单里，以保留它们的首次导入缓存
+        allow = set(self.rules.get("imports", {}).get("allow", []))
+        preserve_prefixes = tuple(allow | {"_airacer_validator_target"})
+
         hook = _SandboxHook()
-        sys.meta_path.insert(0, hook)
         saved_name = "_airacer_validator_target"
+        pre_modules = set(sys.modules.keys())
+        sys.meta_path.insert(0, hook)
         try:
             spec = importlib.util.spec_from_file_location(saved_name, path)
             if spec is None or spec.loader is None:
@@ -441,7 +470,13 @@ class Validator:
                 sys.meta_path.remove(hook)
             except ValueError:
                 pass
-            sys.modules.pop(saved_name, None)
+            # 清理学生代码引入的新模块，保留白名单模块首次导入缓存
+            new_keys = set(sys.modules.keys()) - pre_modules
+            for key in new_keys:
+                base = key.split(".")[0]
+                if base in preserve_prefixes and key != saved_name:
+                    continue
+                sys.modules.pop(key, None)
 
     def _check_entry_callable(self, module: Any,
                               report: ValidationReport) -> None:
@@ -453,6 +488,34 @@ class Validator:
                 f"模块未定义可调用的 '{entry}' 函数",
             ))
 
+    def _make_mock_frames(self, shape: tuple, report: ValidationReport):
+        """构造两组 mock 帧：全零图 + 带合成赛道的图。
+
+        合成赛道图可以触发学生代码里"找得到赛道"的分支，避免只测全零图时
+        永远走 `lost_track` 快速返回导致耗时评估乐观。
+        """
+        if _HAS_NUMPY:
+            blank = np.zeros(shape, dtype=np.uint8)
+            lane = np.full(shape, 200, dtype=np.uint8)
+            # 左右各画一条 80 像素宽的黑色赛道，供不同迭代使用
+            h, w = shape[0], shape[1]
+            lane_l = lane.copy()
+            lane_l[int(h * 0.5):, int(w * 0.15):int(w * 0.30), :] = 20
+            lane_r = lane.copy()
+            lane_r[int(h * 0.5):, int(w * 0.70):int(w * 0.85), :] = 20
+            return [(blank, blank), (lane_l, lane_l), (lane_r, lane_r)]
+
+        report.add(Finding(
+            "W012", SEVERITY_WARN,
+            "未安装 numpy，mock 调用使用占位对象，可能触发假阳性",
+        ))
+        class _Fake:
+            pass
+        f = _Fake()
+        f.shape = tuple(shape)   # type: ignore[attr-defined]
+        f.dtype = "uint8"        # type: ignore[attr-defined]
+        return [(f, f)]
+
     def _check_mock_call(self, module: Any,
                          report: ValidationReport) -> None:
         entry = self.rules.get("interface", {}).get("entry", "control")
@@ -462,33 +525,28 @@ class Validator:
 
         shape = tuple(self.rules.get("runtime", {})
                                  .get("image_shape", [480, 640, 3]))
-        n_calls = int(self.rules.get("runtime", {}).get("mock_calls", 10))
+        n_calls = int(self.rules.get("runtime", {}).get("mock_calls", 30))
         soft_ms = int(self.rules.get("runtime", {}).get("soft_timeout_ms", 20))
         ranges = self.rules.get("interface", {}).get("return_ranges", {})
 
-        if _HAS_NUMPY:
-            left  = np.zeros(shape, dtype=np.uint8)
-            right = np.zeros(shape, dtype=np.uint8)
-        else:
-            report.add(Finding(
-                "W012", SEVERITY_WARN,
-                "未安装 numpy，mock 调用使用占位对象，可能触发假阳性",
-            ))
-            class _Fake:
-                pass
-            left = _Fake()
-            left.shape = tuple(shape)    # type: ignore[attr-defined]
-            left.dtype = "uint8"         # type: ignore[attr-defined]
-            right = left
+        frames = self._make_mock_frames(shape, report)
 
-        # 首调：做接口/返回值检查
+        # ---------- 首调：做接口/返回值检查 ----------
+        # 线上沙箱对 control() 抛异常的处理是：捕获并回落到 (0, 0)，不终止比赛。
+        # 因此 validator 将其降级为 W011 warn，避免阻塞提交。
+        left0, right0 = frames[0]
         try:
-            result = fn(left, right, 0.0)
+            result = fn(left0, right0, 0.0)
         except Exception as e:
             report.add(Finding(
-                "E011", SEVERITY_ERROR,
-                f"{entry}() 首次调用抛异常：{type(e).__name__}: {e}",
+                "W011", SEVERITY_WARN,
+                f"{entry}() 首次调用抛异常：{type(e).__name__}: {e}"
+                f"（线上会被 try/except 捕获并回落到 (0, 0)，但仍建议修复）",
             ))
+            # 既然首调都崩了，耗时测不出来；记录 meta 供消费者判断。
+            report.meta["mock_calls"] = 0
+            report.meta["avg_call_ms"] = None
+            report.meta["soft_timeout_ms"] = soft_ms
             return
 
         if not (isinstance(result, (tuple, list)) and len(result) == 2):
@@ -520,27 +578,44 @@ class Validator:
                 f"speed 超出 [{v_lo}, {v_hi}]：{speed}（线上会被 clamp）",
             ))
 
-        # 耗时粗测
-        t0 = time.perf_counter_ns()
+        # ---------- 耗时粗测：首调丢弃（消除冷启动抖动），轮换不同帧 ----------
+        n_exceptions = 0
+        max_exc_report = 3
+        durations: list[float] = []
         for i in range(n_calls):
+            left, right = frames[(i + 1) % len(frames)]
+            t_start = time.perf_counter_ns()
             try:
-                fn(left, right, float(i) * 0.032)
+                fn(left, right, float(i + 1) * 0.032)
             except Exception as e:
-                report.add(Finding(
-                    "E011", SEVERITY_ERROR,
-                    f"{entry}() 第 {i+2} 次调用抛异常：{type(e).__name__}: {e}",
-                ))
-                return
-        elapsed_ns = time.perf_counter_ns() - t0
-        avg_ms = elapsed_ns / n_calls / 1e6
+                if n_exceptions < max_exc_report:
+                    report.add(Finding(
+                        "W011", SEVERITY_WARN,
+                        f"{entry}() 第 {i+2} 次调用抛异常：{type(e).__name__}: {e}",
+                    ))
+                n_exceptions += 1
+                continue
+            durations.append((time.perf_counter_ns() - t_start) / 1e6)
+
         report.meta["mock_calls"] = n_calls
-        report.meta["avg_call_ms"] = round(avg_ms, 3)
+        report.meta["mock_exceptions"] = n_exceptions
         report.meta["soft_timeout_ms"] = soft_ms
 
-        if avg_ms > soft_ms:
+        if not durations:
+            report.meta["avg_call_ms"] = None
+            return
+
+        avg_ms = sum(durations) / len(durations)
+        p95_ms = sorted(durations)[int(len(durations) * 0.95)] if len(durations) >= 20 else max(durations)
+        report.meta["avg_call_ms"] = round(avg_ms, 3)
+        report.meta["p95_call_ms"] = round(p95_ms, 3)
+
+        # p95 超过软上限 → error；平均值接近/超过 → warn。
+        # 选用 p95 而非 max 是为避免个别 GC 抖动导致误报。
+        if p95_ms > soft_ms:
             report.add(Finding(
                 "W014", SEVERITY_WARN,
-                f"{entry}() 平均耗时 {avg_ms:.2f}ms，超过软上限 {soft_ms}ms，"
+                f"{entry}() p95 耗时 {p95_ms:.2f}ms，超过软上限 {soft_ms}ms，"
                 f"线上会频繁触发超时惩罚",
             ))
         elif avg_ms > soft_ms * 0.7:
@@ -579,7 +654,7 @@ def _render_text(report: ValidationReport, code_path: str) -> str:
         ("语法检查",     {"E003"}),
         ("文件检查",     {"E001", "E002"}),
         ("禁止导入扫描", {"E004", "E005", "E010"}),
-        ("禁用内置扫描", {"E006"}),
+        ("禁用内置扫描", {"E006", "E007"}),
         ("接口验证",     {"E008", "E011", "E012"}),
     ]
     err_codes = {f.code for f in report.errors}

@@ -17,6 +17,8 @@ simnode/config/config.yaml
 recordings/
 submissions/
 race_config.json
+sdk/local_race_config.json
+.local/
 
 # Logs
 *.log

@@ -6,10 +6,15 @@ develop and validate code before submitting to the server.
 
 Prerequisites
 -------------
-- Python 3.8+ (recommended)
-- numpy (required)
-- OpenCV (cv2) optional — example controllers are numpy-only
+- **Python 3.10+** (matches the server-side Sim Node interpreter)
+- ``numpy`` (required)
+- ``pyyaml`` (required by the validator to read ``sdk/rules.yaml``)
+- ``opencv-python`` / ``opencv-python-headless`` (optional — example
+  controllers are numpy-only; the server uses the ``-headless`` variant)
+- ``pytest`` (optional — only for running ``sdk/tests/``)
 - Webots installed (version consistent with course guide)
+
+Run ``python sdk/check_env.py`` to verify everything above at once.
 
 Files of interest
 -----------------
@@ -20,19 +25,23 @@ Files of interest
 - `sdk/validate_controller.py` — local validator (AST + mock call) with
   JSON output, exit-code contract and `--strict` mode
 - `sdk/rules.yaml` — validator rules (import allow/deny list, builtin blacklist,
-  return ranges, timing budget). Tweak it for stricter local checks; note it
-  **only affects the local validator** — the on-server sandbox has its own
-  copy in `simnode/car_sandbox.py`
+  return ranges, timing budget). This file is the single source of truth for
+  the sandbox allow/deny lists; ``sdk/tests/test_consistency.py`` hard-fails
+  if the three physical copies (this file, ``simnode/car_sandbox.py``,
+  ``simnode/webots/controllers/car/sandbox_runner.py``) drift apart
 - `sdk/run_local.py` — one-shot launcher: validate -> make config -> start Webots
 - `sdk/make_local_config.py` — helper to create a sample race_config.json
-- `sdk/check_env.py` — quick dependency check
+- `sdk/check_env.py` — quick dependency check (Python, numpy, pyyaml, cv2,
+  pytest)
+- `sdk/tests/test_validator.py` — pytest unit tests for every validator rule
+- `sdk/tests/test_cli.py` — pytest smoke tests for the CLI contract
+- `sdk/tests/test_consistency.py` — cross-file allow/deny-list consistency
+- `sdk/docs/local_test_guide.md` — Chinese student-facing walkthrough
 - `simnode/webots/controllers/car/car_controller.py` — Webots controller that
   launches the sandbox and exchanges frames
 - `simnode/webots/controllers/car/sandbox_runner.py` — sandbox runner that
   imports student code with a restricted import hook and communicates via
   stdin/stdout
-
-For a Chinese student-facing walkthrough see `sdk/docs/local_test_guide.md`.
 
 Quick local workflow
 --------------------
@@ -63,13 +72,12 @@ python sdk/validate_controller.py --code-path sdk/example_controller.py
 python sdk/validate_controller.py --code-path my_controller.py --json --strict
 ```
 
-3. Create a local race config for Webots. Edit the generated JSON to point
-   `code_path` at an absolute path to your controller file and set `car_slot`
-   to match the robot name in the world if needed (the script defaults to
-   `car_0`; the bundled `airacer.wbt` uses `car_1`).
+3. Create a local race config for Webots. The helper defaults to `car_1`
+   which matches the `car_1` Robot node in the bundled `airacer.wbt` world,
+   so you can usually omit `--car-slot`:
 
 ```powershell
-python sdk/make_local_config.py --code-path "%CD%\sdk\example_controller.py" --car-slot car_1 --out sdk/local_race_config.json --force
+python sdk/make_local_config.py --code-path "%CD%\sdk\example_controller.py" --out sdk/local_race_config.json --force
 ```
 
 4. Launch Webots and open `simnode/webots/worlds/airacer.wbt`. In the Car

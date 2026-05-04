@@ -39,11 +39,14 @@ def control(left_img: np.ndarray, right_img: np.ndarray, timestamp: float) -> Tu
     average them to estimate track center, compute normalized error, and map
     that to steering. Speed is reduced when steering magnitude is large.
     """
-    try:
-        # Defensive checks (will raise if shapes are unexpected)
-        assert left_img.shape == (IMG_H, IMG_W, 3)
-        assert right_img.shape == (IMG_H, IMG_W, 3)
+    # Defensive shape checks — use explicit `if` instead of `assert` because
+    # Python started with `-O` optimises `assert` away. Return a safe stop
+    # when the image shape is unexpected.
+    if (left_img.shape != (IMG_H, IMG_W, 3)
+            or right_img.shape != (IMG_H, IMG_W, 3)):
+        return 0.0, 0.0
 
+    try:
         cx_l = _brightness_center(left_img)
         cx_r = _brightness_center(right_img)
         cx = 0.5 * (cx_l + cx_r)

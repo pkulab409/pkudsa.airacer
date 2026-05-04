@@ -7,6 +7,12 @@ import importlib.util
 # 受限导入器
 # ---------------------------------------------------------------------------
 
+#
+# NOTE: 此处黑白名单必须与下列文件保持一致（唯一事实源见 sdk/rules.yaml）：
+#   - simnode/webots/controllers/car/sandbox_runner.py
+#   - sdk/rules.yaml
+# 若需修改请同步三处；sdk/tests/test_validator.py 会做一致性断言。
+#
 _ALLOWED_MODULES = {
     "numpy":       "numpy",
     "np":          "numpy",
@@ -16,6 +22,8 @@ _ALLOWED_MODULES = {
     "heapq":       "heapq",
     "functools":   "functools",
     "itertools":   "itertools",
+    "typing":      "typing",        # 纯注解，允许
+    "__future__":  "__future__",    # 语法 future 声明
 }
 
 _BLOCKED_PREFIXES = (
@@ -24,9 +32,14 @@ _BLOCKED_PREFIXES = (
     "ctypes", "pathlib", "shutil", "tempfile",
     "requests", "urllib", "http", "ftplib", "smtplib",
     "signal", "gc", "inspect", "importlib",
+    # Windows 特定 / 文件系统遍历
+    "glob", "fnmatch", "winreg", "nt", "_winapi",
 )
 
-_ALLOWED_MSG = "允许使用：numpy, cv2, math, collections, heapq, functools, itertools"
+_ALLOWED_MSG = (
+    "允许使用：numpy, cv2, math, collections, heapq, "
+    "functools, itertools, typing, __future__"
+)
 
 
 def _restricted_importer(name, globals=None, locals=None, fromlist=(), level=0):

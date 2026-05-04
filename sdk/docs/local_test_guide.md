@@ -194,9 +194,13 @@ def control(
 
 `numpy`, `cv2`, `math`, `collections`, `heapq`, `functools`, `itertools`, `typing`, `__future__`
 
-其它所有模块都会被 **拒绝 import**（包括 `os`, `sys`, `time`, `socket`, `subprocess`, `threading`, `requests` 等）。
+其它所有模块都会被 **拒绝 import**（包括 `os`, `sys`, `time`, `socket`,
+`subprocess`, `threading`, `requests`、以及 Windows 特定的 `winreg`/`nt`/`_winapi` 等）。
 
-禁止调用内置：`open`, `eval`, `exec`, `compile`, `globals`, `locals`, `input`, `breakpoint`, `__import__`。
+禁止调用内置：`open`, `eval`, `exec`, `compile`, `globals`, `locals`, `input`, `breakpoint`, `__import__`, `vars`。
+
+禁止访问逃逸属性（validator 直接报 **E007** error）：
+`__globals__`, `__builtins__`, `__subclasses__`, `__mro__`, `__code__`, `__closure__`, `func_globals`。
 
 ### 6.3 性能上限
 
@@ -281,18 +285,23 @@ CI 脚本里推荐 `--strict`，把 warning 也当拦截线。
 
 ### 7.4 常见错误码速查
 
-| Code | 含义 | 典型修法 |
-|---|---|---|
-| E001 | 文件过大 | 删除未用数据/注释；不要在源码里塞图像 |
-| E003 | 语法错误 | 按报错行修 |
-| E004 | 导入了黑名单模块 | 换成白名单内的等价实现 |
-| E006 | 调用了禁用内置（eval/open…） | 线上一定会被拦，老实写代码 |
-| E008 | 缺少 `control` 函数 | 按 6.1 定义 |
-| E011 | mock 调用抛异常 | 本地先跑 `python my_controller.py` 自测 |
-| E012 | 返回值格式错 | 必须 `return steering, speed` 两个 float |
-| W004 | 未知 import | 若不是白名单内的，线上会 ImportError |
-| W007 | 可疑属性访问 | 别碰 `__subclasses__`/`__globals__` 这类 |
-| W014 | 耗时接近/超过 20ms | 优化算法或减少每帧分配 |
+| Code | 级别 | 含义 | 典型修法 |
+|---|---|---|---|
+| E001 | error | 文件过大 | 删除未用数据/注释；不要在源码里塞图像 |
+| E003 | error | 语法错误 | 按报错行修 |
+| E004 | error | 导入了黑名单模块 | 换成白名单内的等价实现 |
+| E005 | error | 相对 import | 只能写绝对 import，且目标必须在白名单 |
+| E006 | error | 调用了禁用内置（eval/open/`__import__`…） | 线上一定会被拦，老实写代码 |
+| E007 | error | 访问了沙箱逃逸属性（`__globals__`/`__subclasses__` 等） | 这在线上 RESTRICTED_BUILTINS 下会失败 |
+| E008 | error | 缺少 `control` 函数 | 按 6.1 定义 |
+| E010 | error | 模块加载时触发非法 import | 检查顶层 import，移除黑名单项 |
+| E011 | error | 模块加载失败（非 ImportError） | 看报错信息，通常是顶层代码抛异常 |
+| E012 | error | 返回值格式错 | 必须 `return steering, speed` 两个 float |
+| W004 | warn | 未知 import（非黑非白） | 若不是白名单内的，线上会 ImportError |
+| W007 | warn | 访问了一般可疑 dunder（`__loader__`/`__spec__`/`__import__`） | 一般无需修；如你在做 meta 编程请确认 |
+| W011 | warn | `control()` 调用抛异常 | 线上会捕获并回落到 (0, 0)，但仍建议修好 |
+| W013 | warn | 返回值越界 | 自觉 clip 到 [-1, 1] / [0, 1] |
+| W014 | warn | 耗时接近/超过 20 ms | 优化算法或减少每帧分配（看 `meta.p95_call_ms`） |
 
 ---
 
@@ -312,23 +321,55 @@ python sdk/run_local.py --code-path my.py --webots "C:\Program Files\Webots\msys
 <summary>❓ Q2：Webots 启动后小车完全不动</summary>
 
 A：最常见三个原因：
-1. **沙箱子进程起不来** — 在 Webots 控制台看红色 stderr，一般是 `control()` 加载时抛异常，本地先 `python my_controller.py` 冒烟
-2. **conda 环境里没装 numpy** — Webots 会优先用 `CONDA_PREFIX` 里的 Python，激活对应 env 后再跑
-3. **`control()` 每帧超过 20ms** — 连续 3 次超时会触发 5 秒停车惩罚
+
+1. **沙箱子进程起不来** — 在 Webots 控制台看红色 stderr，一般是 `control()`
+   加载时抛异常，本地先 `python my_controller.py` 冒烟。
+
+2. **Webots 使用的 Python 里没装 numpy/cv2** — Webots 会选一个 Python
+   解释器启动 `sandbox_runner.py`。把它对准你日常用的 conda env：
+
+   Windows PowerShell：
+   ```powershell
+   conda activate airacer       # 你的环境名
+   $env:WEBOTS_HOME = "C:\Program Files\Webots"
+   python sdk/run_local.py --code-path my_controller.py
+   ```
+
+   Linux/macOS：
+   ```bash
+   conda activate airacer
+   export WEBOTS_HOME=/usr/local/webots   # 或 /Applications/Webots.app
+   python sdk/run_local.py --code-path my_controller.py
+   ```
+
+   也可以在 Webots 菜单 *Tools → Preferences → General → Python command*
+   显式填入 `/path/to/conda/envs/airacer/bin/python`（Windows 上填 `python.exe`）。
+
+3. **`control()` 每帧超过 20 ms** — 连续 3 次超时会触发 5 秒停车惩罚。
+   先用 `python sdk/validate_controller.py --code-path my_controller.py`
+   看 `avg_call_ms` / `p95_call_ms`，接近 20 ms 就要优化。
 </details>
 
 <details>
-<summary>❓ Q3：本地跑通了，提交服务器却被拒</summary>
+<summary>❓ Q3：本地跑通了，提交服务器却被拒 / 运行中抛 ImportError</summary>
 
-A：对齐规则：
-1. 服务端是 Linux，文件路径大小写敏感
-2. 服务端只装了 `numpy` + `opencv-python-headless`，没有 GUI 的 OpenCV 组件会缺
-3. 你可能在控制器之外的模块里有非法 import —— validator 只扫主文件
+A：服务器的 `/api/submit` **不会**静态扫描你的导入，它只做
+`py_compile` + 尝试 `exec_module` + 一次 mock 调用。真正拦截非法 import
+的是**运行时沙箱**（`simnode/car_sandbox.py` 的 `SandboxImportHook`）——
+也就是说：提交的那一刻可能通过，但线上真正跑比赛时才 ImportError。
 
-提交前用 `--strict` 再扫一遍：
+避免这种情况的唯一办法是**本地先用 validator 扫一遍**：
+
 ```powershell
 python sdk/validate_controller.py --code-path my_controller.py --strict
 ```
+
+其他常见差异：
+
+1. 服务端是 Linux，文件路径大小写敏感；
+2. 服务端只装了 `numpy` + `opencv-python-headless`，没有 GUI 的 OpenCV 组件会缺；
+3. Validator 只扫你的主控制器文件；如果你另外 `from helpers import foo`，
+   helpers 里的非法 import 不会被扫到（线上会在 `import helpers` 那一行抛 ImportError）。
 </details>
 
 <details>

@@ -58,7 +58,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--code-path", help="Path to team_controller.py (single-car mode)")
     parser.add_argument("--team-id", default="demo_team", help="Team id (default: demo_team)")
     parser.add_argument(
-        "--car-slot", default="car_0", help="Robot node name in the world (default: car_0)"
+        "--car-slot",
+        default="car_1",
+        help="Robot node name in the world (default: car_1, matching "
+             "simnode/webots/worlds/airacer.wbt)",
     )
     # 多车模式
     parser.add_argument(

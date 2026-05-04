@@ -54,6 +54,7 @@ imports:
     - fnmatch
     - winreg
     - nt
+    - _winapi
 
   # 非黑名单且不在白名单——warn 提示"线上可能加载失败"
   warn_on_unknown: true
@@ -71,17 +72,23 @@ builtins:
     - breakpoint
     - __import__
     - vars
-  # 可疑属性访问（用于侦测逃逸技巧，级别 warn）
-  suspicious_attrs:
+  # 真·沙箱逃逸属性 —— 访问即 error（E007）
+  # 这些属性在线上 RESTRICTED_BUILTINS 下访问或使用会失败，必须拦截。
+  escape_attrs:
     - __globals__
     - __builtins__
     - __subclasses__
+    - __mro__
     - __code__
     - __closure__
-    - __mro__
     - func_globals
+  # 一般可疑 dunder —— 仅 warn（W007）
+  # 这些属性有合法用法，模块顶层作用域 Python 还会隐式定义 __spec__/__loader__，
+  # 故只做提示，不阻塞提交。
+  suspicious_attrs:
     - __loader__
     - __spec__
+    - __import__
 
 interface:
   entry: control          # 模块必须提供的可调用名
@@ -92,6 +99,6 @@ interface:
 
 runtime:
   soft_timeout_ms: 20     # 单帧软上限（与线上 sandbox read_line_timeout 一致）
-  mock_calls: 10          # mock 调用次数（取平均耗时）
+  mock_calls: 30          # mock 调用次数（首调不计入，降低冷启动抖动）
   image_shape: [480, 640, 3]
   image_dtype: uint8

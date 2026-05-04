@@ -44,6 +44,8 @@ import numpy as np  # noqa: E402
 # Import hook — blocks dangerous standard-library and network modules
 # ---------------------------------------------------------------------------
 
+# NOTE: 此黑白名单必须与 simnode/car_sandbox.py 及 sdk/rules.yaml 保持一致。
+# 修改时请同步三处；sdk/tests/test_validator.py 会做一致性断言。
 BLOCKED_PREFIXES: frozenset = frozenset([
     'os', 'sys', 'socket', 'subprocess', 'multiprocessing',
     'threading', 'time', 'datetime', 'io', 'builtins',
@@ -51,6 +53,13 @@ BLOCKED_PREFIXES: frozenset = frozenset([
     'shutil', 'tempfile', 'glob', 'fnmatch',
     'requests', 'urllib', 'http', 'ftplib', 'smtplib',
     'signal', 'gc', 'inspect', 'importlib',
+])
+
+# 与 car_sandbox.py::_ALLOWED_MODULES 对齐的白名单（用于自检 / 错误提示）。
+ALLOWED_BASES: frozenset = frozenset([
+    'numpy', 'np', 'cv2', 'math', 'collections',
+    'heapq', 'functools', 'itertools',
+    'typing', '__future__',
 ])
 
 
@@ -62,8 +71,8 @@ class SandboxImportHook(importlib.abc.MetaPathFinder):
         if base in BLOCKED_PREFIXES:
             raise ImportError(
                 f"[Sandbox] '{fullname}' is not allowed in student code. "
-                f"Allowed libraries include: numpy, cv2, math, collections, "
-                f"heapq, functools, itertools."
+                f"Allowed libraries: numpy, cv2, math, collections, "
+                f"heapq, functools, itertools, typing, __future__."
             )
         return None  # not intercepted — fall through to the next finder
 

@@ -44,7 +44,8 @@ SDK_DIR = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = SDK_DIR.parent
 
 DEFAULT_WORLD = REPO_ROOT / "simnode" / "webots" / "worlds" / "airacer.wbt"
-DEFAULT_CONFIG = SDK_DIR / "local_race_config.json"
+# 生成的临时 race_config 放到仓库根 .local/，避免污染 SDK 目录（便于打包分发）
+DEFAULT_CONFIG = REPO_ROOT / ".local" / "race_config.json"
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +82,14 @@ def _make_config(
 
 
 def _find_webots(explicit: Optional[str]) -> Optional[str]:
-    """按优先级查找 Webots 可执行文件路径。"""
+    """按优先级查找 Webots 可执行文件路径。
+
+    查找顺序：
+      1. 命令行 --webots 显式指定
+      2. $WEBOTS_HOME（多种布局：Windows msys64 / Linux root / macOS .app 内）
+      3. $PATH
+      4. 平台常见默认安装路径（Windows / Linux / macOS）
+    """
     # 1. 命令行参数显式指定
     if explicit:
         if pathlib.Path(explicit).is_file():
@@ -91,16 +99,28 @@ def _find_webots(explicit: Optional[str]) -> Optional[str]:
     # 2. 环境变量
     env = os.environ.get("WEBOTS_HOME")
     if env:
-        candidate = pathlib.Path(env) / ("msys64/mingw64/bin/webotsw.exe"
-                                          if sys.platform == "win32"
-                                          else "webots")
-        if candidate.is_file():
-            return str(candidate)
+        env_path = pathlib.Path(env)
+        candidates: list[pathlib.Path] = []
+        if sys.platform == "win32":
+            candidates += [
+                env_path / "msys64/mingw64/bin/webotsw.exe",
+                env_path / "msys64/mingw64/bin/webots.exe",
+                env_path / "webotsw.exe",
+                env_path / "webots.exe",
+            ]
+        elif sys.platform == "darwin":
+            candidates += [
+                env_path / "Contents/MacOS/webots",
+                env_path / "webots",
+            ]
+        else:  # linux
+            candidates += [env_path / "webots", env_path / "bin/webots"]
         # 兼容把 WEBOTS_HOME 直接指向含 webots 可执行文件的 bin 目录
         for name in ("webots", "webotsw.exe", "webots.exe"):
-            candidate = pathlib.Path(env) / name
-            if candidate.is_file():
-                return str(candidate)
+            candidates.append(env_path / name)
+        for c in candidates:
+            if c.is_file():
+                return str(c)
 
     # 3. PATH 里查找
     for name in ("webots", "webotsw", "webots.exe", "webotsw.exe"):
@@ -108,15 +128,22 @@ def _find_webots(explicit: Optional[str]) -> Optional[str]:
         if found:
             return found
 
-    # 4. Windows / Linux 常见默认路径
-    defaults = [
+    # 4. 各平台常见默认路径
+    defaults_common = [
+        # Windows
         r"C:\Program Files\Webots\msys64\mingw64\bin\webotsw.exe",
         r"C:\Program Files\Webots\msys64\mingw64\bin\webots.exe",
+        # Linux
         "/usr/local/webots/webots",
         "/usr/bin/webots",
         "/snap/bin/webots",
+        "/opt/webots/webots",
+        # macOS
+        "/Applications/Webots.app/Contents/MacOS/webots",
+        "/Applications/Webots.app/webots",
+        os.path.expanduser("~/Applications/Webots.app/Contents/MacOS/webots"),
     ]
-    for d in defaults:
+    for d in defaults_common:
         if pathlib.Path(d).is_file():
             return d
 
@@ -171,8 +198,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="世界文件中的 Robot 节点名（默认 car_1，对应 airacer.wbt）")
     p.add_argument("--world", default=str(DEFAULT_WORLD),
                    help=f"Webots 世界文件路径（默认 {DEFAULT_WORLD.relative_to(REPO_ROOT)}）")
+    try:
+        _cfg_display = DEFAULT_CONFIG.relative_to(REPO_ROOT)
+    except ValueError:
+        _cfg_display = DEFAULT_CONFIG
     p.add_argument("--config-out", default=str(DEFAULT_CONFIG),
-                   help="生成的 race_config.json 路径")
+                   help=f"生成的 race_config.json 路径（默认 {_cfg_display}）")
     p.add_argument("--rules", default=None,
                    help="validator 规则 YAML 路径（默认 sdk/rules.yaml）")
     p.add_argument("--webots", default=None,

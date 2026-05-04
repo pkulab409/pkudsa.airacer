@@ -3,20 +3,21 @@ sdk/tests/test_validator.py — sdk/validate_controller.py 的 pytest 套件
 
 覆盖每一条规则的至少一个正样本 + 一个反样本：
 
-  R1 文件大小超限           — E001
-  R2 语法错误               — E003
-  R3 黑名单 import          — E004
-  R4 黑名单 from-import     — E004
-  R5 未知 import（warn）    — W004
-  R6 白名单 import（正）    — 通过
-  R7 禁用内置 open()        — E006
-  R8 禁用内置 eval()        — E006
-  R9 可疑属性访问           — W007（warn，不阻塞通过）
-  R10 缺少 control 函数     — E008
-  R11 control 签名错误      — W008（warn）
-  R12 control 返回非 tuple  — E012
-  R13 control 返回值越界    — W013（warn）
-  R14 control 抛异常        — E011
+  R1  文件大小超限           — E001
+  R2  语法错误               — E003
+  R3  黑名单 import          — E004
+  R4  黑名单 from-import     — E004
+  R5  未知 import（warn）    — W004
+  R6  白名单 import（正）    — 通过
+  R7  禁用内置 open()        — E006
+  R8  禁用内置 eval()        — E006
+  R9a 逃逸属性访问           — E007（error，阻塞）
+  R9b 可疑属性访问           — W007（warn，不阻塞通过）
+  R10 缺少 control 函数      — E008
+  R11 control 签名错误       — W008（warn）
+  R12 control 返回非 tuple   — E012
+  R13 control 返回值越界     — W013（warn）
+  R14 control 首调抛异常     — W011（warn，线上有 try/except）
 
 运行：
     cd pkudsa.airacer
@@ -239,7 +240,8 @@ class TestBuiltins:
 # ---------------------------------------------------------------------------
 
 class TestSuspiciousAttrs:
-    def test_subclasses_access_warns(self, tmp_path):
+    def test_subclasses_access_is_error(self, tmp_path):
+        """__subclasses__ 是真·逃逸属性 → E007 error。"""
         src = """
             def control(a, b, c):
                 x = ().__class__.__subclasses__()
@@ -247,6 +249,45 @@ class TestSuspiciousAttrs:
         """
         p = _write(tmp_path, "sus.py", src)
         rep = _run(p)
+        assert "E007" in _codes(rep.errors)
+        assert not rep.passed
+
+    def test_globals_access_is_error(self, tmp_path):
+        """__globals__ 同样是 E007。"""
+        src = """
+            def control(a, b, c):
+                g = control.__globals__
+                return 0.0, 0.5
+        """
+        p = _write(tmp_path, "g.py", src)
+        rep = _run(p)
+        assert "E007" in _codes(rep.errors)
+
+    def test_loader_spec_is_warn_not_error(self, tmp_path):
+        """__loader__/__spec__ 应只 warn，不阻塞通过。"""
+        src = """
+            def control(a, b, c):
+                _ = __loader__     # 顶层隐式存在的名字
+                return 0.0, 0.5
+        """
+        p = _write(tmp_path, "ls.py", src)
+        rep = _run(p)
+        # __loader__ 作为 Name 引用不再被扫描（只扫 Attribute），故 passed
+        assert rep.passed, rep.errors
+
+    def test_loader_attr_access_warns(self, tmp_path):
+        """__loader__ 作为属性访问才触发 W007。"""
+        src = """
+            def control(a, b, c):
+                _ = control.__module__   # OK，不在名单
+                return 0.0, 0.5
+            class X:
+                pass
+            _ = X().__spec__ if hasattr(X(), '__spec__') else None
+        """
+        p = _write(tmp_path, "attr.py", src)
+        rep = _run(p)
+        # __spec__ 作为属性访问 → W007
         assert "W007" in _codes(rep.warnings)
 
 
@@ -292,14 +333,20 @@ class TestInterface:
         assert "W013" in _codes(rep.warnings)
         assert rep.passed  # warn 不阻塞
 
-    def test_control_raises(self, tmp_path):
+    def test_control_raises_is_warn(self, tmp_path):
+        """control() 抛异常 → W011 warn（线上会 try/except 回落到 (0, 0)）。
+
+        这是对 P0-3 修复的断言：validator 不应比线上更严格，首调异常只 warn。
+        """
         src = """
             def control(a, b, c):
                 raise RuntimeError("boom")
         """
         p = _write(tmp_path, "raise.py", src)
         rep = _run(p)
-        assert "E011" in _codes(rep.errors)
+        assert "W011" in _codes(rep.warnings)
+        # passed=True —— 因为只有 warn
+        assert rep.passed, rep.errors
 
 
 # ---------------------------------------------------------------------------
