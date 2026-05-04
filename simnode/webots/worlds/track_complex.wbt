@@ -1,0 +1,820 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/CurvedRoadSegment.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/Road.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/GenericTrafficLight.proto"
+EXTERNPROTO "../protos/CarFrost.proto"
+EXTERNPROTO "../protos/CarNova.proto"
+EXTERNPROTO "../protos/CarPhoenix.proto"
+EXTERNPROTO "../protos/CarShadow.proto"
+EXTERNPROTO "../protos/CarThunder.proto"
+EXTERNPROTO "../protos/CarViper.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/YieldSign.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/traffic/protos/YieldPanel.proto"
+
+WorldInfo {
+  title "AI Racer - Complex Track (track_complex)"
+}
+Viewpoint {
+  orientation -0.1456704169625872 0.8901452889167043 0.43176555471846445 0.7246007137539577
+  position -97.42337271811328 -7.351956514012585 100.55765852619605
+}
+Background {
+  skyColor [
+    0.4 0.7 1
+  ]
+}
+DirectionalLight {
+  direction 1 1 -2
+  intensity 1.5
+}
+Solid {
+  translation 76 66 -0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.751095 0.180484 0.137728
+        roughness 0.95
+        metalness 0
+      }
+      geometry Box {
+        size 260 200 0.2
+      }
+    }
+  ]
+  name "ground"
+  boundingObject Box {
+    size 200 142 0.2
+  }
+}
+Road {
+  translation 56 -29 0.1
+  rotation 0 0 1 3.141592653589793
+  name "road_main_straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -123 0.5 0
+    67 0 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 190 -3 0.1
+  rotation 0 0 1 0.3927003061004253
+  name "road_T1_SE_corner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -21 -20 0
+    0 -30 0
+    10 0 0
+  ]
+  splineSubdivision 14
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 191 95 0.1
+  name "road_east_straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    8 -95 0
+    8 41 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 175 136 0.1
+  name "curve_T2_NE_entry"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 24
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 147 161 0.1
+  rotation 0 0 1 3.141592653589793
+  name "road_NE_upper_straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -28 1 0
+    -8 1 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 155 142 0.1
+  rotation 0 0 1 3.141592653589793
+  name "curve_T4_S_outer(1)"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 18
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 155 142 0.1
+  rotation 0 0 1 1.5707996938995747
+  name "curve_T3_S_inner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 18
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 155 142 0.1
+  rotation 0 0 1 3.141592653589793
+  name "curve_T3_S_outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 18
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 155 106 0.1
+  name "curve_T4_S_inner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 18
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 156 106 0.1
+  rotation 0 0 1 -1.5707996938995747
+  name "curve_T4_S_outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 17
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 128 90 0.1
+  rotation 0 0 1 3.141592653589793
+  name "road_4_to_5straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -28 1 0
+    -8 1 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 128 100 0.1
+  rotation 0 0 1 -1.1781003061004252
+  name "road_T6_north_curve"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    14 5 0
+    0 -20 0
+    -50 0 0
+  ]
+  splineSubdivision 14
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 93 143 0.1
+  name "curve_6_to_7_inner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 16
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 93 143 0.1
+  rotation 0 0 1 1.5707996938995747
+  name "curve_6_to_7_outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 16
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 62 115 0.1
+  rotation 0 0 1 1.8326003061004252
+  name "road_NW_upper_straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -110 9.9 0
+    24 -22 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 65 7 0.1
+  rotation 0 0 1 -1.5707996938995747
+  name "curve_T7_hairpin_1"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 16
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 65 7 0.1
+  rotation 0 0 1 -3.141592653589793
+  name "curve_T7_hairpin_2"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 16
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 30 115 0.1
+  rotation 0 0 1 1.8326003061004252
+  name "road_NW_down_straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -110 10 0
+    22 -22 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation 37 142 0.1
+  name "curve_T8_NW_outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 8
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation 9 150 0.1
+  rotation 0 0 1 3.141592653589793
+  name "road_8_to_9straight"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -28 0 0
+    27 0 0
+  ]
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -18 122 0.1
+  rotation 0 0 1 1.570795613280012
+  name "curve_T9_NW_inner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 28
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -18 126 0.1
+  rotation 0 0 1 -3.0106996938995745
+  name "curve_T9_NW_outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 28
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -11 70.5 0.1
+  rotation 0 0 1 0.1308996938995747
+  name "curve_T10_hairpin_1"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 28
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+CurvedRoadSegment {
+  translation -11 71 0.1
+  rotation 0 0 1 -1.4399003061004252
+  name "curve_T10_hairpin_2"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  curvatureRadius 28
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation -36 29.5 0.1
+  rotation 0 0 1 -3.0106903061004253
+  name "road_T12_NW-inner"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -2 24 0
+    0 -6 0
+    -31 -10 0
+  ]
+  splineSubdivision 14
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Road {
+  translation -35 -28 0.1
+  rotation 0 0 1 -1.7016903061004252
+  name "road_T12_NW-outer"
+  width 8
+  rightBarrier TRUE
+  leftBarrier TRUE
+  bottom TRUE
+  wayPoints [
+    -1.5 25 0
+    0 10 0
+    -35 -0.5 0
+  ]
+  splineSubdivision 14
+  appearance PBRAppearance {
+    baseColor 0.2 0.2 0.2
+    roughness 0.9
+    metalness 0
+  }
+}
+Solid {
+  translation 55 -29 0.101
+  rotation 0 0 1 -3.103185307179586
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.05 0.05
+        roughness 0.9
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 8 0.001
+      }
+    }
+  ]
+  name "start_finish_line"
+}
+GenericTrafficLight {
+  translation 64 -23 0.5
+  rotation 0 0 1 -2.8797903061004253
+  state "green"
+}
+Solid {
+  translation 54.6 -26 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_1"
+}
+Solid {
+  translation 54.8 -31.4 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_2"
+}
+Solid {
+  translation 48.6 -26 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_3"
+}
+Solid {
+  translation 48.8 -31.4 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_4"
+}
+Solid {
+  translation 42.6 -26 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_5"
+}
+Solid {
+  translation 42.8 -31.6 0.1005
+  rotation 0 0 1 1.6
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.96 0.96 0.96
+        roughness 0.5
+        metalness 0
+      }
+      geometry Box {
+        size 3 1 0.001
+      }
+    }
+  ]
+  name "pre_grid_6"
+}
+Solid {
+  translation 56 -29 0.1005
+  rotation 0 0 1 -1.5708003061004252
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_0"
+}
+Solid {
+  translation 199 0 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_1"
+}
+Solid {
+  translation 199 103 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_2"
+}
+Solid {
+  translation 158 160 0.1005
+  rotation 0 0 1 -1.5707996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_3"
+}
+Solid {
+  translation 92 159 0.1005
+  rotation 0 0 1 -1.5708003061004252
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_4"
+}
+Solid {
+  translation 47.5 60 0.1005
+  rotation 0 0 1 3.141592653589793
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_5"
+}
+Solid {
+  translation -5 150 0.1005
+  rotation 0 0 1 -1.5707996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_6"
+}
+Solid {
+  translation -22 98 0.1005
+  rotation 0 0 1 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_7"
+}
+Solid {
+  translation -18 40 0.1005
+  rotation 0 0 1 -1.4398996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 0.6
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_8"
+}
+YieldSign {
+  translation 181 -23 0.1
+  rotation 0 0 1 3.141592653589793
+  name "danger_mark_1"
+  height 5
+  signBoards [
+    YieldPanel {
+      translation 0 0 2
+    }
+  ]
+}
+YieldSign {
+  translation 75 16 0.1
+  rotation 0 0 1 1.7016996938995748
+  name "danger_mark_2"
+  height 4
+  signBoards [
+    YieldPanel {
+      translation 0 0 2
+    }
+  ]
+}
+Robot {
+  children [
+    Camera {
+      translation 75 65 100
+      rotation 0 1 0 0
+      name "overhead_cam"
+      fieldOfView 1.1
+      width 640
+      height 480
+    }
+  ]
+  name "supervisor"
+  controller "supervisor"
+  supervisor TRUE
+}
+DEF car_1 CarPhoenix {
+  name "car_1"
+  translation 52.9 -26 0.302
+}
+DEF car_2 CarThunder {
+  name "car_2"
+  translation 53 -31.7 0.302
+}
+DEF car_3 CarViper {
+  name "car_3"
+  translation 47 -26 0.302
+}
+DEF car_4 CarNova {
+  name "car_4"
+  translation 47 -31.7 0.302
+}
+DEF car_5 CarFrost {
+  name "car_5"
+  translation 41 -26 0.302
+}
+DEF car_6 CarShadow {
+  name "car_6"
+  translation 41 -31.7 0.302
+}

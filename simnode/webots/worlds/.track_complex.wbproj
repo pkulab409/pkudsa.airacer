@@ -1,0 +1,22 @@
+Webots Project File version R2025a
+perspectives: 000000ff00000000fd00000002000000010000008700000324fc0200000001fb0000001400540065007800740045006400690074006f00720100000000000003240000004500ffffff0000000300000690000000d9fc0100000001fb0000001a0043006f006e0073006f006c00650041006c006c0041006c006c0100000000000006900000008700ffffff000006070000032400000001000000020000000100000008fc00000000
+simulationViewPerspectives: 000000ff000000010000000200000272000002fe0100000002010000000100
+sceneTreePerspectives: 000000ff00000001000000030000001e000000c0000000fa0100000002010000000200
+maximizedDockId: -1
+centralWidgetVisible: 1
+orthographicViewHeight: 1
+textFiles: -1
+consoles: Console:All:All
+renderingDevicePerspectives: car_1:left_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_1:right_camera;0;0.396294;0.332563;0.221325
+renderingDevicePerspectives: car_2:left_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_2:right_camera;0;0.324761;0.452096;0.274636
+renderingDevicePerspectives: car_3:left_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_3:right_camera;0;0.5625;0;0
+renderingDevicePerspectives: car_4:left_camera;0;0.557813;0;0
+renderingDevicePerspectives: car_4:right_camera;0;0.565625;0;0
+renderingDevicePerspectives: car_5:left_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_5:right_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_6:left_camera;0;0.595312;0;0
+renderingDevicePerspectives: car_6:right_camera;0;0.595312;0;0
+renderingDevicePerspectives: supervisor:overhead_cam;0;0.44892;0.244624;0.221325
