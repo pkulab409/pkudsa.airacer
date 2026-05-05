@@ -1,9 +1,9 @@
 # AI Racer 本地测试手册
 
-> **版本**：v0.1 （草稿）
-> **日期**：2026-05-03
+> **版本**：v0.2 （草稿）
+> **日期**：2026-05-05
 > **适用对象**：AI Racer 参赛学生（有 Python 基础，可能从未用过 Webots）
-> **状态**：🚧 首版；`.wbt` 赛道与接口文档 v0.5 定稿后会再次更新
+> **状态**：🚧 第二版；`.wbt` 赛道与接口文档 v0.5 定稿后会再次更新
 
 ---
 
@@ -139,20 +139,24 @@ sdk/
 
 ### 5.1 复制示例 controller
 
+把教学版复制一份到 `sdk/my_controller.py`（放在 `sdk/` 目录里便于 Webots 定位，也避免仓库根目录杂乱）：
+
 ```powershell
-Copy-Item sdk/examples/team_controller_tutorial.py my_controller.py
+Copy-Item sdk/examples/team_controller_tutorial.py sdk/my_controller.py
 ```
+
+> 💡 路径不是硬性要求，但**建议放在 `sdk/` 里**——仓库根路径若含中文/空格，部分 Webots 版本的 `Camera.saveImage` 会写图失败；`sdk/` 子目录本身是纯 ASCII，减少一类踩坑。
 
 ### 5.2 一键启动
 
 ```powershell
-python sdk/run_local.py --code-path my_controller.py
+python sdk/run_local.py --code-path sdk/my_controller.py
 ```
 
 这条命令会：
 
-1. 用 `rules.yaml` 校验 `my_controller.py`
-2. 生成 `sdk/local_race_config.json`
+1. 用 `rules.yaml` 校验 `sdk/my_controller.py`
+2. 生成 `.local/race_config.json`（仓库根下的 `.local/` 目录，已在 `.gitignore` 外）
 3. 找到 Webots 可执行文件并启动 `simnode/webots/worlds/airacer.wbt`
 
 启动成功后，Webots 窗口里你会看到一辆红色小车按你的代码跑起来。
@@ -161,13 +165,13 @@ python sdk/run_local.py --code-path my_controller.py
 
 ```powershell
 # 只做校验，不启动 Webots（CI 友好）
-python sdk/run_local.py --code-path my_controller.py --validate-only
+python sdk/run_local.py --code-path sdk/my_controller.py --validate-only
 
 # 已经校验过了，跳过校验直接跑
-python sdk/run_local.py --code-path my_controller.py --skip-validate
+python sdk/run_local.py --code-path sdk/my_controller.py --skip-validate
 
 # 无渲染、快速模式（适合 headless / 批量测试）
-python sdk/run_local.py --code-path my_controller.py --fast --minimize
+python sdk/run_local.py --code-path sdk/my_controller.py --fast --minimize
 ```
 
 > ⚠️ 启动后 Webots 窗口里可能一开始小车是静止的——这是正常现象，前 1~2 秒是摄像头激活与沙箱启动时间。
@@ -231,13 +235,13 @@ def control(
 ### 7.1 手动跑一次
 
 ```powershell
-python sdk/validate_controller.py --code-path my_controller.py
+python sdk/validate_controller.py --code-path sdk/my_controller.py
 ```
 
 输出示例：
 
 ```
-正在验证: my_controller.py
+正在验证: sdk/my_controller.py
   ✓ 语法检查
   ✓ 文件检查
   ✓ 禁止导入扫描
@@ -245,9 +249,11 @@ python sdk/validate_controller.py --code-path my_controller.py
   ✓ 接口验证
 
 性能：
-  mock_calls = 10
-  avg_call_ms = 4.67
+  mock_calls = 30
+  mock_exceptions = 0
   soft_timeout_ms = 20
+  avg_call_ms = 4.67
+  p95_call_ms = 5.02
 
 全部通过。
 ```
@@ -255,7 +261,7 @@ python sdk/validate_controller.py --code-path my_controller.py
 ### 7.2 机器可读的 JSON 输出
 
 ```powershell
-python sdk/validate_controller.py --code-path my_controller.py --json
+python sdk/validate_controller.py --code-path sdk/my_controller.py --json
 ```
 
 返回结构（节选）：
@@ -268,7 +274,13 @@ python sdk/validate_controller.py --code-path my_controller.py --json
     {"code": "W004", "severity": "warn", "message": "...", "lineno": 12}
   ],
   "summary": "通过（含 1 条 warning）。",
-  "meta": {"mock_calls": 10, "avg_call_ms": 4.67, "soft_timeout_ms": 20}
+  "meta": {
+    "mock_calls": 30,
+    "mock_exceptions": 0,
+    "soft_timeout_ms": 20,
+    "avg_call_ms": 4.67,
+    "p95_call_ms": 5.02
+  }
 }
 ```
 
@@ -310,10 +322,21 @@ CI 脚本里推荐 `--strict`，把 warning 也当拦截线。
 <details>
 <summary>❓ Q1：<code>run_local.py</code> 报 "未能找到 Webots 可执行文件"</summary>
 
-A：按 2.2 设置 `WEBOTS_HOME`，或直接：
+A：`run_local.py` 会按以下顺序自动查找 Webots：
+1. 命令行 `--webots` 参数；
+2. `$WEBOTS_HOME` 环境变量（支持 Windows msys64 布局、Linux、macOS `.app`）；
+3. 系统 `PATH`；
+4. 各平台常见默认安装路径（Windows 会扫描所有盘符下的 `Webots\...`、`Program Files\Webots\...`、`Program Files (x86)\Webots\...`）。
+
+通常装完 Webots 无需额外配置即可被自动发现。实在找不到的话：
 
 ```powershell
-python sdk/run_local.py --code-path my.py --webots "C:\Program Files\Webots\msys64\mingw64\bin\webotsw.exe"
+# Windows：显式指定（你的安装路径，例如非默认盘符）
+python sdk/run_local.py --code-path sdk/my_controller.py --webots "E:\Webots\msys64\mingw64\bin\webotsw.exe"
+
+# 或设环境变量一次，之后命令行不用带 --webots
+$env:WEBOTS_HOME = "E:\Webots"
+python sdk/run_local.py --code-path sdk/my_controller.py
 ```
 </details>
 
@@ -323,7 +346,7 @@ python sdk/run_local.py --code-path my.py --webots "C:\Program Files\Webots\msys
 A：最常见三个原因：
 
 1. **沙箱子进程起不来** — 在 Webots 控制台看红色 stderr，一般是 `control()`
-   加载时抛异常，本地先 `python my_controller.py` 冒烟。
+   加载时抛异常，本地先 `python sdk/my_controller.py` 冒烟。
 
 2. **Webots 使用的 Python 里没装 numpy/cv2** — Webots 会选一个 Python
    解释器启动 `sandbox_runner.py`。把它对准你日常用的 conda env：
@@ -331,22 +354,20 @@ A：最常见三个原因：
    Windows PowerShell：
    ```powershell
    conda activate airacer       # 你的环境名
-   $env:WEBOTS_HOME = "C:\Program Files\Webots"
-   python sdk/run_local.py --code-path my_controller.py
+   python sdk/run_local.py --code-path sdk/my_controller.py
    ```
 
    Linux/macOS：
    ```bash
    conda activate airacer
-   export WEBOTS_HOME=/usr/local/webots   # 或 /Applications/Webots.app
-   python sdk/run_local.py --code-path my_controller.py
+   python sdk/run_local.py --code-path sdk/my_controller.py
    ```
 
    也可以在 Webots 菜单 *Tools → Preferences → General → Python command*
    显式填入 `/path/to/conda/envs/airacer/bin/python`（Windows 上填 `python.exe`）。
 
 3. **`control()` 每帧超过 20 ms** — 连续 3 次超时会触发 5 秒停车惩罚。
-   先用 `python sdk/validate_controller.py --code-path my_controller.py`
+   先用 `python sdk/validate_controller.py --code-path sdk/my_controller.py`
    看 `avg_call_ms` / `p95_call_ms`，接近 20 ms 就要优化。
 </details>
 
@@ -361,7 +382,7 @@ A：服务器的 `/api/submit` **不会**静态扫描你的导入，它只做
 避免这种情况的唯一办法是**本地先用 validator 扫一遍**：
 
 ```powershell
-python sdk/validate_controller.py --code-path my_controller.py --strict
+python sdk/validate_controller.py --code-path sdk/my_controller.py --strict
 ```
 
 其他常见差异：
@@ -396,6 +417,23 @@ $OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8
 校验器内部已自动降级逻辑：检测到 stdout 不支持 `✓/✗` 时会改用 `[OK]/[FAIL]` 标记。
 </details>
 
+<details>
+<summary>❓ Q7：Webots 启动后控制台持续刷 <code>Error: could not open "...\live_view.jpg" for writing</code></summary>
+
+A：Webots 的 C++ `Camera.saveImage()` 在 Windows 上用窄字符 `fopen`，对含**非 ASCII 字符（中文/韩文/俄文 …）的路径**会直接失败。常见诱因是仓库放在中文目录里，例如 `D:\课程\数据结构\pkudsa.airacer\`。
+
+`sdk/make_local_config.py` 已经做了兜底：当仓库根路径含非 ASCII 字符时，`recording_path` 会自动落到 `%TEMP%\airacer_local\recordings`（Windows 的 `%TEMP%` 对非 ASCII 用户名会返回 8.3 短路径，全 ASCII）。所以**现在**直接运行 `run_local.py` 不会再报错。
+
+如果你自定义了 `--recording-path`，请确保它**全 ASCII**：
+
+```powershell
+python sdk/run_local.py --code-path sdk/my_controller.py `
+    --recording-path C:\airacer\recordings
+```
+
+根治方案是把整个仓库挪到纯 ASCII 路径（推荐 `C:\projects\pkudsa.airacer`）。
+</details>
+
 ---
 
 ## 9. 反馈渠道
@@ -410,3 +448,4 @@ $OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8
 | 版本 | 日期 | 改动 |
 |---|---|---|
 | v0.1 | 2026-05-03 | 初稿：SDK 工具链齐全后的学生侧手册 |
+| v0.2 | 2026-05-05 | 将工作文件从仓库根迁到 `sdk/my_controller.py`；补充 Webots 自动发现（任意盘符）、race_config session 字段默认值、非 ASCII 路径自动兜底（%TEMP%）、FAQ Q7；Q1/Q2/Q3 命令示例统一为 `sdk/my_controller.py` |

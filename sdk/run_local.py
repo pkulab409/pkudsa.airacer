@@ -129,20 +129,37 @@ def _find_webots(explicit: Optional[str]) -> Optional[str]:
             return found
 
     # 4. 各平台常见默认路径
-    defaults_common = [
-        # Windows
-        r"C:\Program Files\Webots\msys64\mingw64\bin\webotsw.exe",
-        r"C:\Program Files\Webots\msys64\mingw64\bin\webots.exe",
-        # Linux
-        "/usr/local/webots/webots",
-        "/usr/bin/webots",
-        "/snap/bin/webots",
-        "/opt/webots/webots",
-        # macOS
-        "/Applications/Webots.app/Contents/MacOS/webots",
-        "/Applications/Webots.app/webots",
-        os.path.expanduser("~/Applications/Webots.app/Contents/MacOS/webots"),
-    ]
+    defaults_common: list[str] = []
+
+    if sys.platform == "win32":
+        # Windows：扫描所有可用盘符下的常见安装目录
+        #   （用户常把 Webots 装在 D:/E:/F: 等非系统盘）
+        win_rel_paths = [
+            r"Webots\msys64\mingw64\bin\webotsw.exe",
+            r"Webots\msys64\mingw64\bin\webots.exe",
+            r"Program Files\Webots\msys64\mingw64\bin\webotsw.exe",
+            r"Program Files\Webots\msys64\mingw64\bin\webots.exe",
+            r"Program Files (x86)\Webots\msys64\mingw64\bin\webotsw.exe",
+            r"Program Files (x86)\Webots\msys64\mingw64\bin\webots.exe",
+        ]
+        drives = [f"{d}:\\" for d in "CDEFGHIJKLMNOPQRSTUVWXYZ"
+                  if pathlib.Path(f"{d}:\\").exists()]
+        for drive in drives:
+            for rel in win_rel_paths:
+                defaults_common.append(drive + rel)
+    else:
+        defaults_common += [
+            # Linux
+            "/usr/local/webots/webots",
+            "/usr/bin/webots",
+            "/snap/bin/webots",
+            "/opt/webots/webots",
+            # macOS
+            "/Applications/Webots.app/Contents/MacOS/webots",
+            "/Applications/Webots.app/webots",
+            os.path.expanduser("~/Applications/Webots.app/Contents/MacOS/webots"),
+        ]
+
     for d in defaults_common:
         if pathlib.Path(d).is_file():
             return d
