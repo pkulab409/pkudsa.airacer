@@ -1,131 +1,140 @@
-﻿#VRML_SIM R2023b utf8
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/Road.proto"
 
 WorldInfo {
   title "AI Racer Demo"
-  basicTimeStep 32
-  coordinateSystem "ENU"
 }
-
 Viewpoint {
-  orientation 1 0 0 1.05
-  position 0 15 30
+  orientation -0.5773502691896258 0.5773502691896258 0.5773502691896258 2.0944
+  position 0 4.9666891932888514e-15 33.54101966249685
 }
-
 Background {
-  skyColor [ 0.4 0.7 1.0 ]
+  skyColor [
+    0.4 0.7 1
+  ]
 }
-
 DirectionalLight {
   direction 1 1 -2
   intensity 1.5
-  castShadows FALSE
 }
-
 Solid {
-  name "ground"
   translation 0 0 -0.1
   children [
     Shape {
       appearance PBRAppearance {
         baseColor 0.15 0.15 0.15
         roughness 0.95
-        metalness 0.0
+        metalness 0
       }
       geometry Box {
         size 120 100 0.2
       }
     }
   ]
+  name "ground"
   boundingObject Box {
     size 120 100 0.2
   }
 }
-
 Solid {
-  name "start_finish_line"
   translation 0 0 0.002
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 1 1 1
       }
       geometry Box {
         size 0.3 8 0.004
       }
     }
   ]
+  name "start_finish_line"
 }
-
 Solid {
-  name "wall_north"
   translation 25 5 0.3
   children [
     Shape {
-      appearance PBRAppearance { baseColor 0.9 0.7 0.1 }
-      geometry Box { size 60 0.3 0.6 }
+      appearance PBRAppearance {
+        baseColor 0.9 0.7 0.1
+      }
+      geometry Box {
+        size 60 0.3 0.6
+      }
     }
   ]
-  boundingObject Box { size 60 0.3 0.6 }
+  name "wall_north"
+  boundingObject Box {
+    size 60 0.3 0.6
+  }
 }
-
 Solid {
-  name "wall_south"
   translation 25 -45 0.3
   children [
     Shape {
-      appearance PBRAppearance { baseColor 0.9 0.7 0.1 }
-      geometry Box { size 60 0.3 0.6 }
+      appearance PBRAppearance {
+        baseColor 0.9 0.7 0.1
+      }
+      geometry Box {
+        size 60 0.3 0.6
+      }
     }
   ]
-  boundingObject Box { size 60 0.3 0.6 }
+  name "wall_south"
+  boundingObject Box {
+    size 60 0.3 0.6
+  }
 }
-
 Solid {
-  name "wall_east"
   translation 52 -20 0.3
   children [
     Shape {
-      appearance PBRAppearance { baseColor 0.9 0.7 0.1 }
-      geometry Box { size 0.3 50 0.6 }
+      appearance PBRAppearance {
+        baseColor 0.9 0.7 0.1
+      }
+      geometry Box {
+        size 0.3 50 0.6
+      }
     }
   ]
-  boundingObject Box { size 0.3 50 0.6 }
+  name "wall_east"
+  boundingObject Box {
+    size 0.3 50 0.6
+  }
 }
-
 Solid {
-  name "wall_west"
   translation -4 -20 0.3
   children [
     Shape {
-      appearance PBRAppearance { baseColor 0.9 0.7 0.1 }
-      geometry Box { size 0.3 50 0.6 }
+      appearance PBRAppearance {
+        baseColor 0.9 0.7 0.1
+      }
+      geometry Box {
+        size 0.3 50 0.6
+      }
     }
   ]
-  boundingObject Box { size 0.3 50 0.6 }
+  name "wall_west"
+  boundingObject Box {
+    size 0.3 50 0.6
+  }
 }
-
 Robot {
-  name "supervisor"
-  supervisor TRUE
-  controller "supervisor"
   children [
     Camera {
-      name "overhead_cam"
       translation 24 -20 60
       rotation 0 1 0 1.5708
+      name "overhead_cam"
+      fieldOfView 1.1
       width 640
       height 480
-      fieldOfView 1.1
     }
   ]
+  name "supervisor"
+  controller "supervisor"
+  supervisor TRUE
 }
-
 DEF car_1 Robot {
-  name "car_1"
   translation -3 -0.5 0.04
-  rotation 0 0 1 0
-  controller "car"
-  customData ""
   children [
     Shape {
       appearance PBRAppearance {
@@ -149,17 +158,26 @@ DEF car_1 Robot {
         }
       ]
       endPoint Solid {
-        name "c1_rl"
         translation -0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c1_rl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -174,17 +192,26 @@ DEF car_1 Robot {
         }
       ]
       endPoint Solid {
-        name "c1_rr"
         translation -0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c1_rr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -193,17 +220,26 @@ DEF car_1 Robot {
         anchor 0.2 -0.22 0
       }
       endPoint Solid {
-        name "c1_fl"
         translation 0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c1_fl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -212,49 +248,55 @@ DEF car_1 Robot {
         anchor 0.2 0.22 0
       }
       endPoint Solid {
-        name "c1_fr"
         translation 0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c1_fr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     Camera {
-      name "left_camera"
       translation 0.32 -0.1 0.04
+      name "left_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
     Camera {
-      name "right_camera"
       translation 0.32 0.1 0.04
+      name "right_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
   ]
+  name "car_1"
   boundingObject Box {
     size 0.6 0.4 0.06
   }
   physics Physics {
     density -1
-    mass 1.0
+    mass 1
   }
-}
-
-DEF car_2 Robot {
-  name "car_2"
-  translation -3 0.5 0.04
-  rotation 0 0 1 0
   controller "car"
-  customData ""
+}
+DEF car_2 Robot {
+  translation -3 0.5 0.04
   children [
     Shape {
       appearance PBRAppearance {
@@ -278,17 +320,26 @@ DEF car_2 Robot {
         }
       ]
       endPoint Solid {
-        name "c2_rl"
         translation -0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c2_rl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -303,17 +354,26 @@ DEF car_2 Robot {
         }
       ]
       endPoint Solid {
-        name "c2_rr"
         translation -0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c2_rr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -322,17 +382,26 @@ DEF car_2 Robot {
         anchor 0.2 -0.22 0
       }
       endPoint Solid {
-        name "c2_fl"
         translation 0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c2_fl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -341,49 +410,55 @@ DEF car_2 Robot {
         anchor 0.2 0.22 0
       }
       endPoint Solid {
-        name "c2_fr"
         translation 0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c2_fr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     Camera {
-      name "left_camera"
       translation 0.32 -0.1 0.04
+      name "left_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
     Camera {
-      name "right_camera"
       translation 0.32 0.1 0.04
+      name "right_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
   ]
+  name "car_2"
   boundingObject Box {
     size 0.6 0.4 0.06
   }
   physics Physics {
     density -1
-    mass 1.0
+    mass 1
   }
-}
-
-DEF car_3 Robot {
-  name "car_3"
-  translation -5 -0.5 0.04
-  rotation 0 0 1 0
   controller "car"
-  customData ""
+}
+DEF car_3 Robot {
+  translation -5 -0.5 0.04
   children [
     Shape {
       appearance PBRAppearance {
@@ -407,17 +482,26 @@ DEF car_3 Robot {
         }
       ]
       endPoint Solid {
-        name "c3_rl"
         translation -0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c3_rl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -432,17 +516,26 @@ DEF car_3 Robot {
         }
       ]
       endPoint Solid {
-        name "c3_rr"
         translation -0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c3_rr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -451,17 +544,26 @@ DEF car_3 Robot {
         anchor 0.2 -0.22 0
       }
       endPoint Solid {
-        name "c3_fl"
         translation 0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c3_fl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -470,49 +572,55 @@ DEF car_3 Robot {
         anchor 0.2 0.22 0
       }
       endPoint Solid {
-        name "c3_fr"
         translation 0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c3_fr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     Camera {
-      name "left_camera"
       translation 0.32 -0.1 0.04
+      name "left_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
     Camera {
-      name "right_camera"
       translation 0.32 0.1 0.04
+      name "right_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
   ]
+  name "car_3"
   boundingObject Box {
     size 0.6 0.4 0.06
   }
   physics Physics {
     density -1
-    mass 1.0
+    mass 1
   }
-}
-
-DEF car_4 Robot {
-  name "car_4"
-  translation -5 0.5 0.04
-  rotation 0 0 1 0
   controller "car"
-  customData ""
+}
+DEF car_4 Robot {
+  translation -5 0.5 0.04
   children [
     Shape {
       appearance PBRAppearance {
@@ -536,17 +644,26 @@ DEF car_4 Robot {
         }
       ]
       endPoint Solid {
-        name "c4_rl"
         translation -0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c4_rl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -561,17 +678,26 @@ DEF car_4 Robot {
         }
       ]
       endPoint Solid {
-        name "c4_rr"
         translation -0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c4_rr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -580,17 +706,26 @@ DEF car_4 Robot {
         anchor 0.2 -0.22 0
       }
       endPoint Solid {
-        name "c4_fl"
         translation 0.2 -0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c4_fl"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     HingeJoint {
@@ -599,39 +734,54 @@ DEF car_4 Robot {
         anchor 0.2 0.22 0
       }
       endPoint Solid {
-        name "c4_fr"
         translation 0.2 0.22 0
         rotation 1 0 0 1.5708
         children [
           Shape {
-            appearance PBRAppearance { baseColor 0.1 0.1 0.1 }
-            geometry Cylinder { radius 0.04 height 0.04 }
+            appearance PBRAppearance {
+              baseColor 0.1 0.1 0.1
+            }
+            geometry Cylinder {
+              height 0.04
+              radius 0.04
+            }
           }
         ]
-        boundingObject Cylinder { radius 0.04 height 0.04 }
-        physics Physics {}
+        name "c4_fr"
+        boundingObject Cylinder {
+          height 0.04
+          radius 0.04
+        }
+        physics Physics {
+        }
       }
     }
     Camera {
-      name "left_camera"
       translation 0.32 -0.1 0.04
+      name "left_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
     Camera {
-      name "right_camera"
       translation 0.32 0.1 0.04
+      name "right_camera"
+      fieldOfView 1.047
       width 640
       height 480
-      fieldOfView 1.047
     }
   ]
+  name "car_4"
   boundingObject Box {
     size 0.6 0.4 0.06
   }
   physics Physics {
     density -1
-    mass 1.0
+    mass 1
   }
+  controller "car"
+}
+Road {
+  translation 8 4 6
+  rotation 0.7548294124240689 0.6469966392206304 0.10783277320343841 0.05
 }
