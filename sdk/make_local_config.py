@@ -30,25 +30,39 @@ def validate_code_path(code_path: str) -> pathlib.Path:
         print(f"[warn] Code path does not end with .py: {p}", file=sys.stderr)
     return p.resolve()
 def parse_car_spec(spec: str) -> dict[str, str]:
-    """Parse a --car argument in the form 'car_slot:team_id:code_path'."""
-    parts = spec.split(":", 2)
-    if len(parts) != 3:
+    """Parse a --car argument.
+
+    支持两种格式（以冒号分隔）：
+      * ``car_slot:team_id:code_path``                —— 3 段，无车型注释
+      * ``car_slot:team_id:code_path:car_model``      —— 4 段，最后一段是车型（仅注释用）
+    """
+    parts = spec.split(":", 3)
+    if len(parts) not in (3, 4):
         raise argparse.ArgumentTypeError(
             f"Invalid --car spec: {spec!r}. "
-            "Expected format 'car_slot:team_id:code_path'"
+            "Expected 'car_slot:team_id:code_path' or "
+            "'car_slot:team_id:code_path:car_model'"
         )
-    car_slot, team_id, code_path = (s.strip() for s in parts)
+    if len(parts) == 3:
+        car_slot, team_id, code_path = (s.strip() for s in parts)
+        car_model = ""
+    else:
+        car_slot, team_id, code_path, car_model = (s.strip() for s in parts)
     if not all([car_slot, team_id, code_path]):
         raise argparse.ArgumentTypeError(
-            f"Invalid --car spec: {spec!r}. All three fields must be non-empty."
+            f"Invalid --car spec: {spec!r}. "
+            "car_slot / team_id / code_path 必须非空。"
         )
     resolved = validate_code_path(code_path)
-    return {
+    entry: dict[str, str] = {
         "car_slot": car_slot,
         "team_id": team_id,
         "team_name": team_id,      # supervisor 需要 team_name；本地无独立显示名时沿用 team_id
         "code_path": str(resolved),
     }
+    if car_model:
+        entry["car_model"] = car_model
+    return entry
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate a race_config JSON for local Webots runs.",
@@ -66,8 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--car-slot",
         default="car_1",
-        help="Robot node name in the world (default: car_1, matching "
-             "simnode/webots/worlds/airacer.wbt)",
+        help="Robot node name in the world (default: car_1). "
+             "Run `python sdk/run_local.py --list-worlds` to see the "
+             "slot -> car-model mapping per track.",
+    )
+    parser.add_argument(
+        "--car-model",
+        default=None,
+        help="Car PROTO type associated with --car-slot (informational, "
+             "e.g. CarPhoenix / CarThunder / ...). Auto-filled by run_local.py.",
     )
     # Session 级字段（supervisor.py 需要）
     parser.add_argument("--race-id", default="local_race",
@@ -115,14 +136,15 @@ def collect_cars(args: argparse.Namespace) -> list[dict[str, str]]:
     if args.code_path:
         resolved = validate_code_path(args.code_path)
         team_name = args.team_name if args.team_name else args.team_id
-        cars.append(
-            {
-                "car_slot": args.car_slot,
-                "team_id": args.team_id,
-                "team_name": team_name,
-                "code_path": str(resolved),
-            }
-        )
+        entry: dict[str, str] = {
+            "car_slot": args.car_slot,
+            "team_id": args.team_id,
+            "team_name": team_name,
+            "code_path": str(resolved),
+        }
+        if args.car_model:
+            entry["car_model"] = args.car_model
+        cars.append(entry)
     if not cars:
         raise ValueError(
             "No car configuration provided. Use --code-path or --car to specify at least one car."
@@ -232,7 +254,9 @@ def main() -> int:
     print(f"     race_id={cfg.get('race_id')}  session_type={cfg.get('session_type')}"
           f"  total_laps={cfg.get('total_laps')}")
     for car in cfg["cars"]:
-        print(f"     - {car['car_slot']}  team={car['team_id']}  code={car['code_path']}")
+        extra = f"  car_model={car['car_model']}" if car.get("car_model") else ""
+        print(f"     - {car['car_slot']}  team={car['team_id']}"
+              f"  code={car['code_path']}{extra}")
     return 0
 if __name__ == "__main__":
     sys.exit(main())
