@@ -31,11 +31,15 @@ Files of interest
   ``simnode/webots/controllers/car/sandbox_runner.py``) drift apart
 - `sdk/run_local.py` — one-shot launcher: validate -> make config -> start Webots
 - `sdk/make_local_config.py` — helper to create a sample race_config.json
+- `sdk/worlds.py` — catalog of available tracks and their slot → car-model
+  mapping (consumed by `run_local.py --list-worlds` and `--world` resolution)
 - `sdk/check_env.py` — quick dependency check (Python, numpy, pyyaml, cv2,
   pytest)
 - `sdk/tests/test_validator.py` — pytest unit tests for every validator rule
 - `sdk/tests/test_cli.py` — pytest smoke tests for the CLI contract
 - `sdk/tests/test_consistency.py` — cross-file allow/deny-list consistency
+- `sdk/tests/test_worlds.py` — ensures `sdk/worlds.py` stays in sync with
+  the actual `.wbt` world files
 - `sdk/docs/local_test_guide.md` — Chinese student-facing walkthrough
 - `simnode/webots/controllers/car/car_controller.py` — Webots controller that
   launches the sandbox and exchanges frames
@@ -52,10 +56,17 @@ Quick local workflow
 python sdk/run_local.py --code-path sdk/examples/team_controller_tutorial.py
 ```
 
-This runs the validator, writes `sdk/local_race_config.json`, auto-discovers
-Webots (via `WEBOTS_HOME` / `PATH` / common install paths) and launches the
-simulation. Pass `--validate-only`, `--skip-validate`, `--fast`, `--minimize`
-or `--webots <path>` for variants.
+This runs the validator, writes `.local/race_config.json`, auto-discovers
+Webots (via `WEBOTS_HOME` / `PATH` / common install paths, scanning every
+drive letter on Windows) and launches the default `track_basic.wbt` world with
+`car_1` (CarPhoenix, red). Pass `--validate-only`, `--skip-validate`, `--fast`,
+`--minimize`, `--webots <path>`, `--world <short-name-or-path>`,
+`--car-slot car_N` for variants.
+
+Use `python sdk/run_local.py --list-worlds` to see every track plus the
+slot → car model mapping. Available short names today: `basic`, `complex`,
+`airacer`. Car PROTOs are defined in `simnode/webots/protos/Car*.proto`
+(CarPhoenix / CarThunder / CarViper / CarNova / CarFrost / CarShadow).
 
 ### Option B — step by step
 
@@ -73,23 +84,22 @@ python sdk/validate_controller.py --code-path my_controller.py --json --strict
 ```
 
 3. Create a local race config for Webots. The helper defaults to `car_1`
-   which matches the `car_1` Robot node in the bundled `airacer.wbt` world,
-   so you can usually omit `--car-slot`:
+   which exists in every bundled track. To pick a specific car model, pass
+   `--car-slot car_N` (see `python sdk/run_local.py --list-worlds`):
 
 ```powershell
 python sdk/make_local_config.py --code-path "%CD%\sdk\example_controller.py" --out sdk/local_race_config.json --force
 ```
 
-4. Launch Webots and open `simnode/webots/worlds/airacer.wbt`. In the Car
-   controller's custom data or environment, set the `RACE_CONFIG_PATH` to the
-   absolute path of the JSON created in step 3. Alternatively, place the file
-   next to the controller so the default 'race_config.json' is found.
+4. Launch Webots and open one of the bundled worlds — `track_basic.wbt`
+   (default), `track_complex.wbt`, or `airacer.wbt`. Set the
+   `RACE_CONFIG_PATH` env var to the absolute path of the JSON from step 3.
 
 Set the environment variable (PowerShell example):
 
 ```powershell
 $env:RACE_CONFIG_PATH = "C:\full\path\to\pkudsa.airacer\sdk\local_race_config.json"
-webots "C:\full\path\to\pkudsa.airacer\simnode\webots\worlds\airacer.wbt"
+webots "C:\full\path\to\pkudsa.airacer\simnode\webots\worlds\track_basic.wbt"
 ```
 
 5. Run the simulation. The Webots car controller will spawn the sandbox runner
