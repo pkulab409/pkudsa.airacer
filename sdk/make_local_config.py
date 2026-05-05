@@ -46,6 +46,7 @@ def parse_car_spec(spec: str) -> dict[str, str]:
     return {
         "car_slot": car_slot,
         "team_id": team_id,
+        "team_name": team_id,      # supervisor 需要 team_name；本地无独立显示名时沿用 team_id
         "code_path": str(resolved),
     }
 def build_parser() -> argparse.ArgumentParser:
@@ -58,11 +59,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--code-path", help="Path to team_controller.py (single-car mode)")
     parser.add_argument("--team-id", default="demo_team", help="Team id (default: demo_team)")
     parser.add_argument(
+        "--team-name",
+        default=None,
+        help="Team display name for supervisor (default: same as --team-id)",
+    )
+    parser.add_argument(
         "--car-slot",
         default="car_1",
         help="Robot node name in the world (default: car_1, matching "
              "simnode/webots/worlds/airacer.wbt)",
     )
+    # Session 级字段（supervisor.py 需要）
+    parser.add_argument("--race-id", default="local_race",
+                        help="Race/session id for supervisor (default: local_race)")
+    parser.add_argument("--session-type", default="practice",
+                        help="Session type label (default: practice)")
+    parser.add_argument("--total-laps", type=int, default=1,
+                        help="Total laps for this session (default: 1)")
+    parser.add_argument("--recording-path", default=None,
+                        help="Telemetry recording output directory "
+                             "(supervisor writes telemetry.jsonl + live_view.jpg "
+                             "inside it; default: <repo_root>/.local/recordings/)")
     # 多车模式
     parser.add_argument(
         "--car",
@@ -97,10 +114,12 @@ def collect_cars(args: argparse.Namespace) -> list[dict[str, str]]:
     # 单车模式
     if args.code_path:
         resolved = validate_code_path(args.code_path)
+        team_name = args.team_name if args.team_name else args.team_id
         cars.append(
             {
                 "car_slot": args.car_slot,
                 "team_id": args.team_id,
+                "team_name": team_name,
                 "code_path": str(resolved),
             }
         )
@@ -114,6 +133,40 @@ def collect_cars(args: argparse.Namespace) -> list[dict[str, str]]:
     if duplicates:
         raise ValueError(f"Duplicate car_slot values detected: {sorted(duplicates)}")
     return cars
+def _default_recording_path() -> str:
+    """Default telemetry recording directory.
+
+    Note: ``recording_path`` is used by supervisor.py as a *directory* (it calls
+    ``os.makedirs(recording_path)`` and writes ``telemetry.jsonl`` /
+    ``live_view.jpg`` inside). Must not point at a file.
+
+    Windows note: Webots' C++ ``Camera.saveImage()`` uses narrow-char ``fopen``
+    which fails on paths containing non-ASCII characters (the repo path under
+    Chinese folders like "课程/大一下/…" breaks this). If the repo root itself
+    is non-ASCII, we fall back to a pure-ASCII path under ``%TEMP%``
+    (which on Windows is an 8.3 short path even when the username is non-ASCII).
+    """
+    import tempfile
+    # sdk/make_local_config.py -> sdk/ -> repo root
+    repo_root = pathlib.Path(__file__).resolve().parent.parent
+    repo_default = repo_root / ".local" / "recordings"
+    if str(repo_default).isascii():
+        return str(repo_default)
+    # 仓库路径含非 ASCII —— Webots saveImage 会失败，落到系统临时目录
+    return str(pathlib.Path(tempfile.gettempdir()) / "airacer_local" / "recordings")
+
+
+def _build_session_meta(args: argparse.Namespace) -> dict[str, Any]:
+    """Build the top-level session fields required by supervisor.py."""
+    rec = args.recording_path if args.recording_path else _default_recording_path()
+    return {
+        "race_id": args.race_id,
+        "session_type": args.session_type,
+        "total_laps": int(args.total_laps),
+        "recording_path": str(pathlib.Path(rec).expanduser().resolve()),
+    }
+
+
 def load_existing(path: pathlib.Path) -> dict[str, Any]:
     """Load an existing config file, or return an empty skeleton."""
     if not path.exists():
@@ -134,6 +187,7 @@ def main() -> int:
         print(f"[error] {e}", file=sys.stderr)
         return 1
     outp = pathlib.Path(args.out).expanduser()
+    session_meta = _build_session_meta(args)
     # 构造最终配置
     if args.append:
         try:
@@ -151,8 +205,11 @@ def main() -> int:
                 )
                 return 1
         cfg["cars"].extend(new_cars)
+        # 追加模式：如原文件缺少 session 字段（老版本配置），补齐默认值
+        for k, v in session_meta.items():
+            cfg.setdefault(k, v)
     else:
-        cfg = {"cars": new_cars}
+        cfg = {**session_meta, "cars": new_cars}
     rendered = json.dumps(cfg, indent=2, ensure_ascii=False)
     if args.dry_run:
         print(rendered)
@@ -165,8 +222,15 @@ def main() -> int:
         )
         return 1
     outp.parent.mkdir(parents=True, exist_ok=True)
+    # 确保 recording_path 目录本身存在（supervisor.py 会 os.makedirs 但提前建好更稳）
+    try:
+        pathlib.Path(cfg["recording_path"]).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     outp.write_text(rendered + "\n", encoding="utf-8")
     print(f"[ok] Wrote {len(cfg['cars'])} car(s) to: {outp.resolve()}")
+    print(f"     race_id={cfg.get('race_id')}  session_type={cfg.get('session_type')}"
+          f"  total_laps={cfg.get('total_laps')}")
     for car in cfg["cars"]:
         print(f"     - {car['car_slot']}  team={car['team_id']}  code={car['code_path']}")
     return 0
