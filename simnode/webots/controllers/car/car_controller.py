@@ -70,18 +70,51 @@ sandbox_script = os.path.join(controller_dir, 'sandbox_runner.py')
 
 # Prefer the activated conda env's Python (has numpy/opencv) over Webots' bundled Python
 _conda_prefix = os.environ.get('CONDA_PREFIX', '')
-_conda_python  = os.path.join(_conda_prefix, 'python.exe') if _conda_prefix else ''
-SANDBOX_PYTHON = _conda_python if os.path.isfile(_conda_python) else sys.executable
+
+# Windows: <conda>\python.exe
+# macOS/Linux: <conda>/bin/python
+_conda_python = ''
+if _conda_prefix:
+    if sys.platform.startswith('win'):
+        _conda_python = os.path.join(_conda_prefix, 'python.exe')
+    else:
+        _conda_python = os.path.join(_conda_prefix, 'bin', 'python')
+
+SANDBOX_PYTHON = _conda_python if (_conda_python and os.path.isfile(_conda_python)) else sys.executable
 
 
 def launch_sandbox():
+    popen_kwargs = {}
+    # Only available on Windows; prevents a console window from opening.
+    if sys.platform.startswith('win'):
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
     return subprocess.Popen(
         [SANDBOX_PYTHON, sandbox_script, '--team-id', team_id, '--code-path', code_path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        **popen_kwargs,
     )
+
+
+def _drain_pipe_to_stderr(pipe, prefix: str):
+    """Continuously drains a subprocess pipe to avoid deadlocks.
+
+    If the child writes lots of logs to stderr and nobody reads it, the OS pipe
+    buffer can fill up and block the child process. That can cascade into the
+    controller appearing to "crash after running for a while".
+    """
+    try:
+        for line in iter(pipe.readline, b''):
+            try:
+                sys.stderr.write(f"[{prefix}] {line.decode(errors='replace')}")
+                sys.stderr.flush()
+            except Exception:
+                # Last resort: drop the line.
+                pass
+    except Exception:
+        pass
 
 
 def get_bgr(cam):
@@ -101,7 +134,8 @@ def send_frame(proc, left_bgr, right_bgr, timestamp):
 
 
 def read_line_timeout(pipe, timeout=0.020):
-    result = [None]
+    # bytes sentinel to keep typing and downstream logic simple
+    result: list[bytes] = [b'']
 
     def _reader():
         try:
@@ -135,6 +169,13 @@ def stop_motors():
 # ---------------------------------------------------------------------------
 
 proc               = launch_sandbox()
+# Drain sandbox stderr so the child can't block on a full pipe.
+_stderr_thread     = threading.Thread(
+    target=_drain_pipe_to_stderr,
+    args=(proc.stderr, f"sandbox:{team_id}"),
+    daemon=True,
+)
+_stderr_thread.start()
 last_steering      = 0.0
 last_speed         = 0.5
 warn_count         = 0
@@ -192,6 +233,12 @@ while robot.step(timestep) != -1:
         else:
             restart_stop_until = current_time + 2.0
             proc = launch_sandbox()
+            _stderr_thread = threading.Thread(
+                target=_drain_pipe_to_stderr,
+                args=(proc.stderr, f"sandbox:{team_id}"),
+                daemon=True,
+            )
+            _stderr_thread.start()
             stop_motors()
             continue
 

@@ -16,8 +16,8 @@ WorldInfo {
   title "AI Racer - Complex Track (track_complex)"
 }
 Viewpoint {
-  orientation -0.1456704169625872 0.8901452889167043 0.43176555471846445 0.7246007137539577
-  position -97.42337271811328 -7.351956514012585 100.55765852619605
+  orientation -0.28288016857974363 0.582316481205031 0.762158989936671 1.1349133602067913
+  position -64.19237621953822 -47.780854776017776 106.0348968458327
 }
 Background {
   skyColor [
@@ -29,7 +29,7 @@ DirectionalLight {
   intensity 1.5
 }
 Solid {
-  translation 76 66 -0.1
+  translation 40 125 0
   children [
     Shape {
       appearance PBRAppearance {
@@ -38,13 +38,13 @@ Solid {
         metalness 0
       }
       geometry Box {
-        size 260 200 0.2
+        size 500 500 0.1
       }
     }
   ]
   name "ground"
   boundingObject Box {
-    size 200 142 0.2
+    size 500 500 1
   }
 }
 Road {
@@ -796,25 +796,25 @@ Robot {
 }
 DEF car_1 CarPhoenix {
   name "car_1"
-  translation 52.9 -26 0.302
+  translation 52.9 -26 0.40
 }
 DEF car_2 CarThunder {
   name "car_2"
-  translation 53 -31.7 0.302
+  translation 53 -31.7 0.40
 }
 DEF car_3 CarViper {
   name "car_3"
-  translation 47 -26 0.302
+  translation 47 -26 0.40
 }
 DEF car_4 CarNova {
   name "car_4"
-  translation 47 -31.7 0.302
+  translation 47 -31.7 0.40
 }
 DEF car_5 CarFrost {
   name "car_5"
-  translation 41 -26 0.302
+  translation 41 -26 0.40
 }
 DEF car_6 CarShadow {
   name "car_6"
-  translation 41 -31.7 0.302
+  translation 41 -31.7 0.40
 }
