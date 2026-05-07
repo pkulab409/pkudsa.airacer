@@ -14,8 +14,8 @@ WorldInfo {
   title "AI Racer - Basic Oval Track (track_basic_oval)"
 }
 Viewpoint {
-  orientation -0.13503544989547778 0.9554848283017147 0.2623245511894929 0.988346599608358
-  position -122.21507268377759 -18.405964045215626 182.3083929058336
+  orientation -0.29110662269270354 0.010309888079966517 0.9566350612601581 3.0738675339568
+  position 268.9792141387429 -16.483950938560163 121.77089579799164
 }
 Background {
   skyColor [
@@ -27,22 +27,22 @@ DirectionalLight {
   intensity 1.5
 }
 Solid {
-  translation 40 125 -0.1
+  translation 40 125 0
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0.15 0.35 0.15
+        baseColor 0.3084 0.561822 0
         roughness 0.95
         metalness 0
       }
       geometry Box {
-        size 200 400 0.2
+        size 500 500 0.1
       }
     }
   ]
   name "ground"
   boundingObject Box {
-    size 200 400 0.2
+    size 500 500 1
   }
 }
 Road {
@@ -383,31 +383,31 @@ Robot {
 }
 DEF car_1 CarPhoenix {
   name "car_1"
-  translation -23 122.6 0.302
+  translation -23 122.6 0.4
   rotation 0 0 1 1.5707996938995747
 }
 DEF car_2 CarThunder {
   name "car_2"
-  translation -17 122.7 0.302
+  translation -17 122.7 0.4
   rotation 0 0 1 1.5707996938995747
 }
 DEF car_3 CarViper {
   name "car_3"
-  translation -17 114.7 0.302
+  translation -17 114.7 0.4
   rotation 0 0 1 1.5707996938995747
 }
 DEF car_4 CarNova {
   name "car_4"
-  translation -23 115 0.302
+  translation -23 115 0.4
   rotation 0 0 1 1.5707996938995747
 }
 DEF car_5 CarFrost {
   name "car_5"
-  translation -17 106.7 0.302
+  translation -17 106.7 0.4
   rotation 0 0 1 1.5707996938995747
 }
 DEF car_6 CarShadow {
   name "car_6"
-  translation -23 107 0.302
+  translation -23 107 0.4
   rotation 0 0 1 1.5707996938995747
 }

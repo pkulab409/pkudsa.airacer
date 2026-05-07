@@ -5,21 +5,24 @@
 
 典型用法
 --------
-# 最小用法：使用默认模板 + 默认世界
-python sdk/run_local.py --code-path sdk/example_controller.py
+# 最小用法：使用默认模板 + 默认世界（basic 椭圆赛道，车位 car_1 = CarPhoenix）
+python sdk/run_local.py --code-path sdk/my_controller.py
 
-# 指定队伍 ID / 车位 / 世界文件
+# 指定队伍 ID / 车位 / 赛道（短名）
 python sdk/run_local.py \
-    --code-path my_controller.py \
+    --code-path sdk/my_controller.py \
     --team-id my_team \
-    --car-slot car_1 \
-    --world simnode/webots/worlds/airacer.wbt
+    --car-slot car_2 \
+    --world complex
+
+# 查看所有可用赛道和车型
+python sdk/run_local.py --list-worlds
 
 # 只跑校验，不启动 Webots（CI / 提交前自检）
-python sdk/run_local.py --code-path my_controller.py --validate-only
+python sdk/run_local.py --code-path sdk/my_controller.py --validate-only
 
 # 不做校验直接跑（已知代码通过校验时使用）
-python sdk/run_local.py --code-path my_controller.py --skip-validate
+python sdk/run_local.py --code-path sdk/my_controller.py --skip-validate
 
 退出码
 ------
@@ -43,7 +46,17 @@ from typing import Optional
 SDK_DIR = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = SDK_DIR.parent
 
-DEFAULT_WORLD = REPO_ROOT / "simnode" / "webots" / "worlds" / "airacer.wbt"
+# 赛道/车型目录（单一信息源，见 sdk/worlds.py）
+if str(SDK_DIR) not in sys.path:
+    sys.path.insert(0, str(SDK_DIR))
+from worlds import (  # noqa: E402
+    DEFAULT_WORLD_KEY,
+    WORLDS,
+    format_catalog,
+    resolve_world,
+)
+
+DEFAULT_WORLD = WORLDS[DEFAULT_WORLD_KEY].path
 # 生成的临时 race_config 放到仓库根 .local/，避免污染 SDK 目录（便于打包分发）
 DEFAULT_CONFIG = REPO_ROOT / ".local" / "race_config.json"
 
@@ -67,6 +80,7 @@ def _make_config(
     team_id: str,
     car_slot: str,
     out_path: pathlib.Path,
+    car_model: Optional[str] = None,
 ) -> int:
     """调用 make_local_config.py 生成 race_config.json。"""
     cmd = [
@@ -77,6 +91,8 @@ def _make_config(
         "--out", str(out_path),
         "--force",
     ]
+    if car_model:
+        cmd += ["--car-model", car_model]
     print(f"[run_local] 生成配置: {' '.join(cmd)}")
     return subprocess.call(cmd)
 
@@ -207,14 +223,19 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    p.add_argument("--code-path", required=True,
-                   help="team_controller.py 的路径")
+    # --list-worlds 不需要 --code-path，因此 required 在 main() 里手动校验
+    p.add_argument("--code-path",
+                   help="team_controller.py 的路径（--list-worlds 时可省略）")
     p.add_argument("--team-id", default="local_team",
                    help="队伍 ID（默认 local_team）")
     p.add_argument("--car-slot", default="car_1",
-                   help="世界文件中的 Robot 节点名（默认 car_1，对应 airacer.wbt）")
-    p.add_argument("--world", default=str(DEFAULT_WORLD),
-                   help=f"Webots 世界文件路径（默认 {DEFAULT_WORLD.relative_to(REPO_ROOT)}）")
+                   help="赛道中的车位名（car_1 / car_2 / …；用 --list-worlds "
+                        "查看每个赛道的车位与对应车型）")
+    p.add_argument("--world", default=DEFAULT_WORLD_KEY,
+                   help=f"赛道：短名（{'/'.join(WORLDS)}）、"
+                        f".wbt 文件名、或完整路径。默认 {DEFAULT_WORLD_KEY}。")
+    p.add_argument("--list-worlds", action="store_true",
+                   help="列出所有可用赛道与车型后退出")
     try:
         _cfg_display = DEFAULT_CONFIG.relative_to(REPO_ROOT)
     except ValueError:
@@ -241,15 +262,46 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
 
+    # --- --list-worlds 捷径：直接打印后退出 ---
+    if args.list_worlds:
+        print(format_catalog())
+        return 0
+
+    if not args.code_path:
+        print("[run_local][error] 必须通过 --code-path 指定控制器文件 "
+              "（或改用 --list-worlds 查看赛道目录）", file=sys.stderr)
+        return 1
+
     code_path = pathlib.Path(args.code_path).expanduser().resolve()
     if not code_path.is_file():
         print(f"[run_local][error] 代码文件不存在: {code_path}", file=sys.stderr)
         return 1
 
-    world_path = pathlib.Path(args.world).expanduser().resolve()
+    # --- 解析 --world：短名 / 文件名 / 路径 ---
+    world_entry = resolve_world(args.world)
+    world_path = world_entry.path.resolve() if world_entry.path.is_absolute() \
+        else pathlib.Path(world_entry.path).expanduser().resolve()
+
     if not args.validate_only and not world_path.is_file():
-        print(f"[run_local][error] 世界文件不存在: {world_path}", file=sys.stderr)
+        print(f"[run_local][error] 世界文件不存在: {world_path}\n"
+              f"    提示：用 `python sdk/run_local.py --list-worlds` 查看可用赛道。",
+              file=sys.stderr)
         return 1
+
+    # --- 校验 --car-slot 是否存在于该赛道 ---
+    car_model_name: Optional[str] = None
+    if world_entry.cars:  # 只对已登记赛道做校验；自定义路径跳过
+        if args.car_slot not in world_entry.cars:
+            print(
+                f"[run_local][error] 车位 {args.car_slot!r} 不在赛道 "
+                f"{world_entry.key!r} 中。可用车位：{', '.join(world_entry.slots)}",
+                file=sys.stderr,
+            )
+            return 1
+        car = world_entry.cars[args.car_slot]
+        car_model_name = car.proto
+        print(f"[run_local] 赛道: {world_entry.title}")
+        print(f"[run_local] 车位: {args.car_slot} -> {car.label()}")
 
     rules_path: Optional[pathlib.Path] = None
     if args.rules:
@@ -270,7 +322,8 @@ def main() -> int:
 
     # --- Step 2: 生成 race_config.json ---
     config_path = pathlib.Path(args.config_out).expanduser().resolve()
-    rc = _make_config(code_path, args.team_id, args.car_slot, config_path)
+    rc = _make_config(code_path, args.team_id, args.car_slot, config_path,
+                      car_model=car_model_name)
     if rc != 0:
         print("[run_local] 生成 race_config 失败。", file=sys.stderr)
         return 1
