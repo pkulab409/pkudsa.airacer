@@ -23,9 +23,11 @@ ROI_BOT = int(IMG_H * 0.95)
 
 # Controller params
 KP, KI, KD = 1.2, 0.0, 0.35
-BASE_SPEED = 0.6
-MIN_SPEED = 0.5
-SPEED_TURN_PENALTY = 1.0
+# Increased base speed and lowered minimum to allow faster cruising
+BASE_SPEED = 0.85
+MIN_SPEED = 0.25
+# Reduce turn penalty so steering doesn't force excessive slow-down
+SPEED_TURN_PENALTY = 0.7
 STEER_CLAMP = 1.0
 
 # Obstacle detection
@@ -39,6 +41,14 @@ OBS_AVOID_GAIN = 0.9
 STEER_ALPHA = 0.65
 
 _state = {"prev_error": 0.0, "integral": 0.0, "prev_t": None, "steer_lpf": 0.0}
+
+
+def _reset_state() -> None:
+    """Reset internal PID / filter state (used by smoke tests)."""
+    _state["prev_error"] = 0.0
+    _state["integral"] = 0.0
+    _state["prev_t"] = None
+    _state["steer_lpf"] = 0.0
 
 
 def _estimate_lane_center_cv(bgr: np.ndarray) -> float | None:
@@ -102,7 +112,12 @@ def control(left_img: np.ndarray, right_img: np.ndarray, timestamp: float) -> tu
     if obs is not None:
         cnt, obs_x = obs
         centrality = max(0.0, 1.0 - abs(obs_x))
-        avoid_dir = -np.sign(obs_x) if abs(obs_x) > 0.05 else 1.0
+        # prefer steering away from the obstacle; if obstacle near center,
+        # pick the side opposite the current lane error so we steer around it
+        if abs(obs_x) > 0.05:
+            avoid_dir = -np.sign(obs_x)
+        else:
+            avoid_dir = -np.sign(lane_error) if lane_error != 0 else 1.0
         proximity = min(1.0, cnt / 2000.0)
         offset = OBS_AVOID_GAIN * avoid_dir * centrality * proximity
         error = float(np.clip(lane_error + offset, -1.5, 1.5))
@@ -118,7 +133,12 @@ def control(left_img: np.ndarray, right_img: np.ndarray, timestamp: float) -> tu
 
     steering_raw = KP * error + KI * _state["integral"] + KD * derivative
     if emergency:
-        steering_raw = -np.sign(obs_x) * STEER_CLAMP if abs(obs_x) > 0.02 else STEER_CLAMP
+        # In emergency, force a full steer away from obstacle. If obstacle
+        # is nearly centered, choose the side away from lane_error.
+        if abs(obs_x) > 0.02:
+            steering_raw = -np.sign(obs_x) * STEER_CLAMP
+        else:
+            steering_raw = -np.sign(lane_error) * STEER_CLAMP if lane_error != 0 else STEER_CLAMP
 
     steer_lpf = STEER_ALPHA * steering_raw + (1 - STEER_ALPHA) * _state["steer_lpf"]
     steering = float(np.clip(steer_lpf, -STEER_CLAMP, STEER_CLAMP))
