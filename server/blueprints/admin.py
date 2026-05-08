@@ -53,9 +53,9 @@ from server.database.action import (
     db_get_teams_with_code,
     db_get_waiting_session,
     db_get_zone,
+    db_get_zone_standings,
     db_get_zone_team_count,
     db_get_zone_team_ids,
-    db_get_zone_standings,
     db_get_zone_teams,
     db_list_zones,
     db_mark_session_aborted,
@@ -77,10 +77,20 @@ from server.race.state_machine import (
 )
 from server.utils.simnode_client import (
     SIMNODE_URL as _SIMNODE_URL,
+)
+from server.utils.simnode_client import (
     cancel_race as simnode_cancel_race,
+)
+from server.utils.simnode_client import (
     get_race_result as simnode_get_result,
+)
+from server.utils.simnode_client import (
     get_race_status as simnode_get_status,
+)
+from server.utils.simnode_client import (
     list_races as simnode_list_races,
+)
+from server.utils.simnode_client import (
     start_race as simnode_start_race,
 )
 
@@ -186,8 +196,7 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
 
     if stage == "placement":
         all_teams_list = [
-            all_teams[i * cars_per : (i + 1) * cars_per]
-            for i in range(total_sessions)
+            all_teams[i * cars_per : (i + 1) * cars_per] for i in range(total_sessions)
         ]
     elif stage == "group_stage":
         ranked = db_get_placement_rankings(conn, zone_id)
@@ -197,8 +206,7 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
         prev = db_get_stage_session_results(conn, zone_id, "group_stage")
         advancers = select_group_stage_advancers(prev)
         all_teams_list = [
-            advancers[i * cars_per : (i + 1) * cars_per]
-            for i in range(total_sessions)
+            advancers[i * cars_per : (i + 1) * cars_per] for i in range(total_sessions)
         ]
     elif stage == "final":
         prev_stage = "semi" if "semi" in bracket["stages"] else "placement"
@@ -248,7 +256,9 @@ async def _broadcast(
 def _build_cars(teams_data: list) -> list:
     """Pure file I/O: read each team's code file and base64-encode it."""
     template = (
-        pathlib.Path(__file__).resolve().parent.parent.parent / "sdk" / "team_controller.py"
+        pathlib.Path(__file__).resolve().parent.parent.parent
+        / "sdk"
+        / "team_controller.py"
     )
     cars = []
     for idx, t in enumerate(teams_data):
@@ -256,13 +266,19 @@ def _build_cars(teams_data: list) -> list:
         if code_path and pathlib.Path(code_path).exists():
             code_b64 = base64.b64encode(pathlib.Path(code_path).read_bytes()).decode()
         else:
-            code_b64 = base64.b64encode(template.read_bytes()).decode() if template.exists() else ""
-        cars.append({
-            "car_slot": f"car_{idx + 1}",
-            "team_id": t["id"],
-            "team_name": t["name"],
-            "code_b64": code_b64,
-        })
+            code_b64 = (
+                base64.b64encode(template.read_bytes()).decode()
+                if template.exists()
+                else ""
+            )
+        cars.append(
+            {
+                "car_slot": f"car_{idx + 1}",
+                "team_id": t["id"],
+                "team_name": t["name"],
+                "code_b64": code_b64,
+            }
+        )
     return cars
 
 
@@ -286,17 +302,19 @@ async def list_zones(_auth=Depends(require_admin)):
     result = []
     for r in rows:
         sm = get_zone_sm(r["id"])
-        result.append({
-            "zone_id":         r["id"],
-            "id":              r["id"],
-            "name":            r["name"],
-            "description":     r["description"],
-            "total_laps":      r["total_laps"],
-            "created_at":      r["created_at"],
-            "team_count":      r["team_count"],
-            "state":           sm.state.value,
-            "running_session": _zone_running_session.get(r["id"]),
-        })
+        result.append(
+            {
+                "zone_id": r["id"],
+                "id": r["id"],
+                "name": r["name"],
+                "description": r["description"],
+                "total_laps": r["total_laps"],
+                "created_at": r["created_at"],
+                "team_count": r["team_count"],
+                "state": sm.state.value,
+                "running_session": _zone_running_session.get(r["id"]),
+            }
+        )
     return result
 
 
@@ -311,7 +329,9 @@ async def create_zone(body: ZoneCreateBody, _auth=Depends(require_admin)):
     now = datetime.datetime.now().isoformat()
     try:
         with get_db(DB_PATH) as conn:
-            db_create_zone(conn, body.id, body.name, body.description, body.total_laps, now)
+            db_create_zone(
+                conn, body.id, body.name, body.description, body.total_laps, now
+            )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail=f"赛区ID已存在: {body.id}")
     return {"status": "created", "zone_id": body.id}
@@ -387,14 +407,16 @@ async def get_stage_sessions(zone_id: str, _auth=Depends(require_admin)):
     sessions = []
     for r in rows:
         team_ids = json.loads(r["team_ids"]) if r["team_ids"] else []
-        sessions.append({
-            "id": r["id"],
-            "type": r["type"],
-            "total_laps": r["total_laps"],
-            "team_count": len(team_ids),
-            "team_ids": team_ids,
-            "phase": r["phase"],
-        })
+        sessions.append(
+            {
+                "id": r["id"],
+                "type": r["type"],
+                "total_laps": r["total_laps"],
+                "team_count": len(team_ids),
+                "team_ids": team_ids,
+                "phase": r["phase"],
+            }
+        )
     return {
         "zone_id": zone_id,
         "current_stage": current_stage,
@@ -425,14 +447,20 @@ async def zone_set_session(
         else:
             br = compute_bracket(len(team_ids))
             total_laps = br["laps_per_stage"].get(body.session_type, zone["total_laps"])
-        team_ids = body.team_ids if body.team_ids is not None else db_get_zone_team_ids(conn, zone_id)
+        team_ids = (
+            body.team_ids
+            if body.team_ids is not None
+            else db_get_zone_team_ids(conn, zone_id)
+        )
 
         try:
             teams_data = db_get_teams_with_code(conn, team_ids)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-        db_upsert_session(conn, body.session_id, body.session_type, team_ids, total_laps, zone_id)
+        db_upsert_session(
+            conn, body.session_id, body.session_type, team_ids, total_laps, zone_id
+        )
 
     return {
         "status": "ready",
@@ -462,9 +490,7 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
             _pre_create_stage_sessions(conn, zone_id, stage, bracket)
             row = db_get_waiting_session(conn, zone_id)
             if row is None:
-                raise HTTPException(
-                    status_code=500, detail="自动创建场次失败"
-                )
+                raise HTTPException(status_code=500, detail="自动创建场次失败")
 
     session_id = row["id"]
     session_type = row["type"]
@@ -538,18 +564,18 @@ async def zone_reset(zone_id: str, _auth=Depends(require_admin)):
 
 @router.post("/zones/{zone_id}/finalize")
 async def zone_finalize(zone_id: str, _auth=Depends(require_admin)):
-    """Advance the zone to the next stage, automatically selecting advancing teams."""
+    """推进赛程：计算下一阶段对阵，预创建所有场次，切回 IDLE。"""
     sm = get_zone_sm(zone_id)
     current = sm.state.value
 
     next_state_map = {
         "PLACEMENT_FINISHED": RaceState.PLACEMENT_DONE,
-        "PLACEMENT_ABORTED":  RaceState.PLACEMENT_DONE,
+        "PLACEMENT_ABORTED": RaceState.PLACEMENT_DONE,
         "GROUP_STAGE_FINISHED": RaceState.GROUP_STAGE_DONE,
-        "GROUP_STAGE_ABORTED":  RaceState.GROUP_STAGE_DONE,
-        "SEMI_FINISHED":       RaceState.SEMI_DONE,
-        "SEMI_ABORTED":        RaceState.SEMI_DONE,
-        "FINAL_FINISHED":      RaceState.CLOSED,
+        "GROUP_STAGE_ABORTED": RaceState.GROUP_STAGE_DONE,
+        "SEMI_FINISHED": RaceState.SEMI_DONE,
+        "SEMI_ABORTED": RaceState.SEMI_DONE,
+        "FINAL_FINISHED": RaceState.CLOSED,
     }
     next_state = next_state_map.get(current)
     if next_state is None:
@@ -562,8 +588,23 @@ async def zone_finalize(zone_id: str, _auth=Depends(require_admin)):
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
 
+    # 决赛结束 → 关闭赛事，无需创建下一阶段
+    if next_state == RaceState.CLOSED:
+        await _broadcast("closed", zone_id=zone_id)
+        return {"state": sm.state.value, "zone_id": zone_id, "next_stage": None}
+
+    # 计算下一阶段对阵，预创建所有 waiting 场次
+    with get_db(DB_PATH) as conn:
+        team_count = db_get_zone_team_count(conn, zone_id)
+        bracket = compute_bracket(team_count)
+        next_stage = _determine_current_stage(conn, zone_id, bracket)
+        if next_stage:
+            _pre_create_stage_sessions(conn, zone_id, next_stage, bracket)
+
+    # 切回 IDLE，管理员可以点「开始比赛」逐个执行
+    sm.reset()
     await _broadcast("idle", zone_id=zone_id)
-    return {"state": sm.state.value, "zone_id": zone_id}
+    return {"state": sm.state.value, "zone_id": zone_id, "next_stage": next_stage}
 
 
 # ---------------------------------------------------------------------------
@@ -628,6 +669,7 @@ async def _handle_finished(
     with get_db(DB_PATH) as conn:
         db_mark_session_finished(conn, session_id, now)
         from server.database.action import update_race_session as _update_race_session
+
         _update_race_session(conn, session_id, result=result)
 
     _zone_running_session.pop(zone_id, None)
@@ -663,19 +705,9 @@ async def _after_race_complete(zone_id: str, stage: str):
         except ValueError:
             pass
     else:
-        # Stage complete — finalize
-        next_map = {
-            "placement":    RaceState.PLACEMENT_DONE,
-            "group_stage":  RaceState.GROUP_STAGE_DONE,
-            "semi":         RaceState.SEMI_DONE,
-            "final":        RaceState.CLOSED,
-        }
-        target = next_map.get(stage)
-        if target:
-            try:
-                sm.transition(target)
-            except ValueError:
-                pass
+        # All sessions done — stay in _FINISHED / _ABORTED,
+        # wait for admin to click "推进赛程" (zone_finalize)
+        pass
 
     await _broadcast(sm.state.value, zone_id=zone_id)
 
@@ -696,12 +728,12 @@ async def _handle_aborted(session_id: str, session_type: str, zone_id: str = "de
         meta_file.write_text(
             json.dumps(
                 {
-                    "session_id":     session_id,
-                    "session_type":   session_type,
-                    "zone_id":        zone_id,
-                    "finish_reason":  "aborted",
-                    "recorded_at":    now,
-                    "teams":          [],
+                    "session_id": session_id,
+                    "session_type": session_type,
+                    "zone_id": zone_id,
+                    "finish_reason": "aborted",
+                    "recorded_at": now,
+                    "teams": [],
                     "final_rankings": [],
                 },
                 ensure_ascii=False,
@@ -733,6 +765,7 @@ async def lock_submissions(_auth=Depends(require_admin)):
 
     # Transition all zones from REGISTRATION → IDLE
     from server.race.state_machine import RaceState, all_zone_ids, get_zone_sm
+
     for zone_id in all_zone_ids():
         sm = get_zone_sm(zone_id)
         if sm.state == RaceState.REGISTRATION:
@@ -743,14 +776,15 @@ async def lock_submissions(_auth=Depends(require_admin)):
 
 @router.post("/unlock-submissions")
 async def unlock_submissions(_auth=Depends(require_admin)):
-    from server.blueprints.submission import _save_lock_state
     import server.blueprints.submission as sub_module
+    from server.blueprints.submission import _save_lock_state
 
     sub_module.submissions_locked = False
     _save_lock_state(False)
 
     # Transition all zones from IDLE → REGISTRATION
     from server.race.state_machine import RaceState, all_zone_ids, get_zone_sm
+
     for zone_id in all_zone_ids():
         sm = get_zone_sm(zone_id)
         if sm.state == RaceState.IDLE:
