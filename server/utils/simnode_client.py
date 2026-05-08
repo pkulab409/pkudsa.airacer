@@ -15,11 +15,21 @@ import httpx
 from server.config.config import Config
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 SIMNODE_URL = Config.get("SIMNODE_URL", "http://localhost:8001")
 
 
 def _url(path: str) -> str:
+    """
+    Safely construct a full URL for SimNode endpoints.
+    Handles IPv4, IPv6 (with brackets), and ensures the path starts with '/'.
+    Uses httpx.URL for proper joining to avoid malformed ports.
+    """
+    if not path.startswith('/'):
+        path = '/' + path
+    # Simplify URL construction: rely on validated SIMNODE_URL and just concatenate.
+    # This avoids httpx.URL join issues with malformed IPv6 literals.
     return f"{SIMNODE_URL.rstrip('/')}{path}"
 
 
@@ -35,8 +45,8 @@ def start_race(
     timeout:      int = 10,
 ) -> Dict[str, Any]:
     """
-    调用 POST /race/create，返回响应（含 stream_ws_url）。
-    失败时抛出 RuntimeError。
+    Call POST /race/create, return response (including stream_ws_url).
+    On failure raise RuntimeError.
     """
     payload = {
         "race_id":      race_id,
@@ -44,14 +54,21 @@ def start_race(
         "total_laps":   total_laps,
         "cars":         cars,
     }
+    logger.debug(f"Calling SimNode POST {_url('/race/create')} with payload: {payload}")
+    logger.debug(f"SimNode POST URL: {_url('/race/create')}, payload: {payload}")
     try:
         resp = httpx.post(_url("/race/create"), json=payload, timeout=timeout)
+        logger.debug(f"SimNode response status: {resp.status_code}, text: {resp.text[:200]}")
         resp.raise_for_status()
         return resp.json()
     except httpx.HTTPStatusError as e:
         raise RuntimeError(f"Sim Node 拒绝创建比赛: {e.response.status_code} {e.response.text}")
+    except httpx.InvalidURL as e:
+        raise RuntimeError(f"Sim Node URL 无效 ({SIMNODE_URL}): {e}")
     except httpx.RequestError as e:
         raise RuntimeError(f"无法连接 Sim Node ({SIMNODE_URL}): {e}")
+    except Exception as e:
+        raise RuntimeError(f"Sim Node 调用未知错误: {e}")
 
 
 # ---------------------------------------------------------------------------

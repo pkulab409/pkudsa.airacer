@@ -159,6 +159,23 @@ def db_get_waiting_session(conn, zone_id: str) -> Optional[Dict]:
     ).fetchone()
     return dict(row) if row else None
 
+def db_get_all_waiting_sessions(conn, zone_id: str) -> list:
+    rows = conn.execute(
+        """SELECT id, type, total_laps, team_ids FROM race_sessions
+           WHERE phase='waiting' AND zone_id=?
+           ORDER BY rowid DESC""",
+        (zone_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+def db_get_specific_waiting_session(conn, zone_id: str, session_id: str) -> dict | None:
+    row = conn.execute(
+        """SELECT id, type, total_laps FROM race_sessions
+           WHERE phase='waiting' AND zone_id=? AND id=?""",
+        (zone_id, session_id),
+    ).fetchone()
+    return dict(row) if row else None
+
 
 def db_mark_session_running(conn, session_id: str, started_at: str):
     conn.execute(

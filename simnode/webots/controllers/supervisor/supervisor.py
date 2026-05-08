@@ -19,7 +19,12 @@ from controller import Supervisor
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())  # 64 ms
 
-config_path = os.environ.get('RACE_CONFIG_PATH', 'race_config.json')
+config_path = os.environ.get('RACE_CONFIG_PATH')
+if not config_path:
+    # Default to config file located alongside this controller script
+    config_path = pathlib.Path(__file__).parent / 'race_config.json'
+# Ensure the path is a string for open()
+config_path = str(config_path)
 with open(config_path, encoding='utf-8') as f:
     config = json.load(f)
 
@@ -31,14 +36,19 @@ cars_config    = config['cars']  # list of dicts
 
 # ---------------------------------------------------------------------------
 # Checkpoints
-# TODO: Update checkpoint coordinates after airacer.wbt track is finalized
+# 根据 track_complex 复杂赛道的真实坐标配置 (half_w 和 half_h 为触发判定的宽容度)
 # ---------------------------------------------------------------------------
 
 CHECKPOINTS = [
-    {"id": 0, "cx":  0.0,  "cy":   0.0, "half_w": 4.0, "half_h": 1.0, "track_heading":  0.0},   # CP0 - start/finish
-    {"id": 1, "cx": 40.0,  "cy":   0.0, "half_w": 1.0, "half_h": 4.0, "track_heading":  1.57},  # CP1
-    {"id": 2, "cx": 50.0,  "cy": -40.0, "half_w": 4.0, "half_h": 1.0, "track_heading":  3.14},  # CP2
-    {"id": 3, "cx":  0.0,  "cy": -40.0, "half_w": 1.0, "half_h": 4.0, "track_heading": -1.57},  # CP3
+    {"id": 0, "cx":  56.0, "cy": -29.0, "half_w": 6.0, "half_h": 6.0, "track_heading": -1.57},  # 终点/起点
+    {"id": 1, "cx": 199.0, "cy":   0.0, "half_w": 6.0, "half_h": 6.0, "track_heading":  0.00},
+    {"id": 2, "cx": 199.0, "cy": 103.0, "half_w": 6.0, "half_h": 6.0, "track_heading":  0.00},
+    {"id": 3, "cx": 158.0, "cy": 160.0, "half_w": 6.0, "half_h": 6.0, "track_heading": -1.57},
+    {"id": 4, "cx":  92.0, "cy": 159.0, "half_w": 6.0, "half_h": 6.0, "track_heading": -1.57},
+    {"id": 5, "cx":  47.5, "cy":  60.0, "half_w": 6.0, "half_h": 6.0, "track_heading":  3.14},
+    {"id": 6, "cx":  -5.0, "cy": 150.0, "half_w": 6.0, "half_h": 6.0, "track_heading": -1.57},
+    {"id": 7, "cx": -22.0, "cy":  98.0, "half_w": 6.0, "half_h": 6.0, "track_heading":  1.57},
+    {"id": 8, "cx": -18.0, "cy":  40.0, "half_w": 6.0, "half_h": 6.0, "track_heading": -1.44},
 ]
 
 

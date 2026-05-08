@@ -14,6 +14,7 @@ from simnode.config.config import Config
 
 logging.basicConfig(level=Config.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 app = FastAPI(title="AI Racer Sim Node", version="1.0.0")
 
@@ -88,6 +89,7 @@ async def _broadcast(race_id: str, message: str) -> None:
 
 @app.post("/race/create", response_model=RaceCreateResponse)
 async def create_race(body: RaceCreateRequest):
+    logger.debug(f"Received create_race request: {body}")
     manager = RaceManager()
 
     async with _ws_lock:
@@ -105,10 +107,9 @@ async def create_race(body: RaceCreateRequest):
             cars=cars_data,
             ws_push_callback=ws_callback,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        logger.debug("Race started successfully")
     except Exception as e:
-        logger.exception(f"启动比赛 {body.race_id} 失败")
+        logger.exception("Error starting race")
         raise HTTPException(status_code=500, detail=str(e))
 
     host = Config.get("SIMNODE_HOST", "localhost:8001")

@@ -307,9 +307,14 @@
             <div class="col-md-4">
               <label class="form-label">
                 参赛队伍
-                <small class="text-muted fw-normal">每行一个 team_id，留空=全部</small>
+                <small class="text-muted fw-normal">(不勾选则默认赛区全部队伍)</small>
               </label>
-              <textarea id="f-teams" class="form-control" rows="3" placeholder="team_001&#10;team_002"></textarea>
+              <!-- 搜索框 -->
+              <input type="text" id="f-teams-search" class="form-control form-control-sm mb-1" placeholder="搜索队伍..." onkeyup="filterTeams()">
+              <!-- 队伍多选列表 -->
+              <div id="f-teams-list" class="border rounded p-2" style="height: 75px; overflow-y: auto; background: #fff;">
+                <div class="text-muted small">请先选择赛区...</div>
+              </div>
             </div>
             <div class="col-12">
               <button class="btn btn-primary" onclick="doSetSession()">配置场次</button>
@@ -320,8 +325,17 @@
         <!-- Action buttons -->
         <div class="ctrl-card">
           <h5>操作</h5>
+          <div class="mb-3 p-3 border rounded bg-light text-dark">
+            <label class="form-label fw-bold">选择要开始的比赛：</label>
+            <div class="d-flex gap-2">
+              <select id="f-start-session" class="form-select shadow-sm" style="max-width: 600px;">
+                <option value="">-- 默认最新场次 --</option>
+              </select>
+              <button class="btn btn-outline-secondary text-nowrap" onclick="loadWaitingSessions()">刷新列表</button>
+            </div>
+          </div>
           <div class="action-btn-group">
-            <button class="btn btn-success" onclick="doZoneAction('start-race')">&#9654; 开始比赛</button>
+            <button class="btn btn-success" onclick="startSelectedRace()">&#9654; 开始比赛</button>
             <button class="btn btn-danger"  onclick="doZoneAction('stop-race')">&#9632; 停止比赛</button>
             <button class="btn btn-secondary" style="background:#6b7280;border:none;" onclick="doZoneAction('reset')">&#8617; 重置赛区</button>
             <button class="btn btn-warning"  onclick="doZoneAction('finalize')">&#8594; 推进阶段</button>
@@ -616,7 +630,8 @@ async function bootApp() {
 ================================================================ */
 function connectWS() {
   if (_ws) { try { _ws.close(); } catch(e) {} }
-  try { _ws = new WebSocket('ws://' + location.host + '/ws/admin'); }
+  var proto = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+try { _ws = new WebSocket(proto + location.host + '/ws/admin'); }
   catch(e) { console.warn('WS unavailable'); return; }
 
   _ws.onmessage = function(ev) {
@@ -738,7 +753,7 @@ function nav(name, linkEl) {
   stopOverhead();
 
   if (name === 'overview')   loadZones();
-  if (name === 'control')    startOverhead();
+  if (name === 'control')    { startOverhead(); loadWaitingSessions(); loadZoneTeamsForSelection(); }
   if (name === 'standings')  { loadStandings(); _standingsTmr = setInterval(loadStandings, 30000); }
   if (name === 'teams')      loadTeams();
   if (name === 'recordings') loadRecordings();
@@ -747,24 +762,120 @@ function nav(name, linkEl) {
 /* ================================================================
    RACE CONTROL
 ================================================================ */
+async function loadWaitingSessions() {
+  if (!currentZone) return;
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/waiting-sessions');
+    var d = r.ok ? await r.json() : [];
+    var sel = document.getElementById('f-start-session');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- 默认最新场次 --</option>' + d.map(function(s) {
+      var t = (s.team_ids && s.team_ids.length) ? s.team_ids.join(', ') : '无';
+      return '<option value="' + s.id + '">ID: ' + s.id + ' | 类型: ' + s.type + ' | 圈数: ' + s.total_laps + ' | 队伍: ' + t + '</option>';
+    }).join('');
+  } catch(e) { console.warn('Failed to load waiting sessions', e); }
+}
+
+async function startSelectedRace() {
+  if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
+  var sid = document.getElementById('f-start-session').value;
+  var body = sid ? { session_id: sid } : {};
+  try {
+    var r = await api('POST', '/api/admin/zones/' + currentZone + '/start-race', body);
+
+    // ---------- 关键改动 ----------
+    // 先把响应体读取为文本（只会消费一次），再根据状态决定是否解析为 JSON
+    const rawText = await r.text();          // <-- 只读取一次
+    let d;
+    if (r.ok) {
+      // 成功：尝试把文本解析为 JSON（后端应返回合法 JSON）
+      try {
+        d = JSON.parse(rawText);
+      } catch (_) {
+        // 若意外返回非 JSON，仍把原始文本当作 message
+        d = { message: rawText };
+      }
+    } else {
+      // 失败：同样尝试解析为 JSON，若失败则直接使用原始文本
+      try {
+        d = JSON.parse(rawText);
+      } catch (_) {
+        d = { message: rawText };
+      }
+    }
+    // ---------------------------------
+
+    toast(r.ok
+          ? (d.message || '比赛启动成功')
+          : (d.detail || d.message || '启动失败'),
+          r.ok ? 'success' : 'danger');
+
+    if (r.ok) loadWaitingSessions();
+  } catch (e) {
+    toast('请求失败: ' + e.message, 'danger');
+  }
+}
+
 async function doSetSession() {
   if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
   var type = document.getElementById('f-type').value;
   var sid  = document.getElementById('f-sid').value.trim();
   var laps = document.getElementById('f-laps').value;
-  var raw  = document.getElementById('f-teams').value.trim();
-  var teams = raw ? raw.split('\n').map(function(t){ return t.trim(); }).filter(Boolean) : [];
+  
+  // 收集已勾选的队伍
+  var teams = [];
+  document.querySelectorAll('.team-cb:checked').forEach(function(cb) {
+    teams.push(cb.value);
+  });
 
   var body = { session_type: type };
   if (sid)        body.session_id = sid;
-  if (laps)       body.laps = parseInt(laps);
-  if (teams.length) body.teams = teams;
+  if (laps)       body.total_laps = parseInt(laps);
+  // 【修复核心】以前是 body.teams = teams; 现已修正为后端需要的 team_ids
+  if (teams.length) body.team_ids = teams; 
 
   try {
     var r = await api('POST', '/api/admin/zones/' + currentZone + '/set-session', body);
     var d = await r.json();
     toast(r.ok ? (d.message || '场次已配置') : (d.detail || d.message || '配置失败'), r.ok ? 'success' : 'danger');
+    if (r.ok && typeof loadWaitingSessions === 'function') loadWaitingSessions();
   } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+// —— 新增功能：为配置面板加载带 Checkbox 的队伍列表 ——
+async function loadZoneTeamsForSelection() {
+  var container = document.getElementById('f-teams-list');
+  if (!container) return;
+  if (!currentZone) {
+    container.innerHTML = '<div class="text-muted small">请先选择赛区...</div>';
+    return;
+  }
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/teams');
+    var d = r.ok ? await r.json() : [];
+    if (!d.length) {
+      container.innerHTML = '<div class="text-muted small">当前赛区无队伍</div>';
+      return;
+    }
+    container.innerHTML = d.map(function(t) {
+      var tid = t.id || t.team_id;
+      var label = tid + (t.name ? ' (' + t.name + ')' : '');
+      return '<div class="form-check team-item">' +
+             '<input class="form-check-input team-cb" type="checkbox" value="' + esc(tid) + '" id="cb-' + esc(tid) + '">' +
+             '<label class="form-check-label" for="cb-' + esc(tid) + '">' + esc(label) + '</label>' +
+             '</div>';
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="text-danger small">加载队伍失败</div>';
+  }
+}
+
+function filterTeams() {
+  var q = document.getElementById('f-teams-search').value.toLowerCase();
+  document.querySelectorAll('.team-item').forEach(function(el) {
+    var txt = el.textContent.toLowerCase();
+    el.style.display = txt.indexOf(q) > -1 ? 'block' : 'none';
+  });
 }
 
 async function doZoneAction(action) {
@@ -788,11 +899,26 @@ function applyLiveStatus(msg) {
   if (sb) { sb.className = 'badge badge-state-' + (msg.state || 'idle') + ' ms-auto'; sb.textContent = msg.state || '--'; }
 
   setText('live-session-id', msg.session_id || '--');
-  setText('live-sim-time',   msg.sim_time != null ? msg.sim_time.toFixed(1) + 's' : '--');
-  setText('live-stage',      msg.session_type || msg.current_stage || '--');
-  setText('live-vehicle-count', msg.vehicles ? Object.keys(msg.vehicles).length : '--');
+  // 兼容：后端可能发 sim_time_approx(int) 或 sim_time(float)
+var t = (msg.sim_time != null) ? msg.sim_time : msg.sim_time_approx;
+setText('live-sim-time', t != null ? (Number(t).toFixed(1) + 's') : '--');
 
-  renderVehicles(msg.vehicles);
+// 兼容：后端不一定发 session_type；至少用 current_stage 或 fallback
+setText('live-stage', msg.session_type || msg.current_stage || msg.stage || '--');
+
+// 车辆数据：兼容 vehicles(dict) 或 live_cars(list)
+var vehiclesDict = msg.vehicles;
+if (!vehiclesDict && Array.isArray(msg.live_cars)) {
+  vehiclesDict = {};
+  msg.live_cars.forEach(function(c) {
+    // 尽量用 team_id 做 key
+    var tid = c.team_id || c.id || c.car_slot || ('car_' + Math.random());
+    vehiclesDict[tid] = c;
+  });
+}
+
+setText('live-vehicle-count', vehiclesDict ? Object.keys(vehiclesDict).length : '--');
+renderVehicles(vehiclesDict);
 }
 
 function setCtrlBadge(state) {
@@ -825,9 +951,16 @@ function renderVehicles(vehicles) {
     var tid = e[0], v = e[1];
     return '<tr>'
       + '<td>' + esc(tid) + '</td>'
-      + '<td>' + (v.lap != null ? v.lap : '--') + '</td>'
-      + '<td>' + (v.speed != null ? v.speed.toFixed(1) : '--') + '</td>'
-      + '<td><span class="badge badge-state-' + (v.status||'idle') + '">' + (v.status||'--') + '</span></td>'
+      var lap = (v.lap != null) ? v.lap : (v.laps != null ? v.laps : '--');
+var spd = (v.speed != null) ? v.speed : (v.v != null ? v.v : (v.spd != null ? v.spd : null));
+var st  = v.status || v.state || 'idle';
+
+return '<tr>'
+  + '<td>' + esc(tid) + '</td>'
+  + '<td>' + lap + '</td>'
+  + '<td>' + (spd != null ? Number(spd).toFixed(1) : '--') + '</td>'
+  + '<td><span class="badge badge-state-' + esc(st) + '">' + esc(st) + '</span></td>'
+  + '</tr>';
       + '</tr>';
   }).join('');
 }
@@ -898,13 +1031,13 @@ async function loadTeams() {
       return;
     }
     tbody.innerHTML = d.map(function(t) {
-      var ts = t.registered_at ? new Date(t.registered_at).toLocaleString('zh-CN') : '--';
+      var ts = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '--';
       return '<tr>'
-        + '<td class="ps-3 fw-semibold">' + esc(t.team_id) + '</td>'
+        + '<td class="ps-3 fw-semibold">' + esc(t.id) + '</td>'
         + '<td>' + esc(t.name||'--') + '</td>'
         + '<td>' + ts + '</td>'
         + '<td>' + (t.active_slot != null ? t.active_slot : '--') + '</td>'
-        + '<td><code>' + esc(t.version||'--') + '</code></td>'
+        + '<td><code>' + esc(t.active_version||'--') + '</code></td>'
         + '</tr>';
     }).join('');
   } catch(e) { console.warn('teams', e); }

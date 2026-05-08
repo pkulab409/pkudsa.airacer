@@ -6,6 +6,8 @@ Backend 配置模块，对应 Avalon 的 config/config.py 模式。
 import os
 import pathlib
 import yaml
+import httpx
+import logging
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # 项目根目录
 
@@ -16,7 +18,7 @@ _DEFAULTS = {
     "ADMIN_PASSWORD":      "12345",
     "SERVER_HOST":         "0.0.0.0",
     "SERVER_PORT":         "8000",
-    "SIMNODE_URL":         "http://localhost:8001",   # Sim Node HTTP 基地址
+    "SIMNODE_URL":         "http://127.0.0.1:5000",   # Sim Node HTTP 基地址
 }
 
 _config: dict = {}
@@ -58,3 +60,11 @@ ADMIN_PASSWORD   = Config.get("ADMIN_PASSWORD")
 SERVER_HOST      = Config.get("SERVER_HOST")
 SERVER_PORT      = int(Config.get("SERVER_PORT"))
 SIMNODE_URL      = Config.get("SIMNODE_URL")
+
+# Validate SIMNODE_URL – ensure it can be parsed by httpx.URL; otherwise fall back to default
+try:
+    _ = httpx.URL(SIMNODE_URL)  # just to validate
+except Exception as e:
+    logger = logging.getLogger(__name__)
+    logger.warning(f"SIMNODE_URL 配置无效 ({SIMNODE_URL})，使用默认值 http://localhost:5000: {e}")
+    SIMNODE_URL = "http://localhost:5000"

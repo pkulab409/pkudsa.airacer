@@ -26,6 +26,7 @@ import asyncio
 import base64
 import datetime
 import json
+import logging
 import pathlib
 import secrets
 import sqlite3
@@ -33,7 +34,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
@@ -80,12 +81,19 @@ from server.utils.simnode_client import (
 router = APIRouter(prefix="/api/admin")
 _security = HTTPBasic()
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
 
 
 def require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> None:
+    """
+    Basic Auth 检查，只验证密码（用户名可以为空或任意）。
+    这样前端只需要提供密码即可通过认证。
+    """
+    # 只比较密码，忽略用户名
     ok = secrets.compare_digest(credentials.password.encode(), ADMIN_PASSWORD.encode())
     if not ok:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -95,7 +103,10 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> Non
 # Request models
 # ---------------------------------------------------------------------------
 
+class StartRaceBody(BaseModel):
+    session_id: Optional[str] = None
 
+    
 class ZoneCreateBody(BaseModel):
     id: str
     name: str
@@ -215,7 +226,17 @@ def _get_running_session_id(zone_id: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/zones")
+
+@router.get("/zones/{zone_id}/waiting-sessions")
+async def get_waiting_sessions(zone_id: str, _auth=Depends(require_admin)):
+    from server.database.action import db_get_all_waiting_sessions
+    with get_db(DB_PATH) as conn:
+        sessions = db_get_all_waiting_sessions(conn, zone_id)
+        for s in sessions:
+            s["team_ids"] = json.loads(s["team_ids"]) if s["team_ids"] else []
+        return sessions
+
+@router.get("/zones")   
 async def list_zones(_auth=Depends(require_admin)):
     with get_db(DB_PATH) as conn:
         rows = db_list_zones(conn)
@@ -325,16 +346,38 @@ async def zone_set_session(
 
 
 @router.post("/zones/{zone_id}/start-race")
-async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
+async def zone_start_race(zone_id: str, body: StartRaceBody = None, _auth=Depends(require_admin)):
+    from server.database.action import db_get_specific_waiting_session
     sm = get_zone_sm(zone_id)
 
+    # ---------- 新增检查 ----------
+    # 如果当前状态已经是对应的 RUNNING 状态，直接返回 JSON 错误，避免 Illegal transition
+    # 这里先获取当前状态，再判断是否已经在运行中
+    from fastapi.responses import JSONResponse   # <‑‑ 确保已导入
+    current_state = sm.state
+    if current_state in (
+        RaceState.QUALIFYING_RUNNING,
+        RaceState.GROUP_RACE_RUNNING,
+        RaceState.SEMI_RUNNING,
+        RaceState.FINAL_RUNNING,
+    ):
+        # 直接返回 409 JSON，前端的 toast 会读取 `detail`
+        return JSONResponse(
+            status_code=409,
+            content={"detail": f"赛区当前已在 {current_state.value} 状态，不能再次启动比赛"}
+        )
+    # --------------------------------
+
     with get_db(DB_PATH) as conn:
-        row = db_get_waiting_session(conn, zone_id)
+        if body and body.session_id:
+            row = db_get_specific_waiting_session(conn, zone_id, body.session_id)
+        else:
+            row = db_get_waiting_session(conn, zone_id)
 
     if row is None:
         raise HTTPException(
             status_code=409,
-            detail="该赛区没有 'waiting' 阶段的场次，请先调用 set-session",
+            detail="指定的场次不存在，或该赛区没有 'waiting' 阶段的场次，请先配置场次",
         )
 
     session_id = row["id"]
@@ -343,6 +386,18 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
     target_state = _running_state_for(session_type)
 
     try:
+        # 如果赛区已经在运行状态，先尝试取消已有比赛再继续
+        if sm.is_running():
+            # 取消当前比赛（如果有对应的 session）
+            current_sid = _zone_running_session.get(zone_id)
+            if current_sid:
+                try:
+                    # 直接调用取消接口，忽略错误
+                    await asyncio.to_thread(simnode_cancel_race, current_sid)
+                except Exception:
+                    pass
+                # 重置状态机
+                sm.reset()
         sm.transition(target_state)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
@@ -355,6 +410,7 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
         )
 
     try:
+        logger.debug(f"Calling SimNode start_race with URL {_SIMNODE_URL}, session_id={session_id}")
         resp = await asyncio.to_thread(
             simnode_start_race, session_id, session_type, total_laps, cars
         )
@@ -642,6 +698,10 @@ async def close_event(_auth=Depends(require_admin)):
 
 @router.get("/live-frame/{session_id}")
 async def get_live_frame(session_id: str, _auth=Depends(require_admin)):
+    # Validate session_id to prevent unsafe characters (e.g., IPv6 literals)
+    import re
+    if not re.fullmatch(r'[a-zA-Z0-9_-]+', session_id):
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
