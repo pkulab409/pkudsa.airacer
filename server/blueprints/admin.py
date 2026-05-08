@@ -220,11 +220,18 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
     else:
         all_teams_list = [all_teams[:cars_per]]
 
+    # 清理同 zone+stage 的旧 waiting 场次，避免时间戳导致累积重复
+    conn.execute(
+        "UPDATE race_sessions SET phase='cancelled' WHERE zone_id=? AND type=? AND phase='waiting'",
+        (zone_id, stage),
+    )
+
+    ts = int(datetime.datetime.now().timestamp())
     first_sid = None
     for i, team_ids in enumerate(all_teams_list):
         if not team_ids:
             continue
-        sid = f"{zone_id}_{stage}_{i + 1}"
+        sid = f"{zone_id}_{stage}_{i + 1}_{ts}"
         db_upsert_session(conn, sid, stage, team_ids, laps, zone_id)
         if first_sid is None:
             first_sid = sid
