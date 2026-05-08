@@ -268,7 +268,7 @@ def db_get_waiting_session(conn, zone_id: str) -> Optional[Dict]:
     row = conn.execute(
         """SELECT id, type, total_laps, team_ids FROM race_sessions
            WHERE phase='waiting' AND zone_id=?
-           ORDER BY rowid DESC LIMIT 1""",
+           ORDER BY rowid ASC LIMIT 1""",
         (zone_id,),
     ).fetchone()
     if row is None:

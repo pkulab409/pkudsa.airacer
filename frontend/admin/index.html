@@ -136,6 +136,30 @@
     /* ── Toast ── */
     .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1090; }
 
+    /* ── Session queue rows ── */
+    .session-row {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .55rem .85rem; border-radius: .4rem; margin-bottom: .35rem;
+      border-left: 4px solid #e2e8f0; background: #fff;
+      font-size: .85rem;
+    }
+    .session-row.phase-running              { border-left-color: #3b82f6; background: #eff6ff; }
+    .session-row.phase-finished,
+    .session-row.phase-recording_ready      { border-left-color: #10b981; background: #ecfdf5; opacity: .8; }
+    .session-row.phase-waiting              { border-left-color: #cbd5e1; background: #f8fafc; }
+    .session-row.phase-aborted              { border-left-color: #ef4444; background: #fef2f2; opacity: .75; }
+    .session-row-num {
+      font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: .95rem;
+      min-width: 80px;
+    }
+    .session-row-teams {
+      flex: 1; font-family: monospace; font-size: .78rem;
+      color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .session-row-meta {
+      font-size: .72rem; color: #94a3b8; white-space: nowrap;
+    }
+
     /* ── Danger zone ── */
     .danger-zone {
       border: 2px solid #dc2626; border-radius: .875rem;
@@ -308,6 +332,12 @@
               <div class="fw-semibold" id="pending-teams-list" style="font-family:monospace;font-size:.8rem;"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Session queue -->
+        <div class="ctrl-card" id="session-queue-card" style="display:none;">
+          <h5>赛程队列 <span class="text-muted fw-normal" id="queue-stage-label" style="font-size:.875rem;"></span></h5>
+          <div id="session-queue-list"></div>
         </div>
 
         <!-- Action buttons -->
@@ -763,7 +793,7 @@ async function doZoneAction(action) {
     var r = await api('POST', '/api/admin/zones/' + currentZone + '/' + action);
     var d = await r.json();
     toast(r.ok ? (d.message || '操作成功') : (d.detail || d.message || '操作失败'), r.ok ? 'success' : 'danger');
-    if (r.ok) { loadPendingSession(); loadZones(); }
+    if (r.ok) { loadPendingSession(); loadSessionQueue(); loadZones(); }
   } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
 }
 
@@ -814,6 +844,58 @@ async function loadPendingSession() {
     } else {
       card.style.display = 'none';
     }
+  } catch(e) { card.style.display = 'none'; }
+  loadSessionQueue();
+}
+
+/* ── Session queue ── */
+function getSessionNum(sid) {
+  var parts = sid ? sid.split('_') : [];
+  var n = parseInt(parts[parts.length - 1], 10);
+  return isNaN(n) ? '?' : n;
+}
+
+var PHASE_LABELS = {
+  waiting: '待开始', running: '进行中',
+  recording_ready: '已完成', finished: '已完成', aborted: '已中止'
+};
+
+async function loadSessionQueue() {
+  if (!currentZone) return;
+  var card = document.getElementById('session-queue-card');
+  var listDiv = document.getElementById('session-queue-list');
+  if (!card || !listDiv) return;
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/stage-sessions');
+    var d = r.ok ? await r.json() : null;
+    if (!d || !d.sessions || !d.sessions.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    setText('queue-stage-label', d.current_stage
+      ? '(' + (STAGE_NAMES[d.current_stage] || d.current_stage) + ')'
+      : '');
+
+    // Filter to current stage only
+    var curStage = d.current_stage;
+    var sessions = d.sessions.filter(function(s) { return s.type === curStage; });
+    if (!sessions.length) { card.style.display = 'none'; return; }
+
+    // Sort: running → waiting → completed/aborted
+    var order = { running: 0, waiting: 1, recording_ready: 2, finished: 2, aborted: 3 };
+    sessions.sort(function(a, b) {
+      return (order[a.phase] || 9) - (order[b.phase] || 9);
+    });
+
+    listDiv.innerHTML = sessions.map(function(s) {
+      var sname = STAGE_NAMES[s.type] || s.type;
+      var num = getSessionNum(s.id);
+      var teams = s.team_ids ? s.team_ids.join(', ') : '--';
+      var meta = (PHASE_LABELS[s.phase] || s.phase) + '  ·  ' + s.total_laps + '圈  ·  ' + s.team_count + '车';
+      return '<div class="session-row phase-' + s.phase + '">'
+        + '<div class="session-row-num">' + sname + ' ' + num + '</div>'
+        + '<div class="session-row-teams" title="' + esc(teams) + '">' + esc(teams) + '</div>'
+        + '<div class="session-row-meta">' + meta + '</div>'
+        + '</div>';
+    }).join('');
   } catch(e) { card.style.display = 'none'; }
 }
 

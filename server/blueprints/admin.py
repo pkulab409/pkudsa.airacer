@@ -175,54 +175,52 @@ def _determine_current_stage(conn, zone_id: str, bracket: dict) -> Optional[str]
     return None
 
 
-def _auto_create_session(conn, zone_id: str, stage: str, bracket: dict) -> str:
-    """Auto-create the next waiting session for a stage. Returns session_id."""
+def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) -> str:
+    """Pre-create ALL sessions for a stage at once. Returns the first session_id."""
     cars_per = bracket["cars_per_session"][stage]
     total_sessions = bracket["sessions_per_stage"][stage]
     laps = bracket["laps_per_stage"][stage]
-
-    finished_count = conn.execute(
-        "SELECT COUNT(*) FROM race_sessions "
-        "WHERE zone_id=? AND type=? AND phase IN ('recording_ready','finished')",
-        (zone_id, stage),
-    ).fetchone()[0]
-    next_idx = finished_count  # 0-indexed session number
-
     all_teams = db_get_zone_team_ids(conn, zone_id)
 
-    if stage == "placement":
-        start = next_idx * cars_per
-        team_ids = all_teams[start:start + cars_per]
+    all_teams_list: list[list[str]] = []
 
+    if stage == "placement":
+        all_teams_list = [
+            all_teams[i * cars_per : (i + 1) * cars_per]
+            for i in range(total_sessions)
+        ]
     elif stage == "group_stage":
         ranked = db_get_placement_rankings(conn, zone_id)
         ranked_ids = [r["team_id"] for r in ranked] if ranked else all_teams
-        groups = snake_draft_group(ranked_ids, total_sessions)
-        team_ids = groups[next_idx] if next_idx < len(groups) else []
-
+        all_teams_list = snake_draft_group(ranked_ids, total_sessions)
     elif stage == "semi":
         prev = db_get_stage_session_results(conn, zone_id, "group_stage")
         advancers = select_group_stage_advancers(prev)
-        start = next_idx * cars_per
-        team_ids = advancers[start:start + cars_per]
-
+        all_teams_list = [
+            advancers[i * cars_per : (i + 1) * cars_per]
+            for i in range(total_sessions)
+        ]
     elif stage == "final":
         prev_stage = "semi" if "semi" in bracket["stages"] else "placement"
         prev = db_get_stage_session_results(conn, zone_id, prev_stage)
         if prev_stage == "semi":
             advancers = select_semi_finalists(prev)
         else:
-            # Direct placement → final (≤4 teams)
             advancers = [r["team_id"] for r in db_get_placement_rankings(conn, zone_id)]
-            advancers = advancers[:bracket["cars_per_session"]["final"]]
-        team_ids = advancers[:cars_per]
-
+            advancers = advancers[:cars_per]
+        all_teams_list = [advancers[:cars_per]]
     else:
-        team_ids = all_teams[:cars_per]
+        all_teams_list = [all_teams[:cars_per]]
 
-    session_id = f"{zone_id}_{stage}_{next_idx + 1}"
-    db_upsert_session(conn, session_id, stage, team_ids, laps, zone_id)
-    return session_id
+    first_sid = None
+    for i, team_ids in enumerate(all_teams_list):
+        if not team_ids:
+            continue
+        sid = f"{zone_id}_{stage}_{i + 1}"
+        db_upsert_session(conn, sid, stage, team_ids, laps, zone_id)
+        if first_sid is None:
+            first_sid = sid
+    return first_sid
 
 
 def _rank_to_points(rank: Optional[int]) -> int:
@@ -369,6 +367,42 @@ async def get_pending_session(zone_id: str, _auth=Depends(require_admin)):
 
 
 # ---------------------------------------------------------------------------
+# Stage sessions queue
+# ---------------------------------------------------------------------------
+
+
+@router.get("/zones/{zone_id}/stage-sessions")
+async def get_stage_sessions(zone_id: str, _auth=Depends(require_admin)):
+    """Return all sessions for this zone grouped by stage, with phase status."""
+    with get_db(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT id, type, total_laps, team_ids, phase FROM race_sessions "
+            "WHERE zone_id=? ORDER BY rowid",
+            (zone_id,),
+        ).fetchall()
+        team_count = db_get_zone_team_count(conn, zone_id)
+        bracket = compute_bracket(team_count)
+        current_stage = _determine_current_stage(conn, zone_id, bracket)
+
+    sessions = []
+    for r in rows:
+        team_ids = json.loads(r["team_ids"]) if r["team_ids"] else []
+        sessions.append({
+            "id": r["id"],
+            "type": r["type"],
+            "total_laps": r["total_laps"],
+            "team_count": len(team_ids),
+            "team_ids": team_ids,
+            "phase": r["phase"],
+        })
+    return {
+        "zone_id": zone_id,
+        "current_stage": current_stage,
+        "sessions": sessions,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Zone-scoped race control
 # ---------------------------------------------------------------------------
 
@@ -416,7 +450,7 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
         row = db_get_waiting_session(conn, zone_id)
 
     if row is None:
-        # Auto-create session based on bracket and current stage
+        # Pre-create ALL sessions for the new stage
         with get_db(DB_PATH) as conn:
             team_count = db_get_zone_team_count(conn, zone_id)
             bracket = compute_bracket(team_count)
@@ -425,7 +459,7 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
                 raise HTTPException(
                     status_code=409, detail="所有阶段已完成，无法开始新比赛"
                 )
-            _auto_create_session(conn, zone_id, stage, bracket)
+            _pre_create_stage_sessions(conn, zone_id, stage, bracket)
             row = db_get_waiting_session(conn, zone_id)
             if row is None:
                 raise HTTPException(
@@ -623,9 +657,7 @@ async def _after_race_complete(zone_id: str, stage: str):
         ).fetchone()[0]
 
     if finished < total:
-        # More sessions in this stage — create next, go IDLE
-        with get_db(DB_PATH) as conn:
-            _auto_create_session(conn, zone_id, stage, bracket)
+        # More waiting sessions already pre-created — go IDLE
         try:
             sm.transition(RaceState.IDLE)
         except ValueError:
