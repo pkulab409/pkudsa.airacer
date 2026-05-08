@@ -27,8 +27,8 @@ Files of interest
 - `sdk/rules.yaml` — validator rules (import allow/deny list, builtin blacklist,
   return ranges, timing budget). This file is the single source of truth for
   the sandbox allow/deny lists; ``sdk/tests/test_consistency.py`` hard-fails
-  if the three physical copies (this file, ``simnode/car_sandbox.py``,
-  ``simnode/webots/controllers/car/sandbox_runner.py``) drift apart
+  if the three physical copies (this file, ``sdk/car_sandbox.py``,
+  ``sdk/webots/controllers/car/sandbox_runner.py``) drift apart
 - `sdk/run_local.py` — one-shot launcher: validate -> make config -> start Webots
 - `sdk/make_local_config.py` — helper to create a sample race_config.json
 - `sdk/worlds.py` — catalog of available tracks and their slot → car-model
@@ -41,11 +41,19 @@ Files of interest
 - `sdk/tests/test_worlds.py` — ensures `sdk/worlds.py` stays in sync with
   the actual `.wbt` world files
 - `sdk/docs/local_test_guide.md` — Chinese student-facing walkthrough
-- `simnode/webots/controllers/car/car_controller.py` — Webots controller that
-  launches the sandbox and exchanges frames
-- `simnode/webots/controllers/car/sandbox_runner.py` — sandbox runner that
-  imports student code with a restricted import hook and communicates via
-  stdin/stdout
+- `sdk/car_sandbox.py` — in-process sandbox (restricted importer +
+  restricted builtins) used by the server-side race runner; shipped with the
+  SDK so local consistency tests can compare against it
+- `sdk/webots/` — self-contained Webots assets:
+    - `worlds/*.wbt` — tracks (track_basic / track_complex / airacer)
+    - `protos/Car*.proto` — 6 car appearance PROTOs
+    - `controllers/car/car_controller.py` — Webots controller that launches
+      the sandbox and exchanges frames
+    - `controllers/car/sandbox_runner.py` — sandbox runner that imports
+      student code with a restricted import hook and communicates via
+      stdin/stdout
+    - `controllers/supervisor/supervisor.py` — race supervisor (checkpoints,
+      collisions, telemetry)
 
 Quick local workflow
 --------------------
@@ -65,7 +73,7 @@ drive letter on Windows) and launches the default `track_basic.wbt` world with
 
 Use `python sdk/run_local.py --list-worlds` to see every track plus the
 slot → car model mapping. Available short names today: `basic`, `complex`,
-`airacer`. Car PROTOs are defined in `simnode/webots/protos/Car*.proto`
+`airacer`. Car PROTOs are defined in `sdk/webots/protos/Car*.proto`
 (CarPhoenix / CarThunder / CarViper / CarNova / CarFrost / CarShadow).
 
 ### Option B — step by step
@@ -99,7 +107,7 @@ Set the environment variable (PowerShell example):
 
 ```powershell
 $env:RACE_CONFIG_PATH = "C:\full\path\to\pkudsa.airacer\sdk\local_race_config.json"
-webots "C:\full\path\to\pkudsa.airacer\simnode\webots\worlds\track_basic.wbt"
+webots "C:\full\path\to\pkudsa.airacer\sdk\webots\worlds\track_basic.wbt"
 ```
 
 5. Run the simulation. The Webots car controller will spawn the sandbox runner

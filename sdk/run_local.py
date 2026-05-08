@@ -44,7 +44,8 @@ from typing import Optional
 
 # SDK 内部模块（同目录导入）
 SDK_DIR = pathlib.Path(__file__).resolve().parent
-REPO_ROOT = SDK_DIR.parent
+# 保留 REPO_ROOT 别名：历史上指仓库根，现在 SDK 自包含，等同于 SDK_DIR。
+REPO_ROOT = SDK_DIR
 
 # 赛道/车型目录（单一信息源，见 sdk/worlds.py）
 if str(SDK_DIR) not in sys.path:
@@ -57,8 +58,8 @@ from worlds import (  # noqa: E402
 )
 
 DEFAULT_WORLD = WORLDS[DEFAULT_WORLD_KEY].path
-# 生成的临时 race_config 放到仓库根 .local/，避免污染 SDK 目录（便于打包分发）
-DEFAULT_CONFIG = REPO_ROOT / ".local" / "race_config.json"
+# 生成的临时 race_config 落在 sdk/.local/，纯 ASCII 且不污染其他目录
+DEFAULT_CONFIG = SDK_DIR / ".local" / "race_config.json"
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +238,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--list-worlds", action="store_true",
                    help="列出所有可用赛道与车型后退出")
     try:
-        _cfg_display = DEFAULT_CONFIG.relative_to(REPO_ROOT)
+        _cfg_display = DEFAULT_CONFIG.relative_to(SDK_DIR.parent)
     except ValueError:
-        _cfg_display = DEFAULT_CONFIG
+        try:
+            _cfg_display = DEFAULT_CONFIG.relative_to(SDK_DIR)
+            _cfg_display = pathlib.Path("sdk") / _cfg_display
+        except ValueError:
+            _cfg_display = DEFAULT_CONFIG
     p.add_argument("--config-out", default=str(DEFAULT_CONFIG),
                    help=f"生成的 race_config.json 路径（默认 {_cfg_display}）")
     p.add_argument("--rules", default=None,

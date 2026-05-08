@@ -18,8 +18,8 @@ import textwrap
 
 import pytest
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-VALIDATOR = REPO_ROOT / "sdk" / "validate_controller.py"
+SDK_DIR = pathlib.Path(__file__).resolve().parents[1]
+VALIDATOR = SDK_DIR / "validate_controller.py"
 
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess:
@@ -124,12 +124,12 @@ def test_json_output_on_error(tmp_path):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("rel", [
-    "sdk/team_controller.py",
-    "sdk/example_controller.py",
-    "sdk/examples/team_controller_tutorial.py",
+    "team_controller.py",
+    "example_controller.py",
+    "examples/team_controller_tutorial.py",
 ])
 def test_shipped_samples_pass(rel):
-    p = REPO_ROOT / rel
+    p = SDK_DIR / rel
     if not p.is_file():
         pytest.skip(f"{rel} not found")
     r = _run_cli("--code-path", str(p))
