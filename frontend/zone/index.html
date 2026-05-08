@@ -102,8 +102,8 @@
       letter-spacing: 0.4px;
       text-transform: uppercase;
     }
-    .phase-badge.qualifying  { background: rgba(255,193,7,0.2);  color: #ffc107;  border: 1px solid rgba(255,193,7,0.4);  }
-    .phase-badge.group_race  { background: rgba(13,202,240,0.2); color: #0dcaf0;  border: 1px solid rgba(13,202,240,0.4); }
+    .phase-badge.placement   { background: rgba(255,193,7,0.2);  color: #ffc107;  border: 1px solid rgba(255,193,7,0.4);  }
+    .phase-badge.group_stage { background: rgba(13,202,240,0.2); color: #0dcaf0;  border: 1px solid rgba(13,202,240,0.4); }
     .phase-badge.semi        { background: rgba(111,66,193,0.2); color: #b97fff;  border: 1px solid rgba(111,66,193,0.4); }
     .phase-badge.final       { background: rgba(255,77,77,0.25); color: #ff6b6b;  border: 1px solid rgba(255,77,77,0.4);  }
     .phase-badge.registration{ background: rgba(40,167,69,0.2);  color: #5ce65c;  border: 1px solid rgba(40,167,69,0.4);  }
@@ -718,19 +718,19 @@
 
 <script>
 // ── Constants ─────────────────────────────────────
-const PHASE_ORDER = ['registration', 'qualifying', 'group_race', 'semi', 'final', 'completed'];
+const PHASE_ORDER = ['registration', 'placement', 'group_stage', 'semi', 'final', 'completed'];
 const PHASE_LABELS = {
-  registration: '报名阶段',
-  qualifying:   '排位赛',
-  group_race:   '分组赛',
-  semi:         '半决赛',
-  final:        '决赛',
-  completed:    '已结束',
+  registration:  '报名阶段',
+  placement:     '排位赛',
+  group_stage:   '分组赛',
+  semi:          '半决赛',
+  final:         '决赛',
+  completed:     '已结束',
 };
 const PHASE_ICONS = {
-  registration: 'bi-pencil-square',
-  qualifying:   'bi-stopwatch',
-  group_race:   'bi-collection',
+  registration:  'bi-pencil-square',
+  placement:     'bi-stopwatch',
+  group_stage:   'bi-collection',
   semi:         'bi-diagram-2',
   final:        'bi-trophy',
   completed:    'bi-check-circle',
@@ -741,8 +741,8 @@ function stateToPhase(state) {
   const s = state || '';
   if (s === 'REGISTRATION') return 'registration';
   if (s === 'IDLE') return 'idle';
-  if (s.startsWith('QUALIFYING')) return 'qualifying';
-  if (s.startsWith('GROUP')) return 'group_race';
+  if (s.startsWith('PLACEMENT')) return 'placement';
+  if (s.startsWith('GROUP_STAGE')) return 'group_stage';
   if (s.startsWith('SEMI')) return 'semi';
   if (s.startsWith('FINAL')) return 'final';
   if (s === 'CLOSED') return 'completed';

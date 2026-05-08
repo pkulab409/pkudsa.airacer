@@ -564,3 +564,70 @@ def get_standings(conn) -> List[Dict]:
                ORDER BY total_points DESC"""
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Placement rankings & stage results (for bracket / grouping)
+# ---------------------------------------------------------------------------
+
+
+def db_get_placement_rankings(conn, zone_id: str) -> list[dict]:
+    """
+    Return teams ranked by placement lap time (ascending).
+
+    Queries all finished placement sessions for the zone, parses result JSON,
+    extracts best_lap_time per team, and sorts fastest-first.
+
+    Returns [{team_id, best_lap_time}, ...]
+    """
+    rows = conn.execute(
+        """SELECT result FROM race_sessions
+           WHERE zone_id=? AND type='placement'
+           AND phase IN ('recording_ready', 'finished')
+           AND result IS NOT NULL""",
+        (zone_id,),
+    ).fetchall()
+
+    rankings: list[dict] = []
+    seen: set[str] = set()
+    for (result_json,) in rows:
+        data = json.loads(result_json) if isinstance(result_json, str) else (result_json or {})
+        for entry in data.get("final_rankings", []):
+            tid = entry.get("team_id")
+            if not tid or tid in seen:
+                continue
+            t = entry.get("best_lap_time")
+            if t is not None:
+                seen.add(tid)
+                rankings.append({"team_id": tid, "best_lap_time": t})
+
+    rankings.sort(key=lambda r: r["best_lap_time"])
+    return rankings
+
+
+def db_get_stage_session_results(conn, zone_id: str, stage: str) -> list[dict]:
+    """
+    Return parsed results for all finished sessions of a given stage.
+
+    Returns [{session_id, rankings: [{team_id, rank, finish_time, best_lap_time}]}, ...]
+    """
+    rows = conn.execute(
+        """SELECT id, result FROM race_sessions
+           WHERE zone_id=? AND type=? AND phase IN ('recording_ready', 'finished')
+           AND result IS NOT NULL""",
+        (zone_id, stage),
+    ).fetchall()
+
+    results: list[dict] = []
+    for sid, result_json in rows:
+        data = json.loads(result_json) if isinstance(result_json, str) else (result_json or {})
+        rankings: list[dict] = []
+        for entry in data.get("final_rankings", []):
+            rankings.append({
+                "team_id": entry.get("team_id"),
+                "rank": entry.get("rank", 99),
+                "finish_time": entry.get("finish_time") or entry.get("race_time"),
+                "best_lap_time": entry.get("best_lap_time"),
+            })
+        results.append({"session_id": sid, "rankings": rankings})
+    return results

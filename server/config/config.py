@@ -5,18 +5,19 @@ Backend 配置模块，对应 Avalon 的 config/config.py 模式。
 
 import os
 import pathlib
+
 import yaml
 
 _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # 项目根目录
 
 _DEFAULTS = {
-    "DB_PATH":             str(_ROOT / "server" / "database" / "race.db"),
-    "RECORDINGS_DIR":      str(_ROOT / "recordings"),
-    "SUBMISSIONS_DIR":     str(_ROOT / "submissions"),
-    "ADMIN_PASSWORD":      "12345",
-    "SERVER_HOST":         "0.0.0.0",
-    "SERVER_PORT":         "8000",
-    "SIMNODE_URL":         "http://localhost:8001",   # Sim Node HTTP 基地址
+    "DB_PATH": str(_ROOT / "server" / "database" / "race.db"),
+    "RECORDINGS_DIR": str(_ROOT / "recordings"),
+    "SUBMISSIONS_DIR": str(_ROOT / "submissions"),
+    "ADMIN_PASSWORD": "12345",
+    "SERVER_HOST": "127.0.0.1",
+    "SERVER_PORT": "8000",
+    "SIMNODE_URL": "http://localhost:8001",  # Sim Node HTTP 基地址
 }
 
 _config: dict = {}
@@ -51,10 +52,10 @@ class Config:
 # ---------------------------------------------------------------------------
 # 便捷常量（向后兼容旧的 config.py 导入方式）
 # ---------------------------------------------------------------------------
-DB_PATH          = Config.get("DB_PATH")
-RECORDINGS_DIR   = Config.get("RECORDINGS_DIR")
-SUBMISSIONS_DIR  = Config.get("SUBMISSIONS_DIR")
-ADMIN_PASSWORD   = Config.get("ADMIN_PASSWORD")
-SERVER_HOST      = Config.get("SERVER_HOST")
-SERVER_PORT      = int(Config.get("SERVER_PORT"))
-SIMNODE_URL      = Config.get("SIMNODE_URL")
+DB_PATH = Config.get("DB_PATH")
+RECORDINGS_DIR = Config.get("RECORDINGS_DIR")
+SUBMISSIONS_DIR = Config.get("SUBMISSIONS_DIR")
+ADMIN_PASSWORD = Config.get("ADMIN_PASSWORD")
+SERVER_HOST = Config.get("SERVER_HOST")
+SERVER_PORT = int(Config.get("SERVER_PORT"))
+SIMNODE_URL = Config.get("SIMNODE_URL")

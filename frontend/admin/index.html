@@ -273,9 +273,9 @@
         <div class="ctrl-card">
           <h5>赛制阶段</h5>
           <div class="bracket-flow">
-            <span class="bracket-stage" id="bs-qualifying">资格赛</span>
+            <span class="bracket-stage" id="bs-placement">排位赛</span>
             <span class="bracket-arrow">›</span>
-            <span class="bracket-stage" id="bs-group_race">小组赛</span>
+            <span class="bracket-stage" id="bs-group_stage">分组赛</span>
             <span class="bracket-arrow">›</span>
             <span class="bracket-stage" id="bs-semi">半决赛</span>
             <span class="bracket-arrow">›</span>
@@ -283,36 +283,29 @@
           </div>
         </div>
 
-        <!-- Session config -->
-        <div class="ctrl-card">
-          <h5>场次配置</h5>
-          <div class="row g-3">
-            <div class="col-md-3">
-              <label class="form-label">场次类型</label>
-              <select id="f-type" class="form-select">
-                <option value="qualifying">qualifying — 资格赛</option>
-                <option value="group_race">group_race — 小组赛</option>
-                <option value="semi">semi — 半决赛</option>
-                <option value="final">final — 决赛</option>
-              </select>
+        <!-- Pending session -->
+        <div class="ctrl-card" id="pending-session-card" style="display:none;">
+          <h5>待开启的比赛 <span class="text-muted fw-normal" id="pending-progress" style="font-size:.875rem;"></span></h5>
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div>
+              <span class="text-muted" style="font-size:.8rem;">场次类型</span>
+              <div class="fw-semibold" id="pending-type">--</div>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">场次 ID</label>
-              <input type="text" id="f-sid" class="form-control" placeholder="如 q1、gA…">
+            <div>
+              <span class="text-muted" style="font-size:.8rem;">Session ID</span>
+              <div class="fw-semibold" id="pending-sid">--</div>
             </div>
-            <div class="col-md-2">
-              <label class="form-label">圈数</label>
-              <input type="number" id="f-laps" class="form-control" placeholder="留空=默认" min="1">
+            <div>
+              <span class="text-muted" style="font-size:.8rem;">圈数</span>
+              <div class="fw-semibold" id="pending-laps">--</div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">
-                参赛队伍
-                <small class="text-muted fw-normal">每行一个 team_id，留空=全部</small>
-              </label>
-              <textarea id="f-teams" class="form-control" rows="3" placeholder="team_001&#10;team_002"></textarea>
+            <div>
+              <span class="text-muted" style="font-size:.8rem;">参赛队伍数</span>
+              <div class="fw-semibold" id="pending-teams">--</div>
             </div>
-            <div class="col-12">
-              <button class="btn btn-primary" onclick="doSetSession()">配置场次</button>
+            <div id="pending-teams-list-col" style="display:none;">
+              <span class="text-muted" style="font-size:.8rem;">队伍列表</span>
+              <div class="fw-semibold" id="pending-teams-list" style="font-family:monospace;font-size:.8rem;"></div>
             </div>
           </div>
         </div>
@@ -322,9 +315,9 @@
           <h5>操作</h5>
           <div class="action-btn-group">
             <button class="btn btn-success" onclick="doZoneAction('start-race')">&#9654; 开始比赛</button>
+            <button class="btn btn-warning" onclick="doZoneAction('finalize')">&#8594; 推进阶段</button>
             <button class="btn btn-danger"  onclick="doZoneAction('stop-race')">&#9632; 停止比赛</button>
             <button class="btn btn-secondary" style="background:#6b7280;border:none;" onclick="doZoneAction('reset')">&#8617; 重置赛区</button>
-            <button class="btn btn-warning"  onclick="doZoneAction('finalize')">&#8594; 推进阶段</button>
           </div>
         </div>
 
@@ -499,6 +492,7 @@
           </div>
         </div>
       </div>
+
 
       <!-- =====================================================
            SECTION: 录像
@@ -728,6 +722,7 @@ function selZone(zid) {
 
   if (_lastMsg[zid]) { applyLiveStatus(_lastMsg[zid]); }
   else if (z) { setCtrlBadge(z.state); highlightStage(z.current_stage); }
+  loadPendingSession();
 }
 
 /* ================================================================
@@ -763,33 +758,64 @@ function nav(name, linkEl) {
 /* ================================================================
    RACE CONTROL
 ================================================================ */
-async function doSetSession() {
-  if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
-  var type = document.getElementById('f-type').value;
-  var sid  = document.getElementById('f-sid').value.trim();
-  var laps = document.getElementById('f-laps').value;
-  var raw  = document.getElementById('f-teams').value.trim();
-  var teams = raw ? raw.split('\n').map(function(t){ return t.trim(); }).filter(Boolean) : [];
-
-  var body = { session_type: type };
-  if (sid)        body.session_id = sid;
-  if (laps)       body.laps = parseInt(laps);
-  if (teams.length) body.teams = teams;
-
-  try {
-    var r = await api('POST', '/api/admin/zones/' + currentZone + '/set-session', body);
-    var d = await r.json();
-    toast(r.ok ? (d.message || '场次已配置') : (d.detail || d.message || '配置失败'), r.ok ? 'success' : 'danger');
-  } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
-}
-
 async function doZoneAction(action) {
   if (!currentZone) { toast('请先选择赛区', 'warning'); return; }
   try {
     var r = await api('POST', '/api/admin/zones/' + currentZone + '/' + action);
     var d = await r.json();
     toast(r.ok ? (d.message || '操作成功') : (d.detail || d.message || '操作失败'), r.ok ? 'success' : 'danger');
+    if (r.ok) { loadPendingSession(); loadZones(); }
   } catch(e) { toast('请求失败: ' + e.message, 'danger'); }
+}
+
+var STAGE_NAMES = { placement: '排位赛', group_stage: '分组赛', semi: '半决赛', final: '决赛' };
+
+async function loadPendingSession() {
+  if (!currentZone) return;
+  var card = document.getElementById('pending-session-card');
+  if (!card) return;
+  try {
+    var r = await api('GET', '/api/admin/zones/' + currentZone + '/pending-session');
+    var d = r.ok ? await r.json() : null;
+    var s = d && d.session;
+    if (s) {
+      card.style.display = 'block';
+      var sname = STAGE_NAMES[s.type] || s.type || '--';
+      setText('pending-type', sname);
+      setText('pending-sid', s.id || '--');
+      setText('pending-laps', s.total_laps != null ? s.total_laps : '--');
+      setText('pending-teams', s.team_count != null ? s.team_count : '--');
+
+      // Show team list if available
+      var listCol = document.getElementById('pending-teams-list-col');
+      var listEl = document.getElementById('pending-teams-list');
+      if (s.team_ids && s.team_ids.length) {
+        listCol.style.display = 'block';
+        listEl.textContent = s.team_ids.join(', ');
+      } else {
+        listCol.style.display = 'none';
+      }
+
+      // Fetch bracket to compute progress (e.g. "第 3/7 场")
+      var progressEl = document.getElementById('pending-progress');
+      progressEl.textContent = '';
+      try {
+        var br = await api('GET', '/api/admin/zones/' + currentZone + '/bracket');
+        var bracket = br.ok ? await br.json() : null;
+        if (bracket && bracket.sessions_per_stage) {
+          var total = bracket.sessions_per_stage[s.type];
+          // Extract session number from session ID (format: {zone}_{stage}_{N})
+          var parts = s.id ? s.id.split('_') : [];
+          var n = parseInt(parts[parts.length - 1], 10);
+          if (total && !isNaN(n)) {
+            progressEl.textContent = '第 ' + n + '/' + total + ' 场';
+          }
+        }
+      } catch(e) {}
+    } else {
+      card.style.display = 'none';
+    }
+  } catch(e) { card.style.display = 'none'; }
 }
 
 /* ── Live status update ── */
@@ -819,7 +845,7 @@ function setCtrlBadge(state) {
 }
 
 function highlightStage(stage) {
-  var order = ['qualifying','group_race','semi','final'];
+  var order = ['placement','group_stage','semi','final'];
   var idx = order.indexOf(stage);
   order.forEach(function(s, i) {
     var el = document.getElementById('bs-' + s);
@@ -914,13 +940,13 @@ async function loadTeams() {
       return;
     }
     tbody.innerHTML = d.map(function(t) {
-      var ts = t.registered_at ? new Date(t.registered_at).toLocaleString('zh-CN') : '--';
+      var ts = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN') : '--';
       return '<tr>'
-        + '<td class="ps-3 fw-semibold">' + esc(t.team_id) + '</td>'
+        + '<td class="ps-3 fw-semibold">' + esc(t.id) + '</td>'
         + '<td>' + esc(t.name||'--') + '</td>'
         + '<td>' + ts + '</td>'
         + '<td>' + (t.active_slot != null ? t.active_slot : '--') + '</td>'
-        + '<td><code>' + esc(t.version||'--') + '</code></td>'
+        + '<td><code>' + esc(t.active_version||'--') + '</code></td>'
         + '</tr>';
     }).join('');
   } catch(e) { console.warn('teams', e); }

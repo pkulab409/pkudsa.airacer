@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 SIMNODE_URL = Config.get("SIMNODE_URL", "http://localhost:8001")
 
+# 禁用代理——simnode 始终在本地，走代理反而连不上
+_client = httpx.Client(proxy=None, trust_env=False)
+
 
 def _url(path: str) -> str:
     return f"{SIMNODE_URL.rstrip('/')}{path}"
@@ -27,29 +30,32 @@ def _url(path: str) -> str:
 # 启动比赛  ↔  BattleManager.start_battle()
 # ---------------------------------------------------------------------------
 
+
 def start_race(
-    race_id:      str,
+    race_id: str,
     session_type: str,
-    total_laps:   int,
-    cars:         List[Dict[str, Any]],
-    timeout:      int = 10,
+    total_laps: int,
+    cars: List[Dict[str, Any]],
+    timeout: int = 10,
 ) -> Dict[str, Any]:
     """
     调用 POST /race/create，返回响应（含 stream_ws_url）。
     失败时抛出 RuntimeError。
     """
     payload = {
-        "race_id":      race_id,
+        "race_id": race_id,
         "session_type": session_type,
-        "total_laps":   total_laps,
-        "cars":         cars,
+        "total_laps": total_laps,
+        "cars": cars,
     }
     try:
-        resp = httpx.post(_url("/race/create"), json=payload, timeout=timeout)
+        resp = _client.post(_url("/race/create"), json=payload, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
     except httpx.HTTPStatusError as e:
-        raise RuntimeError(f"Sim Node 拒绝创建比赛: {e.response.status_code} {e.response.text}")
+        raise RuntimeError(
+            f"Sim Node 拒绝创建比赛: {e.response.status_code} {e.response.text}"
+        )
     except httpx.RequestError as e:
         raise RuntimeError(f"无法连接 Sim Node ({SIMNODE_URL}): {e}")
 
@@ -58,10 +64,11 @@ def start_race(
 # 取消比赛  ↔  BattleManager.cancel_battle()
 # ---------------------------------------------------------------------------
 
+
 def cancel_race(race_id: str, timeout: int = 40) -> bool:
     """Send cancel to simnode and wait for it to finish (graceful stop takes up to 35 s)."""
     try:
-        resp = httpx.post(_url(f"/race/{race_id}/cancel"), timeout=timeout)
+        resp = _client.post(_url(f"/race/{race_id}/cancel"), timeout=timeout)
         return resp.status_code == 200
     except Exception as e:
         logger.warning(f"取消比赛 {race_id} 失败: {e}")
@@ -72,9 +79,10 @@ def cancel_race(race_id: str, timeout: int = 40) -> bool:
 # 查询状态  ↔  BattleManager.get_battle_status()
 # ---------------------------------------------------------------------------
 
+
 def get_race_status(race_id: str, timeout: int = 5) -> Optional[str]:
     try:
-        resp = httpx.get(_url(f"/race/{race_id}/status"), timeout=timeout)
+        resp = _client.get(_url(f"/race/{race_id}/status"), timeout=timeout)
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -88,9 +96,10 @@ def get_race_status(race_id: str, timeout: int = 5) -> Optional[str]:
 # 查询结果  ↔  BattleManager.get_battle_result()
 # ---------------------------------------------------------------------------
 
+
 def get_race_result(race_id: str, timeout: int = 5) -> Optional[Dict]:
     try:
-        resp = httpx.get(_url(f"/race/{race_id}/result"), timeout=timeout)
+        resp = _client.get(_url(f"/race/{race_id}/result"), timeout=timeout)
         if resp.status_code in (404, 425):
             return None
         resp.raise_for_status()
@@ -104,10 +113,11 @@ def get_race_result(race_id: str, timeout: int = 5) -> Optional[Dict]:
 # 列出所有比赛  ↔  BattleManager.get_all_battles()
 # ---------------------------------------------------------------------------
 
+
 def get_race_live_info(race_id: str, timeout: int = 3) -> Optional[Dict]:
     """Return real-time info: webots_pid, sim_time, cars (latest telemetry frame)."""
     try:
-        resp = httpx.get(_url(f"/race/{race_id}/live"), timeout=timeout)
+        resp = _client.get(_url(f"/race/{race_id}/live"), timeout=timeout)
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -119,7 +129,7 @@ def get_race_live_info(race_id: str, timeout: int = 3) -> Optional[Dict]:
 
 def list_races(timeout: int = 5) -> List[Tuple[str, str]]:
     try:
-        resp = httpx.get(_url("/races"), timeout=timeout)
+        resp = _client.get(_url("/races"), timeout=timeout)
         resp.raise_for_status()
         return [(r["race_id"], r["status"]) for r in resp.json()]
     except Exception as e:

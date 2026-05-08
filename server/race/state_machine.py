@@ -15,16 +15,16 @@ class RaceState(str, Enum):
     REGISTRATION = "REGISTRATION"
     # 空闲待命
     IDLE = "IDLE"
-    # 资格赛
-    QUALIFYING_RUNNING = "QUALIFYING_RUNNING"  # 正在进行比赛（仿真运行中）
-    QUALIFYING_FINISHED = "QUALIFYING_FINISHED"  # 某场比赛结束
-    QUALIFYING_ABORTED = "QUALIFYING_ABORTED"  # 某场比赛被终止
-    QUALIFYING_DONE = "QUALIFYING_DONE"  # 当前赛程所有比赛结束
-    # 小组赛
-    GROUP_RACE_RUNNING = "GROUP_RACE_RUNNING"
-    GROUP_RACE_FINISHED = "GROUP_RACE_FINISHED"
-    GROUP_RACE_ABORTED = "GROUP_RACE_ABORTED"
-    GROUP_DONE = "GROUP_DONE"
+    # 排位赛
+    PLACEMENT_RUNNING = "PLACEMENT_RUNNING"  # 正在进行比赛（仿真运行中）
+    PLACEMENT_FINISHED = "PLACEMENT_FINISHED"  # 某场比赛结束
+    PLACEMENT_ABORTED = "PLACEMENT_ABORTED"  # 某场比赛被终止
+    PLACEMENT_DONE = "PLACEMENT_DONE"  # 当前赛程所有比赛结束
+    # 分组赛
+    GROUP_STAGE_RUNNING = "GROUP_STAGE_RUNNING"
+    GROUP_STAGE_FINISHED = "GROUP_STAGE_FINISHED"
+    GROUP_STAGE_ABORTED = "GROUP_STAGE_ABORTED"
+    GROUP_STAGE_DONE = "GROUP_STAGE_DONE"
     # 半决赛
     SEMI_RUNNING = "SEMI_RUNNING"
     SEMI_FINISHED = "SEMI_FINISHED"
@@ -46,41 +46,41 @@ _ALLOWED_NON_IDLE: dict[RaceState, set[RaceState]] = {
     },
     RaceState.IDLE: {
         RaceState.REGISTRATION,
-        RaceState.QUALIFYING_RUNNING,
-        RaceState.GROUP_RACE_RUNNING,
+        RaceState.PLACEMENT_RUNNING,
+        RaceState.GROUP_STAGE_RUNNING,
         RaceState.SEMI_RUNNING,
         RaceState.FINAL_RUNNING,
     },
-    RaceState.QUALIFYING_RUNNING: {
-        RaceState.QUALIFYING_FINISHED,
-        RaceState.QUALIFYING_ABORTED,
+    RaceState.PLACEMENT_RUNNING: {
+        RaceState.PLACEMENT_FINISHED,
+        RaceState.PLACEMENT_ABORTED,
     },
-    RaceState.QUALIFYING_FINISHED: {
-        RaceState.QUALIFYING_DONE,
-        RaceState.QUALIFYING_RUNNING,
+    RaceState.PLACEMENT_FINISHED: {
+        RaceState.PLACEMENT_DONE,
+        RaceState.PLACEMENT_RUNNING,
     },
-    RaceState.QUALIFYING_ABORTED: {
-        RaceState.QUALIFYING_DONE,
-        RaceState.QUALIFYING_RUNNING,
+    RaceState.PLACEMENT_ABORTED: {
+        RaceState.PLACEMENT_DONE,
+        RaceState.PLACEMENT_RUNNING,
     },
-    RaceState.QUALIFYING_DONE: {
-        RaceState.GROUP_RACE_RUNNING,
-        RaceState.SEMI_RUNNING,  # small zones may skip group_race
+    RaceState.PLACEMENT_DONE: {
+        RaceState.GROUP_STAGE_RUNNING,
+        RaceState.SEMI_RUNNING,  # small zones may skip group_stage
         RaceState.FINAL_RUNNING,  # tiny zones go straight to final
     },
-    RaceState.GROUP_RACE_RUNNING: {
-        RaceState.GROUP_RACE_FINISHED,
-        RaceState.GROUP_RACE_ABORTED,
+    RaceState.GROUP_STAGE_RUNNING: {
+        RaceState.GROUP_STAGE_FINISHED,
+        RaceState.GROUP_STAGE_ABORTED,
     },
-    RaceState.GROUP_RACE_FINISHED: {
-        RaceState.GROUP_DONE,
-        RaceState.GROUP_RACE_RUNNING,
+    RaceState.GROUP_STAGE_FINISHED: {
+        RaceState.GROUP_STAGE_DONE,
+        RaceState.GROUP_STAGE_RUNNING,
     },
-    RaceState.GROUP_RACE_ABORTED: {
-        RaceState.GROUP_DONE,
-        RaceState.GROUP_RACE_RUNNING,
+    RaceState.GROUP_STAGE_ABORTED: {
+        RaceState.GROUP_STAGE_DONE,
+        RaceState.GROUP_STAGE_RUNNING,
     },
-    RaceState.GROUP_DONE: {
+    RaceState.GROUP_STAGE_DONE: {
         RaceState.SEMI_RUNNING,
     },
     RaceState.SEMI_RUNNING: {
@@ -113,8 +113,8 @@ ALLOWED: dict[RaceState, set[RaceState]] = {
 }
 
 _RUNNING_STATES = {
-    RaceState.QUALIFYING_RUNNING,
-    RaceState.GROUP_RACE_RUNNING,
+    RaceState.PLACEMENT_RUNNING,
+    RaceState.GROUP_STAGE_RUNNING,
     RaceState.SEMI_RUNNING,
     RaceState.FINAL_RUNNING,
 }

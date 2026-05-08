@@ -560,8 +560,8 @@ html, body {
         </select>
         <select id="filter-type" class="form-select form-select-sm" title="按类型筛选">
           <option value="">全部类型</option>
-          <option value="qualifying">排位赛</option>
-          <option value="group_race">分组赛</option>
+          <option value="placement">排位赛</option>
+          <option value="group_stage">分组赛</option>
           <option value="semi">半决赛</option>
           <option value="final">决赛</option>
           <option value="test">测试</option>
@@ -653,8 +653,8 @@ let activeSessionId = null;
 
 // ── Type labels ────────────────────────────────────────────────
 const TYPE_LABELS = {
-  qualifying: '排位赛',
-  group_race: '分组赛',
+  placement:   '排位赛',
+  group_stage: '分组赛',
   semi:       '半决赛',
   final:      '决赛',
   test:       '测试',
@@ -751,7 +751,7 @@ function renderRecordingsList(recordings) {
 
 function buildRecCard(r) {
   const typeLabel = TYPE_LABELS[r.session_type] || r.session_type || '未知';
-  const typeCls   = `badge-session-${r.session_type || 'qualifying'}`;
+  const typeCls   = `badge-session-${r.session_type || 'placement'}`;
 
   const finish = r.finish_reason && FINISH_LABELS[r.finish_reason]
     ? `<span class="badge ${FINISH_LABELS[r.finish_reason].cls}">${FINISH_LABELS[r.finish_reason].label}</span>`

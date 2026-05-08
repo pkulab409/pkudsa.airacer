@@ -106,7 +106,7 @@ async def get_zone_status(zone_id: str):
 
 
 # ---------------------------------------------------------------------------
-# GET /api/zones/{zone_id}/qualifying-results — standings for audience
+# GET /api/zones/{zone_id}/qualifying-results — placement standings for audience
 # ---------------------------------------------------------------------------
 
 @router.get("/zones/{zone_id}/qualifying-results")
