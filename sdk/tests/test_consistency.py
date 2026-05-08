@@ -3,15 +3,15 @@ sdk/tests/test_consistency.py
 ─────────────────────────────
 确保以下三处黑白名单保持一致（对应验收标准 #5「本地=服务器行为一致」）：
 
-  1. sdk/rules.yaml                                       （校验规则源）
-  2. simnode/car_sandbox.py                               （race_runner 用的沙箱）
-  3. simnode/webots/controllers/car/sandbox_runner.py    （Webots 子进程用的沙箱）
+  1. sdk/rules.yaml                                        （校验规则源）
+  2. sdk/car_sandbox.py                                    （race_runner 用的沙箱）
+  3. sdk/webots/controllers/car/sandbox_runner.py         （Webots 子进程用的沙箱）
 
 一旦三处漂移，validator 就可能误报/漏报，学生本地过线上拒。此测试做硬失败。
 
 运行：
-    cd pkudsa.airacer
-    pytest sdk/tests/test_consistency.py -v
+    cd sdk
+    pytest tests/test_consistency.py -v
 """
 
 from __future__ import annotations
@@ -21,14 +21,9 @@ import sys
 
 import pytest
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-SDK_DIR = REPO_ROOT / "sdk"
-SANDBOX_RUNNER = (
-    REPO_ROOT / "simnode" / "webots" / "controllers" / "car" / "sandbox_runner.py"
-)
+SDK_DIR = pathlib.Path(__file__).resolve().parents[1]
+SANDBOX_RUNNER = SDK_DIR / "webots" / "controllers" / "car" / "sandbox_runner.py"
 
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 if str(SDK_DIR) not in sys.path:
     sys.path.insert(0, str(SDK_DIR))
 
@@ -88,13 +83,13 @@ def _parse_blocked_prefixes_literal(path: pathlib.Path) -> set[str]:
 # ---------------------------------------------------------------------------
 
 def test_rules_yaml_deny_is_superset_of_car_sandbox():
-    from simnode.car_sandbox import _BLOCKED_PREFIXES
+    from car_sandbox import _BLOCKED_PREFIXES
     rules = _load_rules_yaml()
     yaml_deny = set(rules["imports"]["deny"])
     car_deny = set(_BLOCKED_PREFIXES)
     missing = car_deny - yaml_deny
     assert not missing, (
-        f"simnode/car_sandbox.py::_BLOCKED_PREFIXES 有，但 sdk/rules.yaml 的 "
+        f"sdk/car_sandbox.py::_BLOCKED_PREFIXES 有，但 sdk/rules.yaml 的 "
         f"deny 里缺：{sorted(missing)}。学生代码在 validator 看来合规但线上会"
         f"被 ImportError 拒绝。"
     )
@@ -118,7 +113,7 @@ def test_rules_yaml_deny_is_superset_of_sandbox_runner():
 # ---------------------------------------------------------------------------
 
 def test_rules_yaml_allow_is_subset_of_car_sandbox():
-    from simnode.car_sandbox import _ALLOWED_MODULES
+    from car_sandbox import _ALLOWED_MODULES
     rules = _load_rules_yaml()
     yaml_allow = set(rules["imports"]["allow"])
     car_allow = set(_ALLOWED_MODULES.keys())
@@ -134,12 +129,13 @@ def test_rules_yaml_allow_is_subset_of_car_sandbox():
 # ---------------------------------------------------------------------------
 
 def test_car_sandbox_and_sandbox_runner_blacklists_consistent():
-    from simnode.car_sandbox import _BLOCKED_PREFIXES
+    from car_sandbox import _BLOCKED_PREFIXES
     blocked = _parse_blocked_prefixes_literal(SANDBOX_RUNNER)
     # 两处应完全相等
     sym_diff = set(_BLOCKED_PREFIXES) ^ blocked
     assert not sym_diff, (
-        "car_sandbox.py::_BLOCKED_PREFIXES 与 sandbox_runner.py::BLOCKED_PREFIXES "
+        "sdk/car_sandbox.py::_BLOCKED_PREFIXES 与 "
+        "sdk/webots/controllers/car/sandbox_runner.py::BLOCKED_PREFIXES "
         f"不一致，差异：{sorted(sym_diff)}"
     )
 

@@ -163,18 +163,18 @@ def _default_recording_path() -> str:
     ``live_view.jpg`` inside). Must not point at a file.
 
     Windows note: Webots' C++ ``Camera.saveImage()`` uses narrow-char ``fopen``
-    which fails on paths containing non-ASCII characters (the repo path under
-    Chinese folders like "课程/大一下/…" breaks this). If the repo root itself
-    is non-ASCII, we fall back to a pure-ASCII path under ``%TEMP%``
-    (which on Windows is an 8.3 short path even when the username is non-ASCII).
+    which fails on paths containing non-ASCII characters (e.g. a repo placed
+    under "课程/大一下/…"). If the sdk directory itself is non-ASCII, we fall
+    back to a pure-ASCII path under ``%TEMP%`` (which on Windows is an 8.3
+    short path even when the username is non-ASCII).
     """
     import tempfile
-    # sdk/make_local_config.py -> sdk/ -> repo root
-    repo_root = pathlib.Path(__file__).resolve().parent.parent
-    repo_default = repo_root / ".local" / "recordings"
-    if str(repo_default).isascii():
-        return str(repo_default)
-    # 仓库路径含非 ASCII —— Webots saveImage 会失败，落到系统临时目录
+    # sdk/make_local_config.py → sdk/
+    sdk_dir = pathlib.Path(__file__).resolve().parent
+    sdk_default = sdk_dir / ".local" / "recordings"
+    if str(sdk_default).isascii():
+        return str(sdk_default)
+    # SDK 路径含非 ASCII —— Webots saveImage 会失败，落到系统临时目录
     return str(pathlib.Path(tempfile.gettempdir()) / "airacer_local" / "recordings")
 
 

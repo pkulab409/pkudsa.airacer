@@ -1,10 +1,10 @@
 # AI Racer 本地校验规则（SDK 作用域）
 # ---------------------------------------------------------------------------
-# 仅 sdk/validate_controller.py 读取；不影响 Backend / Sim Node。
-# 若要从源码层面对齐线上沙箱行为，请同步检查：
-#   - simnode/car_sandbox.py           （运行时受限 importer）
-#   - simnode/webots/controllers/car/sandbox_runner.py  （meta_path 黑名单）
-#   - server/blueprints/submission.py  （上传时校验）
+# 仅 sdk/validate_controller.py 读取；不影响 Backend。
+# 若要从源码层面对齐线上沙箱行为，请同步检查以下两份黑白名单（都随 SDK 分发）：
+#   - sdk/car_sandbox.py                              （运行时受限 importer）
+#   - sdk/webots/controllers/car/sandbox_runner.py    （meta_path 黑名单）
+# 一致性由 sdk/tests/test_consistency.py 硬性断言。
 # ---------------------------------------------------------------------------
 
 file:

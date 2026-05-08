@@ -1,6 +1,6 @@
 """sdk/worlds.py — 赛道与车型目录（单一信息源）
 
-列出 ``simnode/webots/worlds/*.wbt`` 中可用的赛道、以及每条赛道里
+列出 ``sdk/webots/worlds/*.wbt`` 中可用的赛道、以及每条赛道里
 ``DEF car_N <CarProto>`` 指定的车型，供：
 
 * ``sdk/run_local.py``  —— ``--world`` 支持短名、``--list-worlds`` 打印目录
@@ -20,12 +20,13 @@ from dataclasses import dataclass
 from typing import Optional
 
 # ---------------------------------------------------------------------------
-# 常量：仓库根 / 世界目录
+# 常量：SDK 根 / 世界目录
 # ---------------------------------------------------------------------------
 
 SDK_DIR = pathlib.Path(__file__).resolve().parent
-REPO_ROOT = SDK_DIR.parent
-WORLDS_DIR = REPO_ROOT / "simnode" / "webots" / "worlds"
+# 保留 REPO_ROOT 别名以兼容老调用方；在 SDK-only 布局下等同于 SDK_DIR。
+REPO_ROOT = SDK_DIR
+WORLDS_DIR = SDK_DIR / "webots" / "worlds"
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ class WorldEntry:
 
 
 # ---------------------------------------------------------------------------
-# 车型目录（与 simnode/webots/protos/CAR_UPGRADE_SUMMARY.md 对齐）
+# 车型目录（与 sdk/webots/protos/CAR_UPGRADE_SUMMARY.md 对齐）
 # ---------------------------------------------------------------------------
 
 _PHOENIX = CarModel("CarPhoenix", "烈焰红", "凤凰", "流线型设计，金色赛车条纹")
@@ -152,8 +153,8 @@ def resolve_world(world_arg: Optional[str]) -> WorldEntry:
     # 3. 绝对/相对路径
     p = pathlib.Path(world_arg).expanduser()
     if not p.is_absolute():
-        # 相对 REPO_ROOT 试一次
-        alt = (REPO_ROOT / p).resolve()
+        # 相对 SDK_DIR 试一次
+        alt = (SDK_DIR / p).resolve()
         if alt.is_file():
             p = alt
     p = p.resolve() if p.exists() else p
@@ -178,7 +179,7 @@ def format_catalog() -> str:
         exist = "✓" if w.path.is_file() else "✗ 缺失"
         lines.append(f"")
         lines.append(f"  [{w.key}]  {w.title}   {exist}")
-        lines.append(f"      文件: simnode/webots/worlds/{w.wbt}")
+        lines.append(f"      文件: sdk/webots/worlds/{w.wbt}")
         lines.append(f"      简介: {w.description}")
         lines.append(f"      车位（--car-slot）:")
         for slot, car in w.cars.items():
