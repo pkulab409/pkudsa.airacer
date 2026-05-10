@@ -498,7 +498,7 @@ PROTO CarThunder [
       # Camera - left side
       Camera {
         name "left_camera"
-        translation 2.1 -0.3 0.08
+        translation 2.1 -0.3 0.6
         rotation 0 0 1 -0.1
         width 640
         height 480
@@ -508,7 +508,7 @@ PROTO CarThunder [
       # Camera - right side
       Camera {
         name "right_camera"
-        translation 2.1 0.3 0.08
+        translation 2.1 0.3 0.6
         rotation 0 0 1 0.1
         width 640
         height 480
