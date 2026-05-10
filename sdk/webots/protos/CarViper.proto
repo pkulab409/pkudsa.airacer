@@ -367,7 +367,7 @@ PROTO CarViper [
         device [
           RotationalMotor {
             name "left_motor"
-            maxVelocity 40
+            maxVelocity 400
           }
         ]
         endPoint Solid {
@@ -396,7 +396,7 @@ PROTO CarViper [
         device [
           RotationalMotor {
             name "right_motor"
-            maxVelocity 40
+            maxVelocity 400
           }
         ]
         endPoint Solid {

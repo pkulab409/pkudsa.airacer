@@ -204,6 +204,8 @@ python sdk/run_local.py --list-worlds
 # 选复杂赛道的 car_3（毒蛇绿 CarViper）
 python3 sdk/run_local.py --code-path sdk/my_controller.py --world complex --car-slot car_3
 
+python3 sdk/run_local.py --code-path sdk/my_controller.py --world basic --car-slot car_1
+
 # 也接受 .wbt 文件名或完整路径（向后兼容老写法）
 python sdk/run_local.py --code-path sdk/my_controller.py --world track_complex.wbt --car-slot car_4
 ```

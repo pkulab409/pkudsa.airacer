@@ -400,7 +400,7 @@ PROTO CarThunder [
         device [
           RotationalMotor {
             name "left_motor"
-            maxVelocity 40
+            maxVelocity 400
           }
         ]
         endPoint Solid {
@@ -429,7 +429,7 @@ PROTO CarThunder [
         device [
           RotationalMotor {
             name "right_motor"
-            maxVelocity 40
+            maxVelocity 400
           }
         ]
         endPoint Solid {
