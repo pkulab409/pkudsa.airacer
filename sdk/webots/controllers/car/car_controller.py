@@ -280,4 +280,4 @@ while robot.step(timestep) != -1:
         stop_motors()
         continue
 
-    set_velocity(speed, steering)
+    set_velocity(10*speed, steering)
