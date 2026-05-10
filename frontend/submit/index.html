@@ -1,814 +1,1294 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Racer — Controller 提交平台</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>AI Racer — Controller 提交平台</title>
 
-  <!-- Bootstrap 5 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
-  <!-- Shared theme -->
-  <link rel="stylesheet" href="/static/style.css">
+        <!-- Bootstrap 5 -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        />
+        <!-- Bootstrap Icons -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <!-- Google Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap"
+            rel="stylesheet"
+        />
+        <!-- Shared theme -->
+        <link rel="stylesheet" href="/static/style.css" />
 
-  <style>
-    /* ── Login page layout ── */
-    #login-screen {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #1a1a2e 0%, #991b1b 50%, #dc2626 100%);
-      padding: 1.5rem;
-    }
-    #login-screen .card {
-      width: 100%;
-      max-width: 400px;
-      border: none;
-    }
-    #register-card {
-      border: none;
-    }
-    #login-screen .card-header {
-      background: linear-gradient(135deg, #991b1b, #dc2626);
-      color: #fff;
-      border-radius: var(--card-radius) var(--card-radius) 0 0 !important;
-    }
+        <style>
+            /* ── Login page layout ── */
+            #login-screen {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(
+                    135deg,
+                    #1a1a2e 0%,
+                    #991b1b 50%,
+                    #dc2626 100%
+                );
+                padding: 1.5rem;
+            }
+            #login-screen .card {
+                width: 100%;
+                max-width: 400px;
+                border: none;
+            }
+            #register-card {
+                border: none;
+            }
+            #login-screen .card-header {
+                background: linear-gradient(135deg, #991b1b, #dc2626);
+                color: #fff;
+                border-radius: var(--card-radius) var(--card-radius) 0 0 !important;
+            }
 
-    /* ── Navbar user area ── */
-    .navbar-user-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: .5rem;
-      background: rgba(255,255,255,.15);
-      border-radius: 20px;
-      padding: .3rem .85rem;
-      font-size: .875rem;
-      font-weight: 600;
-      color: #fff;
-    }
-    .navbar-user-pill .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      flex-shrink: 0;
-    }
+            /* ── Navbar user area ── */
+            .navbar-user-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 20px;
+                padding: 0.3rem 0.85rem;
+                font-size: 0.875rem;
+                font-weight: 600;
+                color: #fff;
+            }
+            .navbar-user-pill .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #10b981;
+                flex-shrink: 0;
+            }
 
-    /* ── Slot cards grid ── */
-    .slots-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-    @media (max-width: 768px) {
-      .slots-grid { grid-template-columns: 1fr; }
-    }
+            /* ── Slot cards grid ── */
+            .slots-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1rem;
+            }
+            @media (max-width: 768px) {
+                .slots-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
 
-    /* ── Slot card internals ── */
-    .slot-card .card-header {
-      background: linear-gradient(135deg, #1e293b, #334155);
-      color: #fff;
-      padding: .75rem 1rem;
-    }
-    .slot-card .slot-name {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 1.05rem;
-      font-weight: 700;
-      letter-spacing: .03em;
-    }
-    .slot-card .slot-time {
-      font-size: .78rem;
-      color: #94a3b8;
-      margin-top: .15rem;
-    }
-    .slot-card .card-body {
-      padding: .85rem 1rem;
-    }
+            /* ── Slot card internals ── */
+            .slot-card .card-header {
+                background: linear-gradient(135deg, #1e293b, #334155);
+                color: #fff;
+                padding: 0.75rem 1rem;
+            }
+            .slot-card .slot-name {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1.05rem;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+            }
+            .slot-card .slot-time {
+                font-size: 0.78rem;
+                color: #94a3b8;
+                margin-top: 0.15rem;
+            }
+            .slot-card .card-body {
+                padding: 0.85rem 1rem;
+            }
 
-    /* ── Test status badges inside slot cards ── */
-    .test-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: .3rem;
-      font-size: .75rem;
-      font-weight: 600;
-      padding: .2rem .6rem;
-      border-radius: .4rem;
-    }
-    .test-badge-waiting  { background: #fef3c7; color: #92400e; }
-    .test-badge-running  { background: #dbeafe; color: #1e40af; }
-    .test-badge-done     { background: #d1fae5; color: #065f46; }
-    .test-badge-failed   { background: #fee2e2; color: #991b1b; }
-    .test-badge-none     { background: #f1f5f9; color: #64748b; }
+            /* ── Test status badges inside slot cards ── */
+            .test-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.3rem;
+                font-size: 0.75rem;
+                font-weight: 600;
+                padding: 0.2rem 0.6rem;
+                border-radius: 0.4rem;
+            }
+            .test-badge-waiting {
+                background: #fef3c7;
+                color: #92400e;
+            }
+            .test-badge-running {
+                background: #dbeafe;
+                color: #1e40af;
+            }
+            .test-badge-done {
+                background: #d1fae5;
+                color: #065f46;
+            }
+            .test-badge-failed {
+                background: #fee2e2;
+                color: #991b1b;
+            }
+            .test-badge-none {
+                background: #f1f5f9;
+                color: #64748b;
+            }
 
-    /* ── Report collapse ── */
-    .report-collapse-btn {
-      font-size: .78rem;
-      color: #6b7280;
-      background: none;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: .25rem;
-      font-family: 'Poppins', sans-serif;
-    }
-    .report-collapse-btn:hover { color: #374151; }
-    .report-table {
-      width: 100%;
-      font-size: .8rem;
-      border-collapse: collapse;
-      margin-top: .5rem;
-    }
-    .report-table th {
-      text-align: left;
-      font-size: .7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: #94a3b8;
-      padding: .3rem .5rem;
-      border-bottom: 1px solid #e5e7eb;
-    }
-    .report-table td {
-      padding: .3rem .5rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: #374151;
-      font-size: .8rem;
-    }
-    .report-table td:last-child {
-      font-family: monospace;
-      font-weight: 600;
-      color: #111827;
-    }
+            /* ── Report collapse ── */
+            .report-collapse-btn {
+                font-size: 0.78rem;
+                color: #6b7280;
+                background: none;
+                border: none;
+                padding: 0;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                font-family: "Poppins", sans-serif;
+            }
+            .report-collapse-btn:hover {
+                color: #374151;
+            }
+            .report-table {
+                width: 100%;
+                font-size: 0.8rem;
+                border-collapse: collapse;
+                margin-top: 0.5rem;
+            }
+            .report-table th {
+                text-align: left;
+                font-size: 0.7rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #94a3b8;
+                padding: 0.3rem 0.5rem;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .report-table td {
+                padding: 0.3rem 0.5rem;
+                border-bottom: 1px solid #f1f5f9;
+                color: #374151;
+                font-size: 0.8rem;
+            }
+            .report-table td:last-child {
+                font-family: monospace;
+                font-weight: 600;
+                color: #111827;
+            }
 
-    /* ── Dropzone ── */
-    .dropzone-label { display: block; cursor: pointer; }
-    .dropzone {
-      border: 2px dashed #d1d5db;
-      border-radius: var(--card-radius);
-      padding: 2rem 1.5rem;
-      text-align: center;
-      transition: all .25s;
-      background: #fafafa;
-      position: relative;
-    }
-    .dropzone:hover, .dropzone.drag-over {
-      border-color: var(--primary-color);
-      background: rgba(220,38,38,.04);
-    }
-    .dropzone.drag-over { transform: scale(1.01); }
-    .dropzone.disabled  { opacity: .5; pointer-events: none; }
-    #file-input-hidden  { display: none; }
+            /* ── Dropzone ── */
+            .dropzone-label {
+                display: block;
+                cursor: pointer;
+            }
+            .dropzone {
+                border: 2px dashed #d1d5db;
+                border-radius: var(--card-radius);
+                padding: 2rem 1.5rem;
+                text-align: center;
+                transition: all 0.25s;
+                background: #fafafa;
+                position: relative;
+            }
+            .dropzone:hover,
+            .dropzone.drag-over {
+                border-color: var(--primary-color);
+                background: rgba(220, 38, 38, 0.04);
+            }
+            .dropzone.drag-over {
+                transform: scale(1.01);
+            }
+            .dropzone.disabled {
+                opacity: 0.5;
+                pointer-events: none;
+            }
+            #file-input-hidden {
+                display: none;
+            }
 
-    /* ── Poll indicator ── */
-    .poll-dot {
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulse-dot 2s infinite;
-      vertical-align: middle;
-      margin-right: .25rem;
-    }
+            /* ── Poll indicator ── */
+            .poll-dot {
+                display: inline-block;
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: #10b981;
+                animation: pulse-dot 2s infinite;
+                vertical-align: middle;
+                margin-right: 0.25rem;
+            }
 
-    /* ── Misc ── */
-    .card-section-header {
-      background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
-      color: #fff;
-    }
-    .section-icon { font-size: 1.3rem; }
-    .btn-activate {
-      font-size: .78rem;
-      padding: .25rem .7rem;
-    }
-  </style>
-</head>
-<body>
-
-<!-- ══════════════════════════════════════════════════
+            /* ── Misc ── */
+            .card-section-header {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-dark),
+                    var(--primary-color)
+                );
+                color: #fff;
+            }
+            .section-icon {
+                font-size: 1.3rem;
+            }
+            .btn-activate {
+                font-size: 0.78rem;
+                padding: 0.25rem 0.7rem;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- ══════════════════════════════════════════════════
      LOGIN SCREEN
 ══════════════════════════════════════════════════ -->
-<div id="login-screen">
-  <div class="card shadow-lg">
-    <div class="card-header p-4">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h2 class="mb-1" style="font-family:'Rajdhani',sans-serif;">Controller 提交平台</h2>
-          <p class="mb-0 opacity-75" style="font-size:.875rem;">AI Racer — 队伍登录</p>
+        <div id="login-screen">
+            <div class="card shadow-lg">
+                <div class="card-header p-4">
+                    <div
+                        class="d-flex justify-content-between align-items-center"
+                    >
+                        <div>
+                            <h2
+                                class="mb-1"
+                                style="
+                                    font-family:
+                                        &quot;Rajdhani&quot;, sans-serif;
+                                "
+                            >
+                                Controller 提交平台
+                            </h2>
+                            <p
+                                class="mb-0 opacity-75"
+                                style="font-size: 0.875rem"
+                            >
+                                AI Racer — 队伍登录
+                            </p>
+                        </div>
+                        <i class="bi bi-flag-fill section-icon opacity-75"></i>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div
+                        id="login-alert"
+                        class="alert alert-danger py-2 small d-none"
+                        role="alert"
+                    >
+                        <i class="bi bi-exclamation-circle me-1"></i
+                        ><span id="login-alert-text"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="input-team-id" class="form-label"
+                            >队伍 ID <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="input-team-id"
+                            placeholder="例如: A01"
+                            autocomplete="username"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="input-password" class="form-label"
+                            >密码 <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="input-password"
+                            placeholder="队伍密码"
+                            autocomplete="current-password"
+                        />
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="input-zone" class="form-label"
+                            >赛区 <span class="text-danger">*</span></label
+                        >
+                        <select class="form-select" id="input-zone">
+                            <option value="" disabled selected>
+                                加载中...
+                            </option>
+                        </select>
+                    </div>
+
+                    <button
+                        class="btn btn-primary w-100 py-2"
+                        id="btn-login"
+                        onclick="handleLogin()"
+                    >
+                        <span
+                            class="spinner-border spinner-border-sm me-2 d-none"
+                            id="login-spinner"
+                            role="status"
+                        ></span>
+                        <i
+                            class="bi bi-box-arrow-in-right me-1"
+                            id="login-icon"
+                        ></i>
+                        <span id="login-btn-text">登录</span>
+                    </button>
+
+                    <p
+                        class="text-center mt-3 mb-0"
+                        style="font-size: 0.85rem; color: #6b7280"
+                    >
+                        没有账号？<a
+                            href="#"
+                            onclick="
+                                showRegisterForm();
+                                return false;
+                            "
+                            style="color: #dc2626; font-weight: 600"
+                            >注册队伍</a
+                        >
+                    </p>
+                </div>
+            </div>
+
+            <!-- ── Register card (hidden by default) ── -->
+            <div
+                class="card shadow-lg mt-3 d-none"
+                id="register-card"
+                style="width: 100%; max-width: 400px"
+            >
+                <div
+                    class="card-header p-4"
+                    style="
+                        background: linear-gradient(135deg, #7f1d1d, #b91c1c);
+                        color: #fff;
+                        border-radius: var(--card-radius) var(--card-radius) 0 0;
+                    "
+                >
+                    <div
+                        class="d-flex justify-content-between align-items-center"
+                    >
+                        <div>
+                            <h2
+                                class="mb-1"
+                                style="
+                                    font-family:
+                                        &quot;Rajdhani&quot;, sans-serif;
+                                "
+                            >
+                                注册队伍
+                            </h2>
+                            <p
+                                class="mb-0 opacity-75"
+                                style="font-size: 0.875rem"
+                            >
+                                AI Racer — 创建新队伍
+                            </p>
+                        </div>
+                        <i
+                            class="bi bi-person-plus-fill section-icon opacity-75"
+                        ></i>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div
+                        id="reg-alert"
+                        class="alert alert-danger py-2 small d-none"
+                        role="alert"
+                    >
+                        <i class="bi bi-exclamation-circle me-1"></i
+                        ><span id="reg-alert-text"></span>
+                    </div>
+                    <div
+                        id="reg-success"
+                        class="alert alert-success py-2 small d-none"
+                        role="alert"
+                    >
+                        <i class="bi bi-check-circle me-1"></i
+                        ><span id="reg-success-text"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reg-zone" class="form-label"
+                            >赛区 <span class="text-danger">*</span></label
+                        >
+                        <select class="form-select" id="reg-zone">
+                            <option value="" disabled selected>
+                                请选择赛区
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reg-team-id" class="form-label"
+                            >队伍 ID <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="reg-team-id"
+                            placeholder="2-20位字母/数字/下划线，例如: A01"
+                            autocomplete="off"
+                        />
+                        <div class="form-text">登录时使用，创建后不可更改</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reg-team-name" class="form-label"
+                            >队伍名称 <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="reg-team-name"
+                            placeholder="展示用名称，例如: 极速先锋队"
+                            autocomplete="off"
+                        />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reg-password" class="form-label"
+                            >密码 <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="reg-password"
+                            placeholder="设置登录密码"
+                            autocomplete="new-password"
+                        />
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="reg-password2" class="form-label"
+                            >确认密码 <span class="text-danger">*</span></label
+                        >
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="reg-password2"
+                            placeholder="再次输入密码"
+                            autocomplete="new-password"
+                        />
+                    </div>
+
+                    <button
+                        class="btn btn-danger w-100 py-2"
+                        id="btn-register"
+                        onclick="handleRegister()"
+                    >
+                        <span
+                            class="spinner-border spinner-border-sm me-2 d-none"
+                            id="reg-spinner"
+                            role="status"
+                        ></span>
+                        <i class="bi bi-person-plus me-1" id="reg-icon"></i>
+                        <span id="reg-btn-text">注册</span>
+                    </button>
+
+                    <p
+                        class="text-center mt-3 mb-0"
+                        style="font-size: 0.85rem; color: #6b7280"
+                    >
+                        已有账号？<a
+                            href="#"
+                            onclick="
+                                showLoginForm();
+                                return false;
+                            "
+                            style="color: #dc2626; font-weight: 600"
+                            >返回登录</a
+                        >
+                    </p>
+                </div>
+            </div>
         </div>
-        <i class="bi bi-flag-fill section-icon opacity-75"></i>
-      </div>
-    </div>
-    <div class="card-body p-4">
-      <div id="login-alert" class="alert alert-danger py-2 small d-none" role="alert">
-        <i class="bi bi-exclamation-circle me-1"></i><span id="login-alert-text"></span>
-      </div>
 
-      <div class="mb-3">
-        <label for="input-team-id" class="form-label">队伍 ID <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="input-team-id" placeholder="例如: A01" autocomplete="username">
-      </div>
-
-      <div class="mb-3">
-        <label for="input-password" class="form-label">密码 <span class="text-danger">*</span></label>
-        <input type="password" class="form-control" id="input-password" placeholder="队伍密码" autocomplete="current-password">
-      </div>
-
-      <div class="mb-4">
-        <label for="input-zone" class="form-label">赛区 <span class="text-danger">*</span></label>
-        <select class="form-select" id="input-zone">
-          <option value="" disabled selected>加载中...</option>
-        </select>
-      </div>
-
-      <button class="btn btn-primary w-100 py-2" id="btn-login" onclick="handleLogin()">
-        <span class="spinner-border spinner-border-sm me-2 d-none" id="login-spinner" role="status"></span>
-        <i class="bi bi-box-arrow-in-right me-1" id="login-icon"></i>
-        <span id="login-btn-text">登录</span>
-      </button>
-
-      <p class="text-center mt-3 mb-0" style="font-size:.85rem;color:#6b7280;">
-        没有账号？<a href="#" onclick="showRegisterForm();return false;" style="color:#dc2626;font-weight:600;">注册队伍</a>
-      </p>
-    </div>
-  </div>
-
-  <!-- ── Register card (hidden by default) ── -->
-  <div class="card shadow-lg mt-3 d-none" id="register-card" style="width:100%;max-width:400px;">
-    <div class="card-header p-4" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:#fff;border-radius:var(--card-radius) var(--card-radius) 0 0;">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h2 class="mb-1" style="font-family:'Rajdhani',sans-serif;">注册队伍</h2>
-          <p class="mb-0 opacity-75" style="font-size:.875rem;">AI Racer — 创建新队伍</p>
-        </div>
-        <i class="bi bi-person-plus-fill section-icon opacity-75"></i>
-      </div>
-    </div>
-    <div class="card-body p-4">
-      <div id="reg-alert" class="alert alert-danger py-2 small d-none" role="alert">
-        <i class="bi bi-exclamation-circle me-1"></i><span id="reg-alert-text"></span>
-      </div>
-      <div id="reg-success" class="alert alert-success py-2 small d-none" role="alert">
-        <i class="bi bi-check-circle me-1"></i><span id="reg-success-text"></span>
-      </div>
-
-      <div class="mb-3">
-        <label for="reg-zone" class="form-label">赛区 <span class="text-danger">*</span></label>
-        <select class="form-select" id="reg-zone">
-          <option value="" disabled selected>请选择赛区</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label for="reg-team-id" class="form-label">队伍 ID <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="reg-team-id" placeholder="2-20位字母/数字/下划线，例如: A01" autocomplete="off">
-        <div class="form-text">登录时使用，创建后不可更改</div>
-      </div>
-
-      <div class="mb-3">
-        <label for="reg-team-name" class="form-label">队伍名称 <span class="text-danger">*</span></label>
-        <input type="text" class="form-control" id="reg-team-name" placeholder="展示用名称，例如: 极速先锋队" autocomplete="off">
-      </div>
-
-      <div class="mb-3">
-        <label for="reg-password" class="form-label">密码 <span class="text-danger">*</span></label>
-        <input type="password" class="form-control" id="reg-password" placeholder="设置登录密码" autocomplete="new-password">
-      </div>
-
-      <div class="mb-4">
-        <label for="reg-password2" class="form-label">确认密码 <span class="text-danger">*</span></label>
-        <input type="password" class="form-control" id="reg-password2" placeholder="再次输入密码" autocomplete="new-password">
-      </div>
-
-      <button class="btn btn-danger w-100 py-2" id="btn-register" onclick="handleRegister()">
-        <span class="spinner-border spinner-border-sm me-2 d-none" id="reg-spinner" role="status"></span>
-        <i class="bi bi-person-plus me-1" id="reg-icon"></i>
-        <span id="reg-btn-text">注册</span>
-      </button>
-
-      <p class="text-center mt-3 mb-0" style="font-size:.85rem;color:#6b7280;">
-        已有账号？<a href="#" onclick="showLoginForm();return false;" style="color:#dc2626;font-weight:600;">返回登录</a>
-      </p>
-    </div>
-  </div>
-</div>
-
-
-<!-- ══════════════════════════════════════════════════
+        <!-- ══════════════════════════════════════════════════
      MAIN PANEL
 ══════════════════════════════════════════════════ -->
-<div id="main-panel" style="display:none;">
+        <div id="main-panel" style="display: none">
+            <!-- Navbar -->
+            <nav class="navbar navbar-expand-lg">
+                <div class="container-fluid px-4">
+                    <span class="navbar-brand">
+                        <i class="bi bi-flag-fill me-1"></i> AI Racer
+                    </span>
+                    <div class="d-flex align-items-center gap-3 ms-auto">
+                        <div class="navbar-user-pill">
+                            <span class="dot"></span>
+                            <span id="header-team-name">—</span>
+                            <span
+                                class="opacity-75"
+                                style="font-size: 0.8rem"
+                                id="header-zone-name"
+                            ></span>
+                        </div>
+                        <button
+                            class="btn btn-sm btn-outline-light"
+                            onclick="handleLogout()"
+                        >
+                            <i class="bi bi-box-arrow-right me-1"></i>退出
+                        </button>
+                    </div>
+                </div>
+            </nav>
 
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg">
-    <div class="container-fluid px-4">
-      <span class="navbar-brand">
-        <i class="bi bi-flag-fill me-1"></i> AI Racer
-      </span>
-      <div class="d-flex align-items-center gap-3 ms-auto">
-        <div class="navbar-user-pill">
-          <span class="dot"></span>
-          <span id="header-team-name">—</span>
-          <span class="opacity-75" style="font-size:.8rem;" id="header-zone-name"></span>
-        </div>
-        <button class="btn btn-sm btn-outline-light" onclick="handleLogout()">
-          <i class="bi bi-box-arrow-right me-1"></i>退出
-        </button>
-      </div>
-    </div>
-  </nav>
-
-  <!-- Locked banner -->
-  <div id="locked-banner" class="d-none">
-    <div class="alert alert-danger rounded-0 mb-0 text-center fw-semibold py-2" style="border-radius:0 !important;">
-      <i class="bi bi-lock-fill me-2"></i>代码提交已关闭（管理员已锁定），不再接受新的提交。
-    </div>
-  </div>
-
-  <div class="container py-4" style="max-width:1100px;">
-
-    <!-- ── SLOT CARDS ── -->
-    <div class="card mb-4 shadow-sm">
-      <div class="card-header card-section-header p-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-0"><i class="bi bi-cpu me-2"></i>Controller 槽位</h5>
-            <p class="mb-0 opacity-75" style="font-size:.82rem;">管理三个 Controller 版本，设置参赛槽位</p>
-          </div>
-          <span class="poll-dot"></span><small class="text-white opacity-75" style="font-size:.75rem;">每 10 秒刷新</small>
-        </div>
-      </div>
-      <div class="card-body p-3">
-        <div class="slots-grid" id="slots-grid">
-          <!-- Rendered by JS -->
-          <div class="col-12 text-center text-muted py-4">
-            <span class="spinner-border spinner-border-sm me-2"></span>加载槽位中...
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── UPLOAD CARD ── -->
-    <div class="card mb-4 shadow-sm">
-      <div class="card-header card-section-header p-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-0"><i class="bi bi-cloud-upload me-2"></i>上传新版本</h5>
-            <p class="mb-0 opacity-75" style="font-size:.82rem;">选择槽位并上传包含 Controller 类的 .py 文件</p>
-          </div>
-          <i class="bi bi-file-earmark-code section-icon opacity-75"></i>
-        </div>
-      </div>
-      <div class="card-body p-4">
-
-        <!-- Slot selector -->
-        <div class="mb-3">
-          <label class="form-label">目标槽位 <span class="text-danger">*</span></label>
-          <select class="form-select" id="upload-slot-select" style="max-width:300px;">
-            <option value="main">main — 主力版本</option>
-            <option value="dev">dev — 开发版本</option>
-            <option value="backup">backup — 备用版本</option>
-          </select>
-        </div>
-
-        <!-- Dropzone -->
-        <label class="dropzone-label" for="file-input-hidden" id="dropzone-label">
-          <div class="dropzone" id="dropzone">
-            <input type="file" id="file-input-hidden" accept=".py">
-            <i class="bi bi-cloud-arrow-up display-6 text-muted d-block mb-2"></i>
-            <div class="fw-semibold text-muted mb-1">将 .py 文件拖放至此，或点击选择</div>
-            <div class="text-muted" style="font-size:.8rem;">仅支持 .py 文件，最大 1 MB</div>
-            <div id="dz-filename" class="mt-2 fw-semibold text-danger d-none" style="font-family:monospace;font-size:.9rem;"></div>
-          </div>
-        </label>
-
-        <!-- Actions -->
-        <div class="d-flex align-items-center gap-3 mt-3">
-          <button class="btn btn-primary px-4" id="btn-upload" onclick="handleUpload()" disabled>
-            <span class="spinner-border spinner-border-sm me-2 d-none" id="upload-spinner"></span>
-            <i class="bi bi-cloud-upload me-1" id="upload-icon"></i>
-            <span id="upload-btn-text">上传</span>
-          </button>
-          <span class="text-muted small" id="upload-hint">请先选择文件</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── NOTICES ACCORDION ── -->
-    <div class="card shadow-sm">
-      <div class="card-header p-0">
-        <button class="btn w-100 text-start p-3 d-flex justify-content-between align-items-center"
-                style="background:none;border:none;"
-                data-bs-toggle="collapse" data-bs-target="#notices-collapse" aria-expanded="false">
-          <span class="fw-semibold"><i class="bi bi-info-circle me-2 text-danger"></i>注意事项</span>
-          <i class="bi bi-chevron-down text-muted"></i>
-        </button>
-      </div>
-      <div class="collapse" id="notices-collapse">
-        <div class="card-body pt-2 pb-3 px-4">
-          <ul class="mb-2 ps-3" style="font-size:.875rem;color:#374151;line-height:2;">
-            <li>每次上传会覆盖对应槽位的当前版本。上传后不会自动进入测试队列，需要手动申请测试。</li>
-            <li>提交文件须为 <code>.py</code> 格式，文件大小不超过 <strong>1 MB</strong>。</li>
-            <li>文件须包含 <code>Controller</code> 类及规定的接口方法。</li>
-            <li>代码运行时间超过单圈时限会产生超时警告，三次警告将被取消资格。</li>
-            <li>如有疑问，请联系赛事管理员。</li>
-          </ul>
-          <div class="mt-2">
-            <div class="fw-semibold mb-1" style="font-size:.82rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">禁止导入的模块</div>
-            <div class="d-flex flex-wrap gap-2">
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">os</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">sys</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">subprocess</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">shutil</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">socket</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">requests</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">urllib</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">threading</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">multiprocessing</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">ctypes</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">pickle</code>
-              <code class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded" style="font-size:.8rem;">importlib</code>
+            <!-- Locked banner -->
+            <div id="locked-banner" class="d-none">
+                <div
+                    class="alert alert-danger rounded-0 mb-0 text-center fw-semibold py-2"
+                    style="border-radius: 0 !important"
+                >
+                    <i class="bi bi-lock-fill me-2"></i>代码提交已关闭（<span
+                        id="locked-banner-zone"
+                    ></span
+                    >），不再接受新的提交。
+                </div>
             </div>
-          </div>
+
+            <div class="container py-4" style="max-width: 1100px">
+                <!-- ── SLOT CARDS ── -->
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-header card-section-header p-3">
+                        <div
+                            class="d-flex justify-content-between align-items-center"
+                        >
+                            <div>
+                                <h5 class="mb-0">
+                                    <i class="bi bi-cpu me-2"></i>Controller
+                                    槽位
+                                </h5>
+                                <p
+                                    class="mb-0 opacity-75"
+                                    style="font-size: 0.82rem"
+                                >
+                                    管理三个 Controller 版本，设置参赛槽位
+                                </p>
+                            </div>
+                            <span class="poll-dot"></span
+                            ><small
+                                class="text-white opacity-75"
+                                style="font-size: 0.75rem"
+                                >每 10 秒刷新</small
+                            >
+                        </div>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="slots-grid" id="slots-grid">
+                            <!-- Rendered by JS -->
+                            <div class="col-12 text-center text-muted py-4">
+                                <span
+                                    class="spinner-border spinner-border-sm me-2"
+                                ></span
+                                >加载槽位中...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── UPLOAD CARD ── -->
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-header card-section-header p-3">
+                        <div
+                            class="d-flex justify-content-between align-items-center"
+                        >
+                            <div>
+                                <h5 class="mb-0">
+                                    <i class="bi bi-cloud-upload me-2"></i
+                                    >上传新版本
+                                </h5>
+                                <p
+                                    class="mb-0 opacity-75"
+                                    style="font-size: 0.82rem"
+                                >
+                                    选择槽位并上传包含 Controller 类的 .py 文件
+                                </p>
+                            </div>
+                            <i
+                                class="bi bi-file-earmark-code section-icon opacity-75"
+                            ></i>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- Slot selector -->
+                        <div class="mb-3">
+                            <label class="form-label"
+                                >目标槽位
+                                <span class="text-danger">*</span></label
+                            >
+                            <select
+                                class="form-select"
+                                id="upload-slot-select"
+                                style="max-width: 300px"
+                            >
+                                <option value="main">main — 主力版本</option>
+                                <option value="dev">dev — 开发版本</option>
+                                <option value="backup">
+                                    backup — 备用版本
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Dropzone -->
+                        <label
+                            class="dropzone-label"
+                            for="file-input-hidden"
+                            id="dropzone-label"
+                        >
+                            <div class="dropzone" id="dropzone">
+                                <input
+                                    type="file"
+                                    id="file-input-hidden"
+                                    accept=".py"
+                                />
+                                <i
+                                    class="bi bi-cloud-arrow-up display-6 text-muted d-block mb-2"
+                                ></i>
+                                <div class="fw-semibold text-muted mb-1">
+                                    将 .py 文件拖放至此，或点击选择
+                                </div>
+                                <div
+                                    class="text-muted"
+                                    style="font-size: 0.8rem"
+                                >
+                                    仅支持 .py 文件，最大 1 MB
+                                </div>
+                                <div
+                                    id="dz-filename"
+                                    class="mt-2 fw-semibold text-danger d-none"
+                                    style="
+                                        font-family: monospace;
+                                        font-size: 0.9rem;
+                                    "
+                                ></div>
+                            </div>
+                        </label>
+
+                        <!-- Actions -->
+                        <div class="d-flex align-items-center gap-3 mt-3">
+                            <button
+                                class="btn btn-primary px-4"
+                                id="btn-upload"
+                                onclick="handleUpload()"
+                                disabled
+                            >
+                                <span
+                                    class="spinner-border spinner-border-sm me-2 d-none"
+                                    id="upload-spinner"
+                                ></span>
+                                <i
+                                    class="bi bi-cloud-upload me-1"
+                                    id="upload-icon"
+                                ></i>
+                                <span id="upload-btn-text">上传</span>
+                            </button>
+                            <span class="text-muted small" id="upload-hint"
+                                >请先选择文件</span
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── NOTICES ACCORDION ── -->
+                <div class="card shadow-sm">
+                    <div class="card-header p-0">
+                        <button
+                            class="btn w-100 text-start p-3 d-flex justify-content-between align-items-center"
+                            style="background: none; border: none"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#notices-collapse"
+                            aria-expanded="false"
+                        >
+                            <span class="fw-semibold"
+                                ><i
+                                    class="bi bi-info-circle me-2 text-danger"
+                                ></i
+                                >注意事项</span
+                            >
+                            <i class="bi bi-chevron-down text-muted"></i>
+                        </button>
+                    </div>
+                    <div class="collapse" id="notices-collapse">
+                        <div class="card-body pt-2 pb-3 px-4">
+                            <ul
+                                class="mb-2 ps-3"
+                                style="
+                                    font-size: 0.875rem;
+                                    color: #374151;
+                                    line-height: 2;
+                                "
+                            >
+                                <li>
+                                    每次上传会覆盖对应槽位的当前版本。上传后不会自动进入测试队列，需要手动申请测试。
+                                </li>
+                                <li>
+                                    提交文件须为
+                                    <code>.py</code> 格式，文件大小不超过
+                                    <strong>1 MB</strong>。
+                                </li>
+                                <li>
+                                    文件须包含
+                                    <code>Controller</code> 类及规定的接口方法。
+                                </li>
+                                <li>
+                                    代码运行时间超过单圈时限会产生超时警告，三次警告将被取消资格。
+                                </li>
+                                <li>如有疑问，请联系赛事管理员。</li>
+                            </ul>
+                            <div class="mt-2">
+                                <div
+                                    class="fw-semibold mb-1"
+                                    style="
+                                        font-size: 0.82rem;
+                                        color: #6b7280;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.05em;
+                                    "
+                                >
+                                    禁止导入的模块
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >os</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >sys</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >subprocess</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >shutil</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >socket</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >requests</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >urllib</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >threading</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >multiprocessing</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >ctypes</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >pickle</code
+                                    >
+                                    <code
+                                        class="bg-danger bg-opacity-10 text-danger px-2 py-1 rounded"
+                                        style="font-size: 0.8rem"
+                                        >importlib</code
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /container -->
         </div>
-      </div>
-    </div>
+        <!-- /main-panel -->
 
-  </div><!-- /container -->
-</div><!-- /main-panel -->
-
-
-<!-- ══════════════════════════════════════════════════
+        <!-- ══════════════════════════════════════════════════
      TOAST CONTAINER
 ══════════════════════════════════════════════════ -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-  <div id="main-toast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000">
-    <div class="d-flex">
-      <div class="toast-body fw-semibold" id="toast-body"></div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-  </div>
-</div>
+        <div class="toast-container position-fixed bottom-0 end-0 p-3">
+            <div
+                id="main-toast"
+                class="toast align-items-center border-0"
+                role="alert"
+                aria-live="assertive"
+                aria-atomic="true"
+                data-bs-delay="4000"
+            >
+                <div class="d-flex">
+                    <div class="toast-body fw-semibold" id="toast-body"></div>
+                    <button
+                        type="button"
+                        class="btn-close btn-close-white me-2 m-auto"
+                        data-bs-dismiss="toast"
+                        aria-label="Close"
+                    ></button>
+                </div>
+            </div>
+        </div>
 
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            "use strict";
 
-<script>
-'use strict';
+            // ── State ──────────────────────────────────────────────────────────────────
+            const S = {
+                teamId: null,
+                password: null,
+                zoneId: null,
+                zoneName: null,
+                file: null,
+                pollTimer: null,
+            };
 
-// ── State ──────────────────────────────────────────────────────────────────
-const S = {
-  teamId:   null,
-  password: null,
-  zoneId:   null,
-  zoneName: null,
-  file:     null,
-  pollTimer: null,
-};
+            // ── Bootstrap Toast helper ─────────────────────────────────────────────────
+            function showToast(type, message) {
+                const el = document.getElementById("main-toast");
+                const body = document.getElementById("toast-body");
+                // type: 'success' | 'danger' | 'warning' | 'info'
+                el.className =
+                    "toast align-items-center border-0 text-bg-" + type;
+                body.textContent = message;
+                bootstrap.Toast.getOrCreateInstance(el).show();
+            }
 
-// ── Bootstrap Toast helper ─────────────────────────────────────────────────
-function showToast(type, message) {
-  const el = document.getElementById('main-toast');
-  const body = document.getElementById('toast-body');
-  // type: 'success' | 'danger' | 'warning' | 'info'
-  el.className = 'toast align-items-center border-0 text-bg-' + type;
-  body.textContent = message;
-  bootstrap.Toast.getOrCreateInstance(el).show();
-}
+            // ── Escape HTML ────────────────────────────────────────────────────────────
+            function esc(s) {
+                return String(s ?? "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
 
-// ── Escape HTML ────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+            function fmtSize(b) {
+                if (b < 1024) return b + " B";
+                if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+                return (b / 1048576).toFixed(1) + " MB";
+            }
 
-function fmtSize(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-  return (b / 1048576).toFixed(1) + ' MB';
-}
+            function fmtTime(iso) {
+                if (!iso) return null;
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleString("zh-CN", {
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    });
+                } catch {
+                    return iso;
+                }
+            }
 
-function fmtTime(iso) {
-  if (!iso) return null;
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-  } catch { return iso; }
-}
+            // ── Basic Auth header ──────────────────────────────────────────────────────
+            function authHeader() {
+                return "Basic " + btoa(S.teamId + ":" + S.password);
+            }
 
-// ── Basic Auth header ──────────────────────────────────────────────────────
-function authHeader() {
-  return 'Basic ' + btoa(S.teamId + ':' + S.password);
-}
+            // ══════════════════════════════════════════════════
+            // LOGIN
+            // ══════════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════
-// LOGIN
-// ══════════════════════════════════════════════════
+            async function loadZones() {
+                try {
+                    const r = await fetch("/api/zones");
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    const zones = await r.json(); // [{id, name}, ...]
+                    const sel = document.getElementById("input-zone");
+                    sel.innerHTML =
+                        '<option value="" disabled selected>请选择赛区</option>';
+                    zones.forEach((z) => {
+                        const o = document.createElement("option");
+                        o.value = z.id;
+                        o.textContent = z.name;
+                        sel.appendChild(o);
+                    });
+                } catch (e) {
+                    const sel = document.getElementById("input-zone");
+                    sel.innerHTML =
+                        '<option value="" disabled selected>赛区加载失败</option>';
+                    console.error("loadZones:", e);
+                }
+            }
 
-async function loadZones() {
-  try {
-    const r = await fetch('/api/zones');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const zones = await r.json(); // [{id, name}, ...]
-    const sel = document.getElementById('input-zone');
-    sel.innerHTML = '<option value="" disabled selected>请选择赛区</option>';
-    zones.forEach(z => {
-      const o = document.createElement('option');
-      o.value = z.id;
-      o.textContent = z.name;
-      sel.appendChild(o);
-    });
-  } catch (e) {
-    const sel = document.getElementById('input-zone');
-    sel.innerHTML = '<option value="" disabled selected>赛区加载失败</option>';
-    console.error('loadZones:', e);
-  }
-}
+            async function handleLogin() {
+                const teamId = document
+                    .getElementById("input-team-id")
+                    .value.trim();
+                const password =
+                    document.getElementById("input-password").value;
+                const zoneEl = document.getElementById("input-zone");
+                const zoneId = zoneEl.value;
+                const zoneName =
+                    zoneEl.options[zoneEl.selectedIndex]?.text ?? "";
 
-async function handleLogin() {
-  const teamId   = document.getElementById('input-team-id').value.trim();
-  const password = document.getElementById('input-password').value;
-  const zoneEl   = document.getElementById('input-zone');
-  const zoneId   = zoneEl.value;
-  const zoneName = zoneEl.options[zoneEl.selectedIndex]?.text ?? '';
+                if (!teamId) {
+                    showLoginAlert("请输入队伍 ID");
+                    return;
+                }
+                if (!password) {
+                    showLoginAlert("请输入密码");
+                    return;
+                }
+                if (!zoneId) {
+                    showLoginAlert("请选择赛区");
+                    return;
+                }
 
-  if (!teamId)   { showLoginAlert('请输入队伍 ID'); return; }
-  if (!password) { showLoginAlert('请输入密码'); return; }
-  if (!zoneId)   { showLoginAlert('请选择赛区'); return; }
+                setLoginLoading(true);
 
-  setLoginLoading(true);
+                let resp;
+                try {
+                    resp = await fetch(
+                        "/api/test-status/" + encodeURIComponent(teamId),
+                        {
+                            headers: {
+                                Authorization:
+                                    "Basic " + btoa(teamId + ":" + password),
+                            },
+                        },
+                    );
+                } catch (e) {
+                    showLoginAlert("无法连接服务器: " + e.message);
+                    setLoginLoading(false);
+                    return;
+                }
 
-  let resp;
-  try {
-    resp = await fetch('/api/test-status/' + encodeURIComponent(teamId), {
-      headers: { Authorization: 'Basic ' + btoa(teamId + ':' + password) }
-    });
-  } catch (e) {
-    showLoginAlert('无法连接服务器: ' + e.message);
-    setLoginLoading(false);
-    return;
-  }
+                // 200 = ok, 404 = no submission yet but auth valid
+                if (resp.status === 200 || resp.status === 404) {
+                    S.teamId = teamId;
+                    S.password = password;
+                    S.zoneId = zoneId;
+                    S.zoneName = zoneName;
+                    localStorage.setItem(
+                        "airacer_session",
+                        JSON.stringify({ teamId, password, zoneId, zoneName }),
+                    );
+                    hideLoginAlert();
+                    enterMainPanel();
+                } else if (resp.status === 401) {
+                    showLoginAlert("队伍 ID 或密码错误");
+                } else {
+                    showLoginAlert("登录失败 (HTTP " + resp.status + ")");
+                }
 
-  // 200 = ok, 404 = no submission yet but auth valid
-  if (resp.status === 200 || resp.status === 404) {
-    S.teamId   = teamId;
-    S.password = password;
-    S.zoneId   = zoneId;
-    S.zoneName = zoneName;
-    localStorage.setItem('airacer_session', JSON.stringify({ teamId, password, zoneId, zoneName }));
-    hideLoginAlert();
-    enterMainPanel();
-  } else if (resp.status === 401) {
-    showLoginAlert('队伍 ID 或密码错误');
-  } else {
-    showLoginAlert('登录失败 (HTTP ' + resp.status + ')');
-  }
+                setLoginLoading(false);
+            }
 
-  setLoginLoading(false);
-}
+            function showLoginAlert(msg) {
+                const el = document.getElementById("login-alert");
+                document.getElementById("login-alert-text").textContent = msg;
+                el.classList.remove("d-none");
+            }
+            function hideLoginAlert() {
+                document.getElementById("login-alert").classList.add("d-none");
+            }
 
-function showLoginAlert(msg) {
-  const el = document.getElementById('login-alert');
-  document.getElementById('login-alert-text').textContent = msg;
-  el.classList.remove('d-none');
-}
-function hideLoginAlert() {
-  document.getElementById('login-alert').classList.add('d-none');
-}
+            function setLoginLoading(loading) {
+                const btn = document.getElementById("btn-login");
+                const spinner = document.getElementById("login-spinner");
+                const icon = document.getElementById("login-icon");
+                const text = document.getElementById("login-btn-text");
+                btn.disabled = loading;
+                spinner.classList.toggle("d-none", !loading);
+                icon.classList.toggle("d-none", loading);
+                text.textContent = loading ? "登录中..." : "登录";
+            }
 
-function setLoginLoading(loading) {
-  const btn     = document.getElementById('btn-login');
-  const spinner = document.getElementById('login-spinner');
-  const icon    = document.getElementById('login-icon');
-  const text    = document.getElementById('login-btn-text');
-  btn.disabled  = loading;
-  spinner.classList.toggle('d-none', !loading);
-  icon.classList.toggle('d-none', loading);
-  text.textContent = loading ? '登录中...' : '登录';
-}
+            function handleLogout() {
+                S.teamId = S.password = S.zoneId = S.zoneName = S.file = null;
+                if (S.pollTimer) {
+                    clearInterval(S.pollTimer);
+                    S.pollTimer = null;
+                }
+                localStorage.removeItem("airacer_session");
+                document.getElementById("main-panel").style.display = "none";
+                document.getElementById("login-screen").style.display = "flex";
+                document.getElementById("input-password").value = "";
+                resetDropzone();
+            }
 
-function handleLogout() {
-  S.teamId = S.password = S.zoneId = S.zoneName = S.file = null;
-  if (S.pollTimer) { clearInterval(S.pollTimer); S.pollTimer = null; }
-  localStorage.removeItem('airacer_session');
-  document.getElementById('main-panel').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('input-password').value = '';
-  resetDropzone();
-}
+            // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+            document
+                .getElementById("input-team-id")
+                .addEventListener("keydown", (e) => {
+                    if (e.key === "Enter")
+                        document.getElementById("input-password").focus();
+                });
+            document
+                .getElementById("input-password")
+                .addEventListener("keydown", (e) => {
+                    if (e.key === "Enter")
+                        document.getElementById("input-zone").focus();
+                });
+            document
+                .getElementById("input-zone")
+                .addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") handleLogin();
+                });
 
-// ── Keyboard shortcuts ─────────────────────────────────────────────────────
-document.getElementById('input-team-id').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('input-password').focus();
-});
-document.getElementById('input-password').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('input-zone').focus();
-});
-document.getElementById('input-zone').addEventListener('keydown', e => {
-  if (e.key === 'Enter') handleLogin();
-});
+            // ── Register form toggle ───────────────────────────────────────────────────
+            function showRegisterForm() {
+                document
+                    .getElementById("login-screen")
+                    .querySelector(".card")
+                    .classList.add("d-none");
+                const regCard = document.getElementById("register-card");
+                regCard.classList.remove("d-none");
+                // Sync zones to register select
+                const loginZone = document.getElementById("input-zone");
+                const regZone = document.getElementById("reg-zone");
+                regZone.innerHTML = loginZone.innerHTML;
+                regZone.value = "";
+                hideRegAlert();
+                document.getElementById("reg-success").classList.add("d-none");
+            }
 
-// ── Register form toggle ───────────────────────────────────────────────────
-function showRegisterForm() {
-  document.getElementById('login-screen').querySelector('.card').classList.add('d-none');
-  const regCard = document.getElementById('register-card');
-  regCard.classList.remove('d-none');
-  // Sync zones to register select
-  const loginZone = document.getElementById('input-zone');
-  const regZone = document.getElementById('reg-zone');
-  regZone.innerHTML = loginZone.innerHTML;
-  regZone.value = '';
-  hideRegAlert();
-  document.getElementById('reg-success').classList.add('d-none');
-}
+            function showLoginForm() {
+                document
+                    .getElementById("login-screen")
+                    .querySelector(".card")
+                    .classList.remove("d-none");
+                document
+                    .getElementById("register-card")
+                    .classList.add("d-none");
+                hideLoginAlert();
+            }
 
-function showLoginForm() {
-  document.getElementById('login-screen').querySelector('.card').classList.remove('d-none');
-  document.getElementById('register-card').classList.add('d-none');
-  hideLoginAlert();
-}
+            function showRegAlert(msg) {
+                document.getElementById("reg-alert-text").textContent = msg;
+                document.getElementById("reg-alert").classList.remove("d-none");
+            }
+            function hideRegAlert() {
+                document.getElementById("reg-alert").classList.add("d-none");
+            }
 
-function showRegAlert(msg) {
-  document.getElementById('reg-alert-text').textContent = msg;
-  document.getElementById('reg-alert').classList.remove('d-none');
-}
-function hideRegAlert() {
-  document.getElementById('reg-alert').classList.add('d-none');
-}
+            function setRegLoading(loading) {
+                const btn = document.getElementById("btn-register");
+                const spinner = document.getElementById("reg-spinner");
+                const icon = document.getElementById("reg-icon");
+                const text = document.getElementById("reg-btn-text");
+                btn.disabled = loading;
+                spinner.classList.toggle("d-none", !loading);
+                icon.classList.toggle("d-none", loading);
+                text.textContent = loading ? "注册中..." : "注册";
+            }
 
-function setRegLoading(loading) {
-  const btn     = document.getElementById('btn-register');
-  const spinner = document.getElementById('reg-spinner');
-  const icon    = document.getElementById('reg-icon');
-  const text    = document.getElementById('reg-btn-text');
-  btn.disabled  = loading;
-  spinner.classList.toggle('d-none', !loading);
-  icon.classList.toggle('d-none', loading);
-  text.textContent = loading ? '注册中...' : '注册';
-}
+            async function handleRegister() {
+                hideRegAlert();
+                const zoneEl = document.getElementById("reg-zone");
+                const zoneId = zoneEl.value;
+                const teamId = document
+                    .getElementById("reg-team-id")
+                    .value.trim();
+                const teamName = document
+                    .getElementById("reg-team-name")
+                    .value.trim();
+                const password = document.getElementById("reg-password").value;
+                const password2 =
+                    document.getElementById("reg-password2").value;
 
-async function handleRegister() {
-  hideRegAlert();
-  const zoneEl    = document.getElementById('reg-zone');
-  const zoneId    = zoneEl.value;
-  const teamId    = document.getElementById('reg-team-id').value.trim();
-  const teamName  = document.getElementById('reg-team-name').value.trim();
-  const password  = document.getElementById('reg-password').value;
-  const password2 = document.getElementById('reg-password2').value;
+                if (!zoneId) {
+                    showRegAlert("请选择赛区");
+                    return;
+                }
+                if (!teamId) {
+                    showRegAlert("请输入队伍 ID");
+                    return;
+                }
+                if (!/^[a-zA-Z0-9_]{2,20}$/.test(teamId)) {
+                    showRegAlert(
+                        "队伍 ID 只允许字母/数字/下划线，长度 2-20 位",
+                    );
+                    return;
+                }
+                if (!teamName) {
+                    showRegAlert("请输入队伍名称");
+                    return;
+                }
+                if (!password) {
+                    showRegAlert("请输入密码");
+                    return;
+                }
+                if (password !== password2) {
+                    showRegAlert("两次密码输入不一致");
+                    return;
+                }
 
-  if (!zoneId)    { showRegAlert('请选择赛区'); return; }
-  if (!teamId)    { showRegAlert('请输入队伍 ID'); return; }
-  if (!/^[a-zA-Z0-9_]{2,20}$/.test(teamId)) {
-    showRegAlert('队伍 ID 只允许字母/数字/下划线，长度 2-20 位');
-    return;
-  }
-  if (!teamName)  { showRegAlert('请输入队伍名称'); return; }
-  if (!password)  { showRegAlert('请输入密码'); return; }
-  if (password !== password2) { showRegAlert('两次密码输入不一致'); return; }
+                setRegLoading(true);
 
-  setRegLoading(true);
+                let resp, data;
+                try {
+                    resp = await fetch("/api/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            zone_id: zoneId,
+                            team_id: teamId,
+                            team_name: teamName,
+                            password,
+                        }),
+                    });
+                    data = await resp.json();
+                } catch (e) {
+                    showRegAlert("网络错误: " + e.message);
+                    setRegLoading(false);
+                    return;
+                }
 
-  let resp, data;
-  try {
-    resp = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ zone_id: zoneId, team_id: teamId, team_name: teamName, password })
-    });
-    data = await resp.json();
-  } catch (e) {
-    showRegAlert('网络错误: ' + e.message);
-    setRegLoading(false);
-    return;
-  }
+                setRegLoading(false);
 
-  setRegLoading(false);
+                if (resp.ok && data.status === "registered") {
+                    const successEl = document.getElementById("reg-success");
+                    document.getElementById("reg-success-text").textContent =
+                        `注册成功！队伍 "${teamId}" 已创建，即将跳转登录…`;
+                    successEl.classList.remove("d-none");
+                    document.getElementById("btn-register").disabled = true;
+                    setTimeout(() => {
+                        showLoginForm();
+                        document.getElementById("input-team-id").value = teamId;
+                        document.getElementById("input-password").value =
+                            password;
+                        document.getElementById("input-zone").value = zoneId;
+                    }, 1500);
+                } else {
+                    showRegAlert(data.detail || data.message || "注册失败");
+                }
+            }
 
-  if (resp.ok && data.status === 'registered') {
-    const successEl = document.getElementById('reg-success');
-    document.getElementById('reg-success-text').textContent = `注册成功！队伍 "${teamId}" 已创建，即将跳转登录…`;
-    successEl.classList.remove('d-none');
-    document.getElementById('btn-register').disabled = true;
-    setTimeout(() => {
-      showLoginForm();
-      document.getElementById('input-team-id').value = teamId;
-      document.getElementById('input-password').value = password;
-      document.getElementById('input-zone').value = zoneId;
-    }, 1500);
-  } else {
-    showRegAlert(data.detail || data.message || '注册失败');
-  }
-}
+            // ══════════════════════════════════════════════════
+            // MAIN PANEL
+            // ══════════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════
-// MAIN PANEL
-// ══════════════════════════════════════════════════
+            async function enterMainPanel() {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("main-panel").style.display = "block";
+                document.getElementById("header-team-name").textContent =
+                    S.teamId;
+                document.getElementById("header-zone-name").textContent =
+                    S.zoneName ? "· " + S.zoneName : "";
+                await refreshSlots();
+                startPolling();
+            }
 
-async function enterMainPanel() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('main-panel').style.display = 'block';
-  document.getElementById('header-team-name').textContent = S.teamId;
-  document.getElementById('header-zone-name').textContent = S.zoneName ? '· ' + S.zoneName : '';
-  await refreshSlots();
-  startPolling();
-}
+            // ── Poll ───────────────────────────────────────────────────────────────────
+            function startPolling() {
+                if (S.pollTimer) clearInterval(S.pollTimer);
+                S.pollTimer = setInterval(refreshSlots, 10000);
+            }
 
-// ── Poll ───────────────────────────────────────────────────────────────────
-function startPolling() {
-  if (S.pollTimer) clearInterval(S.pollTimer);
-  S.pollTimer = setInterval(refreshSlots, 10000);
-}
+            async function refreshSlots() {
+                if (!S.teamId) return;
+                let resp, data;
+                try {
+                    resp = await fetch(
+                        "/api/test-status/" + encodeURIComponent(S.teamId),
+                        {
+                            headers: { Authorization: authHeader() },
+                        },
+                    );
+                    data = await resp.json();
+                } catch (e) {
+                    console.error("refreshSlots:", e);
+                    return;
+                }
 
-async function refreshSlots() {
-  if (!S.teamId) return;
-  let resp, data;
-  try {
-    resp = await fetch('/api/test-status/' + encodeURIComponent(S.teamId), {
-      headers: { Authorization: authHeader() }
-    });
-    data = await resp.json();
-  } catch (e) {
-    console.error('refreshSlots:', e);
-    return;
-  }
+                if (resp.status === 404 || !data.slots) {
+                    renderSlots({});
+                    return;
+                }
+                renderSlots(data.slots || {});
+            }
 
-  if (resp.status === 404 || !data.slots) {
-    renderSlots({});
-    return;
-  }
-  renderSlots(data.slots || {});
-}
+            // ══════════════════════════════════════════════════
+            // SLOT CARDS
+            // ══════════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════
-// SLOT CARDS
-// ══════════════════════════════════════════════════
+            const SLOT_DEFS = [
+                { key: "main", label: "Main", desc: "主力版本" },
+                { key: "dev", label: "Dev", desc: "开发版本" },
+                { key: "backup", label: "Backup", desc: "备用版本" },
+            ];
 
-const SLOT_DEFS = [
-  { key: 'main',   label: 'Main',   desc: '主力版本' },
-  { key: 'dev',    label: 'Dev',    desc: '开发版本' },
-  { key: 'backup', label: 'Backup', desc: '备用版本' },
-];
+            function renderSlots(slots) {
+                const grid = document.getElementById("slots-grid");
+                grid.innerHTML = SLOT_DEFS.map((def) =>
+                    renderSlotCard(def, slots[def.key] ?? null),
+                ).join("");
+            }
 
-function renderSlots(slots) {
-  const grid = document.getElementById('slots-grid');
-  grid.innerHTML = SLOT_DEFS.map(def => renderSlotCard(def, slots[def.key] ?? null)).join('');
-}
+            function renderSlotCard(def, slot) {
+                const isActive = slot?.is_race_active === true;
+                const activeClass = isActive ? "slot-active" : "";
 
-function renderSlotCard(def, slot) {
-  const isActive = slot?.is_race_active === true;
-  const activeClass = isActive ? 'slot-active' : '';
+                // Time
+                const timeStr = slot?.version ? fmtTime(slot.version) : null;
+                const timeHtml = timeStr
+                    ? `<div class="slot-time"><i class="bi bi-clock me-1"></i>${esc(timeStr)}</div>`
+                    : `<div class="slot-time text-secondary">尚未上传</div>`;
 
-  // Time
-  const timeStr = slot?.version ? fmtTime(slot.version) : null;
-  const timeHtml = timeStr
-    ? `<div class="slot-time"><i class="bi bi-clock me-1"></i>${esc(timeStr)}</div>`
-    : `<div class="slot-time text-secondary">尚未上传</div>`;
+                // Test badge
+                const testBadge = buildTestBadge(slot?.queue_status);
 
-  // Test badge
-  const testBadge = buildTestBadge(slot?.queue_status);
+                // Active badge
+                const activeBadge = isActive
+                    ? `<span class="slot-active-badge"><i class="bi bi-lightning-charge-fill me-1"></i>参赛中</span>`
+                    : "";
 
-  // Active badge
-  const activeBadge = isActive
-    ? `<span class="slot-active-badge"><i class="bi bi-lightning-charge-fill me-1"></i>参赛中</span>`
-    : '';
+                // Report section
+                const reportHtml = buildReportHtml(def.key, slot);
 
-  // Report section
-  const reportHtml = buildReportHtml(def.key, slot);
-
-  // Buttons
-  const uploadBtn = `
+                // Buttons
+                const uploadBtn = `
     <button class="btn btn-primary btn-sm" onclick="quickUploadSlot('${def.key}')">
       <i class="bi bi-cloud-upload me-1"></i>上传新版本
     </button>`;
-  const requestBtn = slot?.version && !['waiting', 'running'].includes(slot.queue_status)
-    ? `<button class="btn btn-outline-primary btn-sm" onclick="requestTest('${def.key}')">
+                const requestBtn =
+                    slot?.version &&
+                    !["waiting", "running"].includes(slot.queue_status)
+                        ? `<button class="btn btn-outline-primary btn-sm" onclick="requestTest('${def.key}')">
         <i class="bi bi-play-circle me-1"></i>申请测试
        </button>`
-    : '';
-  const requestStatusBtn = slot?.version && ['waiting', 'running'].includes(slot.queue_status)
-    ? `<button class="btn btn-outline-secondary btn-sm" disabled>
-        <i class="bi bi-clock-history me-1"></i>${slot.queue_status === 'running' ? '运行中' : '排队中'}
+                        : "";
+                const requestStatusBtn =
+                    slot?.version &&
+                    ["waiting", "running"].includes(slot.queue_status)
+                        ? `<button class="btn btn-outline-secondary btn-sm" disabled>
+        <i class="bi bi-clock-history me-1"></i>${slot.queue_status === "running" ? "运行中" : "排队中"}
        </button>`
-    : '';
-  const activateBtn = !isActive
-    ? `<button class="btn btn-outline-success btn-sm btn-activate" onclick="activateSlot('${def.key}')">
+                        : "";
+                const activateBtn = !isActive
+                    ? `<button class="btn btn-outline-success btn-sm btn-activate" onclick="activateSlot('${def.key}')">
         <i class="bi bi-check-circle me-1"></i>设为参赛
        </button>`
-    : `<button class="btn btn-outline-success btn-sm btn-activate" disabled>
+                    : `<button class="btn btn-outline-success btn-sm btn-activate" disabled>
         <i class="bi bi-check-circle-fill me-1"></i>已参赛
        </button>`;
 
-  return `
+                return `
     <div class="card slot-card ${activeClass} h-100 position-relative overflow-visible">
       ${activeBadge}
       <div class="card-header d-flex justify-content-between align-items-start">
@@ -828,248 +1308,318 @@ function renderSlotCard(def, slot) {
         </div>
       </div>
     </div>`;
-}
+            }
 
-function buildTestBadge(status) {
-  if (!status || status === 'none' || status === 'no_run') return `<span class="test-badge test-badge-none">无测试</span>`;
-  if (status === 'waiting')  return `<span class="test-badge test-badge-waiting"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 排队中</span>`;
-  if (status === 'running')  return `<span class="test-badge test-badge-running"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 运行中</span>`;
-  if (status === 'done')     return `<span class="test-badge test-badge-done"><i class="bi bi-check-circle-fill"></i> 已完成</span>`;
-  if (status === 'failed')   return `<span class="test-badge test-badge-failed"><i class="bi bi-x-circle-fill"></i> 失败</span>`;
-  return `<span class="test-badge test-badge-none">${esc(status)}</span>`;
-}
+            function buildTestBadge(status) {
+                if (!status || status === "none" || status === "no_run")
+                    return `<span class="test-badge test-badge-none">无测试</span>`;
+                if (status === "waiting")
+                    return `<span class="test-badge test-badge-waiting"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 排队中</span>`;
+                if (status === "running")
+                    return `<span class="test-badge test-badge-running"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 运行中</span>`;
+                if (status === "done")
+                    return `<span class="test-badge test-badge-done"><i class="bi bi-check-circle-fill"></i> 已完成</span>`;
+                if (status === "failed")
+                    return `<span class="test-badge test-badge-failed"><i class="bi bi-x-circle-fill"></i> 失败</span>`;
+                return `<span class="test-badge test-badge-none">${esc(status)}</span>`;
+            }
 
-function buildReportHtml(slotKey, slot) {
-  if (!slot?.test) {
-    return `<div class="text-muted" style="font-size:.8rem;">暂无测试报告</div>`;
-  }
-  const r = slot.test;
-  const rows = [
-    ['完成圈数', r.laps_completed ?? '—'],
-    ['最快圈时', r.best_lap_time != null ? r.best_lap_time.toFixed(3) + ' s' : '—'],
-    ['轻微碰撞', r.collisions_minor ?? '—'],
-    ['严重碰撞', r.collisions_major ?? '—'],
-    ['超时警告', r.timeout_warnings ?? '—'],
-    ['结束原因', r.finish_reason ? esc(r.finish_reason) : '—'],
-  ];
-  const collapseId = 'report-' + slotKey;
-  return `
+            function buildReportHtml(slotKey, slot) {
+                if (!slot?.test) {
+                    return `<div class="text-muted" style="font-size:.8rem;">暂无测试报告</div>`;
+                }
+                const r = slot.test;
+                const rows = [
+                    ["完成圈数", r.laps_completed ?? "—"],
+                    [
+                        "最快圈时",
+                        r.best_lap_time != null
+                            ? r.best_lap_time.toFixed(3) + " s"
+                            : "—",
+                    ],
+                    ["轻微碰撞", r.collisions_minor ?? "—"],
+                    ["严重碰撞", r.collisions_major ?? "—"],
+                    ["超时警告", r.timeout_warnings ?? "—"],
+                    ["结束原因", r.finish_reason ? esc(r.finish_reason) : "—"],
+                ];
+                const collapseId = "report-" + slotKey;
+                return `
     <button class="report-collapse-btn" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false">
       <i class="bi bi-chevron-down"></i> 测试报告
     </button>
     <div class="collapse" id="${collapseId}">
       <table class="report-table">
         <thead><tr><th>指标</th><th>数值</th></tr></thead>
-        <tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</tbody>
+        <tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</tbody>
       </table>
     </div>`;
-}
+            }
 
-// ── Quick-set slot from card button ───────────────────────────────────────
-function quickUploadSlot(slotKey) {
-  document.getElementById('upload-slot-select').value = slotKey;
-  document.getElementById('dropzone').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  document.getElementById('dropzone').classList.add('drag-over');
-  setTimeout(() => document.getElementById('dropzone').classList.remove('drag-over'), 800);
-}
+            // ── Quick-set slot from card button ───────────────────────────────────────
+            function quickUploadSlot(slotKey) {
+                document.getElementById("upload-slot-select").value = slotKey;
+                document
+                    .getElementById("dropzone")
+                    .scrollIntoView({ behavior: "smooth", block: "center" });
+                document.getElementById("dropzone").classList.add("drag-over");
+                setTimeout(
+                    () =>
+                        document
+                            .getElementById("dropzone")
+                            .classList.remove("drag-over"),
+                    800,
+                );
+            }
 
-// ── Activate slot ──────────────────────────────────────────────────────────
-async function activateSlot(slotName) {
-  let resp, data;
-  try {
-    resp = await fetch('/api/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ team_id: S.teamId, password: S.password, slot_name: slotName })
-    });
-    data = await resp.json();
-  } catch (e) {
-    showToast('danger', '设置失败: ' + e.message);
-    return;
-  }
-  if (resp.ok && (data.status === 'activated' || data.status === 'ok' || data.success)) {
-    showToast('success', `已将 ${slotName} 设为参赛槽位`);
-    await refreshSlots();
-  } else {
-    showToast('danger', data.message || data.detail || '设置失败');
-  }
-}
+            // ── Activate slot ──────────────────────────────────────────────────────────
+            async function activateSlot(slotName) {
+                let resp, data;
+                try {
+                    resp = await fetch("/api/activate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            team_id: S.teamId,
+                            password: S.password,
+                            slot_name: slotName,
+                        }),
+                    });
+                    data = await resp.json();
+                } catch (e) {
+                    showToast("danger", "设置失败: " + e.message);
+                    return;
+                }
+                if (
+                    resp.ok &&
+                    (data.status === "activated" ||
+                        data.status === "ok" ||
+                        data.success)
+                ) {
+                    showToast("success", `已将 ${slotName} 设为参赛槽位`);
+                    await refreshSlots();
+                } else {
+                    showToast(
+                        "danger",
+                        data.message || data.detail || "设置失败",
+                    );
+                }
+            }
 
-// ══════════════════════════════════════════════════
-// UPLOAD
-// ══════════════════════════════════════════════════
+            // ══════════════════════════════════════════════════
+            // UPLOAD
+            // ══════════════════════════════════════════════════
 
-// Dropzone events
-const dropzoneEl = document.getElementById('dropzone');
-const fileInput  = document.getElementById('file-input-hidden');
+            // Dropzone events
+            const dropzoneEl = document.getElementById("dropzone");
+            const fileInput = document.getElementById("file-input-hidden");
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) selectFile(fileInput.files[0]);
-});
+            fileInput.addEventListener("change", () => {
+                if (fileInput.files[0]) selectFile(fileInput.files[0]);
+            });
 
-dropzoneEl.addEventListener('dragover', e => {
-  e.preventDefault();
-  dropzoneEl.classList.add('drag-over');
-});
-dropzoneEl.addEventListener('dragleave', () => dropzoneEl.classList.remove('drag-over'));
-dropzoneEl.addEventListener('drop', e => {
-  e.preventDefault();
-  dropzoneEl.classList.remove('drag-over');
-  if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
-});
+            dropzoneEl.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dropzoneEl.classList.add("drag-over");
+            });
+            dropzoneEl.addEventListener("dragleave", () =>
+                dropzoneEl.classList.remove("drag-over"),
+            );
+            dropzoneEl.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dropzoneEl.classList.remove("drag-over");
+                if (e.dataTransfer.files[0])
+                    selectFile(e.dataTransfer.files[0]);
+            });
 
-function selectFile(file) {
-  if (!file.name.endsWith('.py')) {
-    showToast('warning', '仅支持 .py 文件');
-    return;
-  }
-  if (file.size > 1048576) {
-    showToast('warning', '文件过大（最大 1 MB）');
-    return;
-  }
-  S.file = file;
-  const fn = document.getElementById('dz-filename');
-  fn.textContent = file.name + '  (' + fmtSize(file.size) + ')';
-  fn.classList.remove('d-none');
-  dropzoneEl.querySelector('.bi-cloud-arrow-up').className = 'bi bi-file-earmark-check display-6 text-danger d-block mb-2';
-  dropzoneEl.querySelector('.fw-semibold').textContent = '已选择文件';
-  document.getElementById('btn-upload').disabled = false;
-  document.getElementById('upload-hint').textContent = '准备上传';
-}
+            function selectFile(file) {
+                if (!file.name.endsWith(".py")) {
+                    showToast("warning", "仅支持 .py 文件");
+                    return;
+                }
+                if (file.size > 1048576) {
+                    showToast("warning", "文件过大（最大 1 MB）");
+                    return;
+                }
+                S.file = file;
+                const fn = document.getElementById("dz-filename");
+                fn.textContent = file.name + "  (" + fmtSize(file.size) + ")";
+                fn.classList.remove("d-none");
+                dropzoneEl.querySelector(".bi-cloud-arrow-up").className =
+                    "bi bi-file-earmark-check display-6 text-danger d-block mb-2";
+                dropzoneEl.querySelector(".fw-semibold").textContent =
+                    "已选择文件";
+                document.getElementById("btn-upload").disabled = false;
+                document.getElementById("upload-hint").textContent = "准备上传";
+            }
 
-function resetDropzone() {
-  S.file = null;
-  const fn = document.getElementById('dz-filename');
-  fn.classList.add('d-none');
-  fn.textContent = '';
-  const iconEl = dropzoneEl.querySelector('.bi');
-  if (iconEl) iconEl.className = 'bi bi-cloud-arrow-up display-6 text-muted d-block mb-2';
-  dropzoneEl.querySelector('.fw-semibold').textContent = '将 .py 文件拖放至此，或点击选择';
-  document.getElementById('btn-upload').disabled = true;
-  document.getElementById('upload-hint').textContent = '请先选择文件';
-  fileInput.value = '';
-}
+            function resetDropzone() {
+                S.file = null;
+                const fn = document.getElementById("dz-filename");
+                fn.classList.add("d-none");
+                fn.textContent = "";
+                const iconEl = dropzoneEl.querySelector(".bi");
+                if (iconEl)
+                    iconEl.className =
+                        "bi bi-cloud-arrow-up display-6 text-muted d-block mb-2";
+                dropzoneEl.querySelector(".fw-semibold").textContent =
+                    "将 .py 文件拖放至此，或点击选择";
+                document.getElementById("btn-upload").disabled = true;
+                document.getElementById("upload-hint").textContent =
+                    "请先选择文件";
+                fileInput.value = "";
+            }
 
-async function handleUpload() {
-  const file = S.file;
-  if (!file) { showToast('warning', '请先选择文件'); return; }
+            async function handleUpload() {
+                const file = S.file;
+                if (!file) {
+                    showToast("warning", "请先选择文件");
+                    return;
+                }
 
-  const slotName = document.getElementById('upload-slot-select').value;
+                const slotName =
+                    document.getElementById("upload-slot-select").value;
 
-  let b64;
-  try {
-    b64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = e => res(btoa(e.target.result));
-      reader.onerror = rej;
-      reader.readAsBinaryString(file);
-    });
-  } catch (e) {
-    showToast('danger', '读取文件失败: ' + e.message);
-    return;
-  }
+                let b64;
+                try {
+                    b64 = await new Promise((res, rej) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => res(btoa(e.target.result));
+                        reader.onerror = rej;
+                        reader.readAsBinaryString(file);
+                    });
+                } catch (e) {
+                    showToast("danger", "读取文件失败: " + e.message);
+                    return;
+                }
 
-  setUploadLoading(true);
+                setUploadLoading(true);
 
-  let resp, data;
-  try {
-    resp = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        team_id:   S.teamId,
-        password:  S.password,
-        code:      b64,
-        slot_name: slotName,
-      })
-    });
-    data = await resp.json();
-  } catch (e) {
-    showToast('danger', '网络错误: ' + e.message);
-    setUploadLoading(false);
-    return;
-  }
+                let resp, data;
+                try {
+                    resp = await fetch("/api/submit", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            team_id: S.teamId,
+                            password: S.password,
+                            code: b64,
+                            slot_name: slotName,
+                        }),
+                    });
+                    data = await resp.json();
+                } catch (e) {
+                    showToast("danger", "网络错误: " + e.message);
+                    setUploadLoading(false);
+                    return;
+                }
 
-  setUploadLoading(false);
+                setUploadLoading(false);
 
-  if (data.status === 'uploaded' || data.success) {
-    showToast('success', `上传成功！请手动申请测试。`);
-    resetDropzone();
-    await refreshSlots();
-    startPolling();
-  } else if (data.status === 'locked') {
-    document.getElementById('locked-banner').classList.remove('d-none');
-    showToast('warning', '提交已关闭，管理员已锁定。');
-  } else {
-    showToast('danger', data.message || data.detail || '上传失败');
-  }
-}
+                if (data.status === "uploaded" || data.success) {
+                    showToast("success", `上传成功！请手动申请测试。`);
+                    resetDropzone();
+                    await refreshSlots();
+                    startPolling();
+                } else if (resp.status === 403) {
+                    // Per-zone locked: show locked banner
+                    document
+                        .getElementById("locked-banner")
+                        .classList.remove("d-none");
+                    document.getElementById("locked-banner-zone").textContent =
+                        S.zoneName || S.zoneId || "";
+                    showToast("warning", data.detail || "提交已关闭");
+                } else {
+                    showToast(
+                        "danger",
+                        data.message || data.detail || "上传失败",
+                    );
+                }
+            }
 
-async function requestTest(slotName) {
-  let resp, data;
-  try {
-    resp = await fetch('/api/test-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        team_id:  S.teamId,
-        password: S.password,
-        slot_name: slotName,
-      }),
-    });
-    data = await resp.json();
-  } catch (e) {
-    showToast('danger', '网络错误: ' + e.message);
-    return;
-  }
+            async function requestTest(slotName) {
+                let resp, data;
+                try {
+                    resp = await fetch("/api/test-request", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            team_id: S.teamId,
+                            password: S.password,
+                            slot_name: slotName,
+                        }),
+                    });
+                    data = await resp.json();
+                } catch (e) {
+                    showToast("danger", "网络错误: " + e.message);
+                    return;
+                }
 
-  if (resp.ok && data.status === 'queued') {
-    showToast('success', `测试申请成功！${slotName} 槽位已进入队列 (${data.queue_position})`);
-    await refreshSlots();
-    startPolling();
-  } else {
-    showToast('danger', data.message || data.detail || '测试申请失败');
-  }
-}
+                if (resp.ok && data.status === "queued") {
+                    showToast(
+                        "success",
+                        `测试申请成功！${slotName} 槽位已进入队列 (${data.queue_position})`,
+                    );
+                    await refreshSlots();
+                    startPolling();
+                } else {
+                    showToast(
+                        "danger",
+                        data.message || data.detail || "测试申请失败",
+                    );
+                }
+            }
 
-function setUploadLoading(loading) {
-  const btn     = document.getElementById('btn-upload');
-  const spinner = document.getElementById('upload-spinner');
-  const icon    = document.getElementById('upload-icon');
-  const text    = document.getElementById('upload-btn-text');
-  btn.disabled  = loading;
-  spinner.classList.toggle('d-none', !loading);
-  icon.classList.toggle('d-none', loading);
-  text.textContent = loading ? '上传中...' : '上传';
-}
+            function setUploadLoading(loading) {
+                const btn = document.getElementById("btn-upload");
+                const spinner = document.getElementById("upload-spinner");
+                const icon = document.getElementById("upload-icon");
+                const text = document.getElementById("upload-btn-text");
+                btn.disabled = loading;
+                spinner.classList.toggle("d-none", !loading);
+                icon.classList.toggle("d-none", loading);
+                text.textContent = loading ? "上传中..." : "上传";
+            }
 
-// ══════════════════════════════════════════════════
-// AUTO-RESTORE SESSION
-// ══════════════════════════════════════════════════
+            // ══════════════════════════════════════════════════
+            // AUTO-RESTORE SESSION
+            // ══════════════════════════════════════════════════
 
-(async function init() {
-  await loadZones();
+            (async function init() {
+                await loadZones();
 
-  const saved = localStorage.getItem('airacer_session');
-  if (!saved) return;
-  let sess;
-  try { sess = JSON.parse(saved); } catch { return; }
-  if (!sess.teamId || !sess.password) return;
+                const saved = localStorage.getItem("airacer_session");
+                if (!saved) return;
+                let sess;
+                try {
+                    sess = JSON.parse(saved);
+                } catch {
+                    return;
+                }
+                if (!sess.teamId || !sess.password) return;
 
-  // Silently verify session
-  try {
-    const r = await fetch('/api/test-status/' + encodeURIComponent(sess.teamId), {
-      headers: { Authorization: 'Basic ' + btoa(sess.teamId + ':' + sess.password) }
-    });
-    if (r.status === 200 || r.status === 404) {
-      S.teamId   = sess.teamId;
-      S.password = sess.password;
-      S.zoneId   = sess.zoneId;
-      S.zoneName = sess.zoneName;
-      enterMainPanel();
-    }
-  } catch { /* ignore */ }
-})();
-</script>
-</body>
+                // Silently verify session
+                try {
+                    const r = await fetch(
+                        "/api/test-status/" + encodeURIComponent(sess.teamId),
+                        {
+                            headers: {
+                                Authorization:
+                                    "Basic " +
+                                    btoa(sess.teamId + ":" + sess.password),
+                            },
+                        },
+                    );
+                    if (r.status === 200 || r.status === 404) {
+                        S.teamId = sess.teamId;
+                        S.password = sess.password;
+                        S.zoneId = sess.zoneId;
+                        S.zoneName = sess.zoneName;
+                        enterMainPanel();
+                    }
+                } catch {
+                    /* ignore */
+                }
+            })();
+        </script>
+    </body>
 </html>

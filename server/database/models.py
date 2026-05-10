@@ -5,7 +5,7 @@ SQLite schema and helpers.  No ORM — raw sqlite3 only.
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-
+from typing import Union
 
 # ---------------------------------------------------------------------------
 # Schema

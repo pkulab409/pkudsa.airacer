@@ -759,45 +759,73 @@ async def _handle_aborted(session_id: str, session_type: str, zone_id: str = "de
 
 
 # ---------------------------------------------------------------------------
-# Legacy endpoints (default zone, backward compat)
+# Per-zone submission lock/unlock
+# ---------------------------------------------------------------------------
+
+
+@router.post("/zones/{zone_id}/lock-submissions")
+async def lock_zone_submissions(zone_id: str, _auth=Depends(require_admin)):
+    """锁定指定赛区的提交：将赛区状态从 REGISTRATION → IDLE。"""
+    from server.race.state_machine import RaceState, get_zone_sm
+
+    sm = get_zone_sm(zone_id)
+    if sm.state != RaceState.REGISTRATION:
+        raise HTTPException(
+            status_code=409,
+            detail=f"赛区 '{zone_id}' 当前状态为 {sm.state.value}，不是 REGISTRATION，无法锁定提交。",
+        )
+    sm.transition(RaceState.IDLE)
+    return {"status": "locked", "zone_id": zone_id}
+
+
+@router.post("/zones/{zone_id}/unlock-submissions")
+async def unlock_zone_submissions(zone_id: str, _auth=Depends(require_admin)):
+    """解锁指定赛区的提交：将赛区状态从 IDLE → REGISTRATION。"""
+    from server.race.state_machine import RaceState, get_zone_sm
+
+    sm = get_zone_sm(zone_id)
+    if sm.state != RaceState.IDLE:
+        raise HTTPException(
+            status_code=409,
+            detail=f"赛区 '{zone_id}' 当前状态为 {sm.state.value}，不是 IDLE，无法解锁提交。",
+        )
+    sm.transition(RaceState.REGISTRATION)
+    return {"status": "unlocked", "zone_id": zone_id}
+
+
+# ---------------------------------------------------------------------------
+# Legacy endpoints (apply to all zones, backward compat)
 # ---------------------------------------------------------------------------
 
 
 @router.post("/lock-submissions")
-async def lock_submissions(_auth=Depends(require_admin)):
-    import server.blueprints.submission as sub_module
-
-    sub_module.submissions_locked = True
-    sub_module._save_lock_state(True)
-
-    # Transition all zones from REGISTRATION → IDLE
+async def lock_all_submissions(_auth=Depends(require_admin)):
+    """锁定所有赛区提交：将所有 REGISTRATION 状态的赛区 → IDLE。"""
     from server.race.state_machine import RaceState, all_zone_ids, get_zone_sm
 
+    locked = []
     for zone_id in all_zone_ids():
         sm = get_zone_sm(zone_id)
         if sm.state == RaceState.REGISTRATION:
             sm.transition(RaceState.IDLE)
+            locked.append(zone_id)
 
-    return {"status": "locked"}
+    return {"status": "locked", "zones_locked": locked}
 
 
 @router.post("/unlock-submissions")
-async def unlock_submissions(_auth=Depends(require_admin)):
-    import server.blueprints.submission as sub_module
-    from server.blueprints.submission import _save_lock_state
-
-    sub_module.submissions_locked = False
-    _save_lock_state(False)
-
-    # Transition all zones from IDLE → REGISTRATION
+async def unlock_all_submissions(_auth=Depends(require_admin)):
+    """解锁所有赛区提交：将所有 IDLE 状态的赛区 → REGISTRATION。"""
     from server.race.state_machine import RaceState, all_zone_ids, get_zone_sm
 
+    unlocked = []
     for zone_id in all_zone_ids():
         sm = get_zone_sm(zone_id)
         if sm.state == RaceState.IDLE:
             sm.transition(RaceState.REGISTRATION)
+            unlocked.append(zone_id)
 
-    return {"status": "unlocked"}
+    return {"status": "unlocked", "zones_unlocked": unlocked}
 
 
 @router.post("/set-session")

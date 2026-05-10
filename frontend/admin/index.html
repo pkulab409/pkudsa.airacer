@@ -697,6 +697,13 @@
                                 >
                                     &#8617; 重置赛区
                                 </button>
+                                <button
+                                    class="btn btn-outline-danger"
+                                    onclick="doToggleZoneSubmissions()"
+                                    id="btn-zone-toggle-submissions"
+                                >
+                                    &#128274; 锁定提交
+                                </button>
                             </div>
                         </div>
 
@@ -935,20 +942,25 @@
 
                         <!-- Danger zone -->
                         <div class="danger-zone">
-                            <div class="danger-zone-title">提交管理</div>
+                            <div class="danger-zone-title">
+                                提交管理（全部赛区）
+                            </div>
                             <p
                                 class="text-muted mb-3"
                                 style="font-size: 0.875rem"
                             >
+                                批量操作所有赛区的提交开关。<br />
                                 锁定后队伍将无法上传或切换代码，赛区状态从报名阶段转入待命。<br />
                                 <span class="text-danger"
                                     >生产环境锁定后不应再次解锁。</span
                                 >
+                                <br />
+                                如需操作单个赛区，请在左侧选择赛区后，在「控制面板」中使用「锁定提交/解锁提交」按钮。
                             </p>
                             <button
                                 id="btn-toggle-submissions"
                                 class="btn btn-danger btn-lg px-4"
-                                onclick="doToggleSubmissions()"
+                                onclick="doToggleAllSubmissions()"
                             >
                                 锁定所有队伍提交
                             </button>
@@ -1354,6 +1366,9 @@
                     setCtrlBadge(z.state);
                     highlightStage(z.current_stage);
                 }
+                // Update per-zone lock button
+                var zoneState = z ? z.state : null;
+                _updateZoneLockButton(zoneState);
                 loadPendingSession();
             }
 
@@ -1714,8 +1729,9 @@
 
             async function pollOverhead() {
                 if (!currentZone) return;
-                var sid =
-                    document.getElementById("live-session-id").textContent;
+                var sid = (
+                    document.getElementById("live-session-id").textContent || ""
+                ).trim();
                 if (!sid || sid === "--") return;
                 var img = document.getElementById("live-overhead-img");
                 if (!img) return;
@@ -1904,73 +1920,100 @@
                 }
             }
 
-            var _submissionsLocked = false;
-
-            function _updateLockButton() {
-                var btn = document.getElementById("btn-toggle-submissions");
+            // ── Per-zone submission lock (control panel) ──
+            function _updateZoneLockButton(zoneState) {
+                var btn = document.getElementById(
+                    "btn-zone-toggle-submissions",
+                );
                 if (!btn) return;
-                if (_submissionsLocked) {
-                    btn.textContent = "解锁所有队伍提交";
-                    btn.className = "btn btn-warning btn-lg px-4";
+                if (zoneState === "REGISTRATION") {
+                    btn.textContent = "\u{1F512} 锁定提交";
+                    btn.className = "btn btn-outline-danger";
+                    btn.title =
+                        "将赛区从报名阶段转入待命，锁定后队伍无法上传代码";
+                } else if (zoneState === "IDLE") {
+                    btn.textContent = "\u{1F513} 解锁提交";
+                    btn.className = "btn btn-outline-warning";
+                    btn.title =
+                        "将赛区从待命转回报名阶段，解锁后队伍可上传代码";
                 } else {
-                    btn.textContent = "锁定所有队伍提交";
-                    btn.className = "btn btn-danger btn-lg px-4";
+                    btn.textContent = "\u{1F512} 提交锁定";
+                    btn.className = "btn btn-outline-secondary";
+                    btn.disabled = true;
+                    btn.title = "当前赛区状态不允许修改提交锁定";
                 }
             }
 
-            async function doToggleSubmissions() {
-                if (_submissionsLocked) {
-                    if (
-                        !confirm(
-                            "确认解锁代码提交？解锁后队伍可继续提交新代码。\n\n生产环境不建议执行此操作。",
-                        )
-                    )
-                        return;
-                    try {
-                        var r = await api(
-                            "POST",
-                            "/api/admin/unlock-submissions",
-                        );
-                        var d = await r.json();
-                        if (r.ok) {
-                            _submissionsLocked = false;
-                            _updateLockButton();
-                        }
+            async function doToggleZoneSubmissions() {
+                if (!currentZone) {
+                    toast("请先选择赛区", "warning");
+                    return;
+                }
+                // Determine current action from button state
+                var btn = document.getElementById(
+                    "btn-zone-toggle-submissions",
+                );
+                var isLocked = btn.textContent.includes("解锁");
+                var action = isLocked
+                    ? "unlock-submissions"
+                    : "lock-submissions";
+                var msg = isLocked
+                    ? '确认解锁赛区 "' + currentZone + '" 的代码提交？'
+                    : '确认锁定赛区 "' +
+                      currentZone +
+                      '" 的代码提交？锁定后队伍将无法上传新版本。';
+                if (!confirm(msg)) return;
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" + currentZone + "/" + action,
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
                         toast(
-                            r.ok
-                                ? d.message || "提交已解锁"
-                                : d.detail || d.message || "操作失败",
-                            r.ok ? "success" : "danger",
+                            isLocked ? "提交已解锁" : "提交已锁定",
+                            "success",
                         );
-                    } catch (e) {
-                        toast("请求失败: " + e.message, "danger");
+                        // Refresh zone info to update state and button
+                        await loadZones();
+                        selZone(currentZone);
+                    } else {
+                        toast(d.detail || d.message || "操作失败", "danger");
                     }
-                } else {
-                    if (
-                        !confirm(
-                            "确认锁定所有队伍的代码提交？锁定后队伍将无法上传新版本。",
-                        )
-                    )
-                        return;
-                    try {
-                        var r = await api(
-                            "POST",
-                            "/api/admin/lock-submissions",
-                        );
-                        var d = await r.json();
-                        if (r.ok) {
-                            _submissionsLocked = true;
-                            _updateLockButton();
-                        }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            // ── Global lock/unlock (danger zone, all zones at once) ──
+            async function doToggleAllSubmissions() {
+                var btn = document.getElementById("btn-toggle-submissions");
+                var isUnlock = btn.textContent.includes("解锁");
+                var action = isUnlock
+                    ? "unlock-submissions"
+                    : "lock-submissions";
+                var msg = isUnlock
+                    ? "确认解锁所有赛区的代码提交？"
+                    : "确认锁定所有赛区的代码提交？锁定后队伍将无法上传新版本。";
+                if (!confirm(msg)) return;
+                try {
+                    var r = await api("POST", "/api/admin/" + action);
+                    var d = await r.json();
+                    if (r.ok) {
+                        var zones = d.zones_locked || d.zones_unlocked || [];
                         toast(
-                            r.ok
-                                ? d.message || "提交已锁定"
-                                : d.detail || d.message || "操作失败",
-                            r.ok ? "success" : "danger",
+                            isUnlock
+                                ? "已解锁 " + zones.length + " 个赛区"
+                                : "已锁定 " + zones.length + " 个赛区",
+                            "success",
                         );
-                    } catch (e) {
-                        toast("请求失败: " + e.message, "danger");
+                        await loadZones();
+                        if (currentZone) selZone(currentZone);
+                    } else {
+                        toast(d.detail || d.message || "操作失败", "danger");
                     }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
                 }
             }
 

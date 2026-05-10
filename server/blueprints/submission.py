@@ -10,22 +10,18 @@ GET  /api/test-status/{team_id}   — all 3 slot statuses (Basic Auth)
 import asyncio
 import base64
 import datetime
-import importlib.util
-import json
 import os
 import pathlib
-import py_compile
-import sys
 import tempfile
 import threading
 from typing import Optional
 
 import bcrypt as _bcrypt
-import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
+from sdk.validate_controller import validate as _sdk_validate
 from server.config.config import DB_PATH, SUBMISSIONS_DIR
 from server.database.action import (
     create_test_run,
@@ -57,25 +53,6 @@ def _verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-# ---------------------------------------------------------------------------
-# Global submission lock (set by admin)
-# ---------------------------------------------------------------------------
-
-_LOCK_FILE = pathlib.Path(__file__).resolve().parent.parent / "config" / "lock_state.json"
-
-def _load_lock_state() -> bool:
-    try:
-        return json.loads(_LOCK_FILE.read_text())["locked"]
-    except Exception:
-        return False
-
-def _save_lock_state(locked: bool) -> None:
-    _LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _LOCK_FILE.write_text(json.dumps({"locked": locked}))
-
-submissions_locked: bool = _load_lock_state()
-
-# ---------------------------------------------------------------------------
 # In-memory test queue
 # ---------------------------------------------------------------------------
 
@@ -83,14 +60,18 @@ _test_queue: list[dict] = []
 _test_queue_lock = threading.Lock()
 
 
-def enqueue_test(submission_id: str, test_run_id: int, slot_name: str, team_id: str) -> int:
+def enqueue_test(
+    submission_id: str, test_run_id: int, slot_name: str, team_id: str
+) -> int:
     with _test_queue_lock:
-        _test_queue.append({
-            "submission_id": submission_id,
-            "test_run_id": test_run_id,
-            "slot_name": slot_name,
-            "team_id": team_id,
-        })
+        _test_queue.append(
+            {
+                "submission_id": submission_id,
+                "test_run_id": test_run_id,
+                "slot_name": slot_name,
+                "team_id": team_id,
+            }
+        )
         return len(_test_queue)
 
 
@@ -163,52 +144,44 @@ class TestRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-# todo: 与SDK代码审查部分保持一致
-def _validate_code(code_str: str) -> None:
-    """Run syntax + import + signature checks. Raises HTTPException on failure."""
+def _rules_path() -> pathlib.Path:
+    return pathlib.Path(__file__).resolve().parent.parent.parent / "sdk" / "rules.yaml"
+
+
+def _validate_code(code_str: str) -> list[dict]:
+    """
+    使用 SDK validate_controller 进行全面的代码审查。
+
+    Returns: warnings 列表（即使通过也可能有 warning）。
+    Raises:  HTTPException(400) 如果校验不通过。
+    """
+    # 去除 BOM 字符（U+FEFF），防止 AST 解析失败
+    clean_code = code_str.lstrip("\ufeff")
     with tempfile.NamedTemporaryFile(
         suffix=".py", delete=False, mode="w", encoding="utf-8"
     ) as tmp_src:
-        tmp_src.write(code_str)
+        tmp_src.write(clean_code)
         tmp_path = tmp_src.name
 
     try:
-        try:
-            py_compile.compile(tmp_path, doraise=True)
-        except py_compile.PyCompileError as exc:
-            raise HTTPException(status_code=400, detail=f"Syntax error: {exc}")
+        report = _sdk_validate(
+            code_path=tmp_path,
+            rules_path=str(_rules_path()),
+        )
 
-        spec = importlib.util.spec_from_file_location("_team_ctrl_check", tmp_path)
-        module = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(module)
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail=f"Import error: {exc}")
-
-        if not callable(getattr(module, "control", None)):
+        if not report.passed:
+            detail_lines = [f"代码审查未通过: {report.summary}"]
+            for f in report.errors:
+                loc = f" (第 {f.lineno} 行)" if f.lineno is not None else ""
+                detail_lines.append(f"  [{f.code}]{loc} {f.message}")
             raise HTTPException(
                 status_code=400,
-                detail="Module must define a callable named 'control'",
+                detail="\n".join(detail_lines),
             )
 
-        dummy_img1 = np.zeros((480, 640, 3), dtype=np.uint8)
-        dummy_img2 = np.zeros((480, 640, 3), dtype=np.uint8)
-        try:
-            result = module.control(dummy_img1, dummy_img2, 0.0)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=400, detail=f"control() raised an exception: {exc}"
-            )
+        # 通过后返回 warnings（前端可展示）
+        return [f.to_dict() for f in report.warnings]
 
-        if (
-            not isinstance(result, (tuple, list))
-            or len(result) != 2
-            or not all(isinstance(v, (int, float)) for v in result)
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="control() must return a tuple of 2 floats",
-            )
     finally:
         try:
             os.unlink(tmp_path)
@@ -223,9 +196,6 @@ def _validate_code(code_str: str) -> None:
 
 @router.post("/api/submit")
 async def submit_code(body: SubmitRequest):
-    if submissions_locked:
-        raise HTTPException(status_code=403, detail="Submissions are locked")
-
     slot = body.slot_name.lower()
     if slot not in VALID_SLOTS:
         raise HTTPException(
@@ -241,13 +211,27 @@ async def submit_code(body: SubmitRequest):
     if not _verify_password(body.password, team_row["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid password")
 
+    # 按赛区检查是否允许提交
+    zone_id = team_row["zone_id"]
+    if zone_id:
+        from server.race.state_machine import RaceState, get_zone_sm
+
+        sm = get_zone_sm(zone_id)
+        if sm.state != RaceState.REGISTRATION:
+            raise HTTPException(
+                status_code=403,
+                detail=f"赛区 '{zone_id}' 的代码提交已关闭（当前状态: {sm.state.value}），不再接受新的提交。",
+            )
+
     try:
         code_bytes = base64.b64decode(body.code)
         code_str = code_bytes.decode("utf-8")
+        # 去除 BOM 字符（U+FEFF），防止后续解析和运行失败
+        code_str = code_str.lstrip("\ufeff")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid base64 code: {exc}")
 
-    _validate_code(code_str)
+    warnings = _validate_code(code_str)
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     dest_dir = pathlib.Path(SUBMISSIONS_DIR) / body.team_id / slot / timestamp
@@ -257,7 +241,10 @@ async def submit_code(body: SubmitRequest):
 
     with get_db(DB_PATH) as conn:
         submission_id = db_create_submission_with_slot(
-            conn, body.team_id, str(dest_file), slot,
+            conn,
+            body.team_id,
+            str(dest_file),
+            slot,
             submitted_at=timestamp,
         )
 
@@ -265,6 +252,7 @@ async def submit_code(body: SubmitRequest):
         "status": "uploaded",
         "slot_name": slot,
         "version": timestamp,
+        "warnings": warnings,
     }
 
 
@@ -309,6 +297,7 @@ async def request_test(body: TestRequest):
 
     # 赛程已开始则拒绝测试
     from server.race.state_machine import all_running_zones
+
     running = all_running_zones()
     if running:
         raise HTTPException(
