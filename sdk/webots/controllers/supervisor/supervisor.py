@@ -19,9 +19,29 @@ from controller import Supervisor
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())  # 64 ms
 
-config_path = os.environ.get('RACE_CONFIG_PATH', 'race_config.json')
-with open(config_path, encoding='utf-8') as f:
-    config = json.load(f)
+config_path = os.environ.get('RACE_CONFIG_PATH')
+if not config_path:
+    sdk_dir = pathlib.Path(__file__).resolve().parents[4]
+    candidates = [
+        pathlib.Path("race_config.json"),
+        sdk_dir / ".local" / "race_config.json",
+        sdk_dir / "local_race_config.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            config_path = str(candidate)
+            break
+    if not config_path:
+        config_path = "race_config.json"
+
+try:
+    with open(config_path, encoding='utf-8') as f:
+        config = json.load(f)
+except FileNotFoundError as exc:
+    raise FileNotFoundError(
+        "race_config.json not found. Set RACE_CONFIG_PATH or run sdk/run_local.py "
+        "to generate sdk/.local/race_config.json."
+    ) from exc
 
 session_id     = config['race_id']
 session_type   = config['session_type']
