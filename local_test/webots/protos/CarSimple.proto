@@ -1,0 +1,33 @@
+PROTO CarSimple [
+  field SFString name "car_simple"
+  field SFVec3f translation 0 0 0.4
+  field SFRotation rotation 0 0 1 0
+  field SFString controller "direct_car"
+]
+{
+  Robot {
+    name IS name
+    translation IS translation
+    rotation IS rotation
+    controller IS controller
+    children [
+      Transform {
+        children [
+          Shape { geometry Box { size 1 0.6 0.2 } }
+        ]
+      }
+
+      RotationalMotor { name "left_motor" maxVelocity 40 }
+      RotationalMotor { name "right_motor" maxVelocity 40 }
+
+      Camera { name "left_camera" translation 0.2 -0.18 0.45 width 640 height 480 fieldOfView 1.047 }
+      Camera { name "right_camera" translation 0.2 0.18 0.45 width 640 height 480 fieldOfView 1.047 }
+
+      InertialUnit { name "imu" }
+    ]
+
+    boundingObject Box { size 1 1 0.5 }
+    physics Physics { mass 100 }
+  }
+}
+

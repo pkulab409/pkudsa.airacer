@@ -1,0 +1,29 @@
+{
+  "session_id": "local_20260511_230050",
+  "session_type": "test",
+  "total_laps": 1,
+  "recording_path": "D:\\AI_car\\local_test\\recordings\\local_20260511_230050",
+  "recorded_at": "2026-05-11T23:02:12",
+  "duration_sim": 60.0,
+  "total_frames": 1875,
+  "teams": [
+    {
+      "team_id": "local_team",
+      "team_name": "local_team"
+    }
+  ],
+  "finish_reason": "no_checkpoint_timeout",
+  "final_rankings": [
+    {
+      "rank": 1,
+      "team_id": "local_team",
+      "team_name": "local_team",
+      "laps": 0,
+      "checkpoints_passed": 0,
+      "best_lap": null,
+      "total_time": null,
+      "status": "normal",
+      "collision_major_count": 0
+    }
+  ]
+}
