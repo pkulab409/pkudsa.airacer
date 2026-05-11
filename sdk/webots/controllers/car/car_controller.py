@@ -189,6 +189,7 @@ def run():
     if right_camera is not None:
         right_camera.enable(timestep)
 
+
     # Motors (differential drive + optional front drive/steer)
     try:
         left_motor = robot.getDevice('left_motor')

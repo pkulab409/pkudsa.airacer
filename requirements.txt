@@ -19,3 +19,6 @@ bcrypt>=4.1.0
 
 # 数值处理（validation：对 control() 接口做 numpy 数组测试）
 numpy>=1.24.0
+
+# 本地控制器调试（OpenCV 车道线识别）
+opencv-python>=4.8.0

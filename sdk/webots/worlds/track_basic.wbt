@@ -9,13 +9,14 @@ EXTERNPROTO "../protos/CarPhoenix.proto"
 EXTERNPROTO "../protos/CarShadow.proto"
 EXTERNPROTO "../protos/CarThunder.proto"
 EXTERNPROTO "../protos/CarViper.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/tesla/TeslaModel3.proto"
 
 WorldInfo {
   title "AI Racer - Basic Oval Track (track_basic_oval)"
 }
 Viewpoint {
   orientation -0.29110662269270354 0.010309888079966517 0.9566350612601581 3.0738675339568
-  position 268.9792141387429 -16.483950938560163 121.77089579799164
+  position 209.4927316324796 126.36241535889363 225.30444313941737
 }
 Background {
   skyColor [
@@ -379,8 +380,8 @@ Robot {
   ]
   name "supervisor"
   controller "supervisor"
-  window "<none>"
   supervisor TRUE
+  window "<none>"
 }
 DEF car_1 CarPhoenix {
   name "car_1"
@@ -411,4 +412,34 @@ DEF car_6 CarShadow {
   name "car_6"
   translation -23 107 0.4
   rotation 0 0 1 1.5707996938995747
+}
+TeslaModel3 {
+  translation -20 127 0.4
+  rotation 0 0 1 1.5708
+  controller "tesla"
+  sensorsSlotFront [
+    Pose {
+      translation 0 0 1.5
+      children [
+        Camera {
+          translation 0.9 0 0
+          rotation 0 1 0 0.4
+          name "left_camera"
+          fieldOfView 1.047
+          width 640
+          height 480
+          far 100
+        }
+        Camera {
+          translation -0.9 0 0
+          rotation 0 1 0 -0.4
+          name "right_camera"
+          fieldOfView 1.047
+          width 640
+          height 480
+          far 100
+        }
+      ]
+    }
+  ]
 }
