@@ -940,6 +940,100 @@
                             </div>
                         </div>
 
+                        <!-- Configure race (debug) -->
+                        <div class="ctrl-card mb-4">
+                            <h5>配置比赛（调试）</h5>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">赛区</label>
+                                    <select
+                                        id="cfg-zone"
+                                        class="form-select"
+                                        onchange="loadTeamsForConfig()"
+                                    >
+                                        <option value="">-- 选择赛区 --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">阶段</label>
+                                    <select id="cfg-stage" class="form-select">
+                                        <option value="placement">
+                                            排位赛
+                                        </option>
+                                        <option value="group_stage">
+                                            分组赛
+                                        </option>
+                                        <option value="semi">半决赛</option>
+                                        <option value="final">决赛</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">赛程 ID</label>
+                                    <input
+                                        type="text"
+                                        id="cfg-sid"
+                                        class="form-control"
+                                        placeholder="自动生成"
+                                    />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">圈数</label>
+                                    <input
+                                        type="number"
+                                        id="cfg-laps"
+                                        class="form-control"
+                                        placeholder="默认"
+                                        min="1"
+                                    />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">参赛队伍</label>
+                                    <div
+                                        id="cfg-teams"
+                                        class="d-flex flex-wrap gap-2"
+                                        style="
+                                            max-height: 150px;
+                                            overflow-y: auto;
+                                        "
+                                    >
+                                        <div
+                                            class="text-muted"
+                                            style="font-size: 0.85rem"
+                                        >
+                                            请先选择赛区
+                                        </div>
+                                    </div>
+                                    <div class="mt-1" style="font-size: 0.8rem">
+                                        <a
+                                            href="#"
+                                            onclick="
+                                                checkAllTeams(true);
+                                                return false;
+                                            "
+                                            >全选</a
+                                        >
+                                        &nbsp;|&nbsp;
+                                        <a
+                                            href="#"
+                                            onclick="
+                                                checkAllTeams(false);
+                                                return false;
+                                            "
+                                            >取消全选</a
+                                        >
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <button
+                                        class="btn btn-warning"
+                                        onclick="doConfigureRace()"
+                                    >
+                                        配置比赛
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Danger zone -->
                         <div class="danger-zone">
                             <div class="danger-zone-title">
@@ -1231,6 +1325,30 @@
                 renderSidebar();
                 renderOverview();
                 _populateDeleteZoneSelect();
+                _populateConfigZoneSelect();
+            }
+
+            function _populateConfigZoneSelect() {
+                var sel = document.getElementById("cfg-zone");
+                if (!sel) return;
+                var cur = sel.value;
+                sel.innerHTML =
+                    '<option value="">-- 选择赛区 --</option>' +
+                    _zones
+                        .map(function (z) {
+                            return (
+                                '<option value="' +
+                                z.zone_id +
+                                '">' +
+                                esc(z.name || z.zone_id) +
+                                " (" +
+                                z.zone_id +
+                                ")" +
+                                "</option>"
+                            );
+                        })
+                        .join("");
+                if (cur) sel.value = cur;
             }
 
             function _populateDeleteZoneSelect() {
@@ -2011,6 +2129,104 @@
                         if (currentZone) selZone(currentZone);
                     } else {
                         toast(d.detail || d.message || "操作失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            /* ── 配置比赛（调试） ── */
+            async function loadTeamsForConfig() {
+                var zid = document.getElementById("cfg-zone").value;
+                var teamsDiv = document.getElementById("cfg-teams");
+                if (!zid) {
+                    teamsDiv.innerHTML =
+                        '<div class="text-muted" style="font-size:.85rem;">请先选择赛区</div>';
+                    return;
+                }
+                try {
+                    var r = await api(
+                        "GET",
+                        "/api/admin/zones/" + zid + "/teams",
+                    );
+                    var d = r.ok ? await r.json() : [];
+                    if (!d.length) {
+                        teamsDiv.innerHTML =
+                            '<div class="text-muted" style="font-size:.85rem;">该赛区暂无队伍</div>';
+                        return;
+                    }
+                    teamsDiv.innerHTML = d
+                        .map(function (t) {
+                            var checked = "";
+                            return (
+                                '<label class="form-check form-check-inline">' +
+                                '<input type="checkbox" class="form-check-input cfg-team-cb" ' +
+                                checked +
+                                ' value="' +
+                                esc(t.id) +
+                                '" />' +
+                                '<span class="form-check-label">' +
+                                esc(t.name || t.id) +
+                                "</span></label>"
+                            );
+                        })
+                        .join("");
+                } catch (e) {
+                    teamsDiv.innerHTML =
+                        '<div class="text-danger" style="font-size:.85rem;">加载队伍失败</div>';
+                }
+            }
+
+            function checkAllTeams(checked) {
+                document
+                    .querySelectorAll(".cfg-team-cb")
+                    .forEach(function (cb) {
+                        cb.checked = checked;
+                    });
+            }
+
+            async function doConfigureRace() {
+                var zid = document.getElementById("cfg-zone").value;
+                var stage = document.getElementById("cfg-stage").value;
+                var sid = document.getElementById("cfg-sid").value.trim();
+                var laps = document.getElementById("cfg-laps").value.trim();
+
+                if (!zid) {
+                    toast("请选择赛区", "warning");
+                    return;
+                }
+
+                // Collect checked teams
+                var teamIds = [];
+                document
+                    .querySelectorAll(".cfg-team-cb:checked")
+                    .forEach(function (cb) {
+                        teamIds.push(cb.value);
+                    });
+
+                var body = {
+                    session_type: stage,
+                    session_id: sid || zid + "_" + stage + "_" + Date.now(),
+                    team_ids: teamIds.length ? teamIds : undefined,
+                };
+                if (laps) body.total_laps = parseInt(laps);
+
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" + zid + "/set-session",
+                        body,
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast("比赛已配置: " + (d.session_id || ""), "success");
+                        // Refresh the session queue for the configured zone
+                        if (currentZone === zid) {
+                            loadPendingSession();
+                            loadSessionQueue();
+                        }
+                    } else {
+                        toast(d.detail || d.message || "配置失败", "danger");
                     }
                 } catch (e) {
                     toast("请求失败: " + e.message, "danger");
