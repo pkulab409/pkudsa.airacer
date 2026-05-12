@@ -51,9 +51,9 @@ def heading_matches(heading, track_heading, tol=math.pi / 2):
 
 TRACK_ROAD_WIDTH = 8.0
 TRACK_HALF_WIDTH = TRACK_ROAD_WIDTH / 2.0
-GUARDRAIL_FAIL_MARGIN = 2.0
+GUARDRAIL_FAIL_MARGIN = 0
 GUARDRAIL_FAIL_DISTANCE = TRACK_HALF_WIDTH + GUARDRAIL_FAIL_MARGIN
-NO_CHECKPOINT_TIMEOUT = 60.0
+NO_CHECKPOINT_TIMEOUT = 180.0
 TRACK_ROUTE = [(cp['cx'], cp['cy']) for cp in CHECKPOINTS]
 TRACK_SEGMENTS = list(zip(TRACK_ROUTE, TRACK_ROUTE[1:] + TRACK_ROUTE[:1]))
 
@@ -112,6 +112,10 @@ os.makedirs(recording_path, exist_ok=True)
 telemetry_path = os.path.join(recording_path, 'telemetry.jsonl')
 tel_file = open(telemetry_path, 'a', encoding='utf-8')
 frame_count = 0
+
+# Print/update interval for on-console status reports (seconds)
+PRINT_INTERVAL = 1.0
+_last_print_time = 0.0
 
 _overhead_cam = robot.getDevice('overhead_cam') if robot.getDevice else None
 if _overhead_cam:
@@ -320,7 +324,17 @@ while robot.step(timestep) != -1:
     check_car_collisions(cars, sim_time, events_this_frame)
     check_race_end(cars, sim_time, events_this_frame)
     write_telemetry_frame(sim_time, cars, events_this_frame)
-
+    # Periodically print a short status line to the Webots console (approximately once per second)
+    try:
+        if sim_time - _last_print_time >= PRINT_INTERVAL:
+            status_parts = []
+            for c in cars:
+                # show team, speed and checkpoints passed
+                status_parts.append(f"{c['team_id']}: speed={c['speed']:.2f} m/s cp={c['checkpoints_passed']}")
+            print('[Supervisor] ' + ' | '.join(status_parts))
+            _last_print_time = sim_time
+    except Exception:
+        pass
     if _overhead_node and len(cars) > 0:
         try:
             car0 = cars[0]
@@ -359,5 +373,13 @@ while robot.step(timestep) != -1:
         break
 
 tel_file.close()
+try:
+    # Print a final summary to the Webots console before writing metadata
+    print(f"[Supervisor] Race finished: reason={finish_reason}, duration={round(robot.getTime(),3)}s")
+    for c in cars:
+        print(f"[Supervisor] Team {c['team_id']}: checkpoints={c['checkpoints_passed']}, laps={c['lap']}, status={c['status']}")
+except Exception:
+    pass
+
 write_metadata(finish_reason, final_rankings)
 

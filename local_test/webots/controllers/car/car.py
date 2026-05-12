@@ -10,19 +10,22 @@ This controller is intentionally simple:
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
-from pathlib import Path
+import sys
 
 import numpy as np
 from controller import Robot
 
 
 IMG_H, IMG_W = 480, 640
-WHEEL_MAX = 10.0
-ROOT_DIR = Path(__file__).resolve().parents[3]
-DEFAULT_TEAM_CONTROLLER = ROOT_DIR / "team_controller.py"
+WHEEL_SPEED_SCALE = float(os.environ.get("CAR_WHEEL_SPEED_SCALE", "50.0"))
+WHEEL_TURN_SCALE = float(os.environ.get("CAR_WHEEL_TURN_SCALE", "75.0"))
+WHEEL_CMD_LIMIT = float(os.environ.get("CAR_WHEEL_CMD_LIMIT", "100.0"))
+DISPLAY_PANEL_W = int(os.environ.get("CAR_DISPLAY_PANEL_W", "160"))
+DISPLAY_PANEL_H = int(os.environ.get("CAR_DISPLAY_PANEL_H", "120"))
+DISPLAY_SCALE = int(os.environ.get("CAR_DISPLAY_SCALE", "2"))
+DISPLAY_UPDATE_STEPS = int(os.environ.get("CAR_DISPLAY_UPDATE_STEPS", "3"))
 
 
 def _load_config() -> dict:
@@ -47,12 +50,6 @@ def _image_to_gray(cam) -> np.ndarray:
     return arr[:, :, :3].mean(axis=2)
 
 
-def _image_to_bgr(cam) -> np.ndarray:
-    raw = cam.getImage()
-    arr = np.frombuffer(raw, dtype=np.uint8).reshape((IMG_H, IMG_W, 4))
-    return arr[:, :, :3].copy()
-
-
 def _estimate_lane_center(gray: np.ndarray) -> float | None:
     # Road is typically darker than the surrounding terrain. We use a simple
     # threshold and compute the weighted centroid of dark pixels in the lower
@@ -71,36 +68,40 @@ def _estimate_lane_center(gray: np.ndarray) -> float | None:
 
 
 def _set_motor_velocity(left_motor, right_motor, speed: float, steering: float) -> None:
-    v = speed * WHEEL_MAX
-    diff = steering * WHEEL_MAX * 0.5
-    left_motor.setVelocity(max(-WHEEL_MAX, min(WHEEL_MAX, v + diff)))
-    right_motor.setVelocity(max(-WHEEL_MAX, min(WHEEL_MAX, v - diff)))
+    v = speed * WHEEL_SPEED_SCALE
+    diff = steering * WHEEL_TURN_SCALE
+    left_motor.setVelocity(max(-WHEEL_CMD_LIMIT, min(WHEEL_CMD_LIMIT, v + diff)))
+    right_motor.setVelocity(max(-WHEEL_CMD_LIMIT, min(WHEEL_CMD_LIMIT, v - diff)))
 
 
-def _load_custom_control():
-    """Load user-defined `control()` from `local_test/team_controller.py`.
+def _render_camera_pair(display, left_img: np.ndarray, right_img: np.ndarray) -> None:
+    """Render left/right camera views side-by-side on a Webots Display."""
+    try:
+        display.setColor(0x000000)
+        display.fillRectangle(0, 0, DISPLAY_PANEL_W * 2, DISPLAY_PANEL_H)
 
-    Priority:
-      1. `LOCAL_TEST_TEAM_CONTROLLER` env var if set
-      2. `local_test/team_controller.py` if it exists
+        sample_w = max(1, IMG_W // (DISPLAY_PANEL_W // DISPLAY_SCALE))
+        sample_h = max(1, IMG_H // (DISPLAY_PANEL_H // DISPLAY_SCALE))
+        src_w = DISPLAY_PANEL_W // DISPLAY_SCALE
+        src_h = DISPLAY_PANEL_H // DISPLAY_SCALE
 
-    The file must define: `control(left_img, right_img, timestamp) -> (steering, speed)`.
-    """
-    custom_path = os.environ.get("LOCAL_TEST_TEAM_CONTROLLER")
-    candidate = Path(custom_path).expanduser() if custom_path else DEFAULT_TEAM_CONTROLLER
-    if not candidate.is_file():
-        return None
-
-    spec = importlib.util.spec_from_file_location("local_test_team_controller", str(candidate))
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    control_fn = getattr(module, "control", None)
-    if callable(control_fn):
-        print(f"[car] loaded custom control from: {candidate}")
-        return control_fn
-    return None
+        for panel_idx, img in enumerate((left_img, right_img)):
+            x_off = panel_idx * DISPLAY_PANEL_W
+            for sy in range(src_h):
+                src_y = min(IMG_H - 1, sy * sample_h)
+                dst_y = sy * DISPLAY_SCALE
+                for sx in range(src_w):
+                    src_x = min(IMG_W - 1, sx * sample_w)
+                    b, g, r = img[src_y, src_x, :3]
+                    display.setColor((int(r) << 16) | (int(g) << 8) | int(b))
+                    display.fillRectangle(
+                        x_off + sx * DISPLAY_SCALE,
+                        dst_y,
+                        DISPLAY_SCALE,
+                        DISPLAY_SCALE,
+                    )
+    except Exception:
+        pass
 
 
 robot = Robot()
@@ -108,7 +109,16 @@ timestep = int(robot.getBasicTimeStep())
 node_name = robot.getName()
 cfg = _load_config()
 my_cfg = _find_my_config(cfg, node_name)
-custom_control = _load_custom_control()
+
+# Try to import a team-provided controller (team_controller.py) from the
+# local_test directory. If present, prefer its `control` function. This
+# allows students to only edit `local_test/team_controller.py` and have
+# the `car.py` delegate to it.
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+    from team_controller import control
+except Exception:
+    control = None
 
 left_motor = robot.getDevice("left_motor")
 right_motor = robot.getDevice("right_motor")
@@ -117,10 +127,22 @@ right_motor.setPosition(float("inf"))
 left_motor.setVelocity(0.0)
 right_motor.setVelocity(0.0)
 
+# Cap our command limit to the actual motor capability to avoid Webots warnings.
+try:
+    motor_limit = min(float(left_motor.getMaxVelocity()), float(right_motor.getMaxVelocity()))
+    WHEEL_CMD_LIMIT = min(WHEEL_CMD_LIMIT, motor_limit)
+except Exception:
+    pass
+
 left_cam = robot.getDevice("left_camera")
 right_cam = robot.getDevice("right_camera")
 left_cam.enable(timestep)
 right_cam.enable(timestep)
+
+try:
+    camera_display = robot.getDevice("camera_display")
+except Exception:
+    camera_display = None
 
 # If this node is not the configured car, keep it idle so only car_1 moves.
 if my_cfg is None:
@@ -131,16 +153,36 @@ if my_cfg is None:
 
 last_steering = 0.0
 last_speed = 0.45
+display_step = 0
 
 while robot.step(timestep) != -1:
     try:
-        if custom_control is not None:
-            left_img = _image_to_bgr(left_cam)
-            right_img = _image_to_bgr(right_cam)
-            steering, speed = custom_control(left_img, right_img, robot.getTime())
-            steering = float(max(-1.0, min(1.0, steering)))
-            speed = float(max(0.0, min(1.0, speed)))
+        # If a team controller is available, call it with HxWx3 images.
+        need_images = control is not None or camera_display is not None
+        if need_images:
+            # Grab images from cameras and convert to H,W,3 uint8 arrays.
+            left_raw = left_cam.getImage()
+            left_arr = np.frombuffer(left_raw, dtype=np.uint8).reshape((IMG_H, IMG_W, 4))[:, :, :3].copy()
+            right_raw = right_cam.getImage()
+            right_arr = np.frombuffer(right_raw, dtype=np.uint8).reshape((IMG_H, IMG_W, 4))[:, :, :3].copy()
+
+            if camera_display is not None and display_step % DISPLAY_UPDATE_STEPS == 0:
+                _render_camera_pair(camera_display, left_arr, right_arr)
+            display_step += 1
+
+        if control is not None:
+
+            # Call the student's control function. It should return (steering, speed_norm).
+            try:
+                steering, speed = control(left_arr, right_arr, robot.getTime())
+                steering = float(np.clip(steering, -1.0, 1.0))
+                speed = float(max(0.0, min(1.0, speed)))
+            except Exception:
+                # If the team controller errors, fall back to safe reduced values.
+                steering = last_steering * 0.6
+                speed = last_speed * 0.6
         else:
+            # Fallback: simple lane-following heuristic using left camera.
             gray = _image_to_gray(left_cam)
             cx = _estimate_lane_center(gray)
             if cx is None:

@@ -23,6 +23,8 @@ PROTO CarSimple [
       Camera { name "left_camera" translation 0.2 -0.18 0.45 width 640 height 480 fieldOfView 1.047 }
       Camera { name "right_camera" translation 0.2 0.18 0.45 width 640 height 480 fieldOfView 1.047 }
 
+      Display { name "camera_display" width 320 height 120 }
+
       InertialUnit { name "imu" }
     ]
 
