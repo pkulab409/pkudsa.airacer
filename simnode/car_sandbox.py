@@ -24,12 +24,15 @@ _ALLOWED_MODULES = {
     "itertools":   "itertools",
     "typing":      "typing",        # 纯注解，允许
     "__future__":  "__future__",    # 语法 future 声明
+    "pathlib":     "pathlib",       # 路径操作，允许只读用途
+    "dataclasses": "dataclasses",   # 数据类装饰器，允许
+    "re":          "re",            # 正则表达式，允许
 }
 
 _BLOCKED_PREFIXES = (
     "os", "sys", "socket", "subprocess", "multiprocessing",
     "threading", "time", "datetime", "io", "builtins",
-    "ctypes", "pathlib", "shutil", "tempfile",
+    "ctypes", "shutil", "tempfile",
     "requests", "urllib", "http", "ftplib", "smtplib",
     "signal", "gc", "inspect", "importlib",
     # Windows 特定 / 文件系统遍历
@@ -38,7 +41,7 @@ _BLOCKED_PREFIXES = (
 
 _ALLOWED_MSG = (
     "允许使用：numpy, cv2, math, collections, heapq, "
-    "functools, itertools, typing, __future__"
+    "functools, itertools, typing, __future__, pathlib, dataclasses, re"
 )
 
 

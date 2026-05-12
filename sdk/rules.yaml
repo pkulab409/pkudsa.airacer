@@ -23,6 +23,9 @@ imports:
     - itertools
     - typing          # 纯注解，允许
     - __future__      # 语法 future 声明，编译期处理，不是真正的 import
+    - pathlib         # 路径操作，允许只读用途
+    - dataclasses     # 数据类装饰器，允许
+    - re              # 正则表达式，允许
 
   # 黑名单——显式拒绝（优先级高于 allow）
   # 与 simnode/car_sandbox.py::_BLOCKED_PREFIXES 对齐 + Windows 特定项
@@ -38,7 +41,6 @@ imports:
     - io
     - builtins
     - ctypes
-    - pathlib
     - shutil
     - tempfile
     - requests

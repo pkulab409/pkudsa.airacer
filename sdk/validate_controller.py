@@ -455,6 +455,7 @@ class Validator:
                 report.add(Finding("E011", SEVERITY_ERROR, "无法构造模块 spec"))
                 return None
             module = importlib.util.module_from_spec(spec)
+            sys.modules[saved_name] = module  # @dataclass 等装饰器需要模块已注册
             spec.loader.exec_module(module)
             return module
         except ImportError as e:

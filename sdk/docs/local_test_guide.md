@@ -251,7 +251,7 @@ def control(
 
 ### 6.2 可用库（沙箱白名单）
 
-`numpy`, `cv2`, `math`, `collections`, `heapq`, `functools`, `itertools`, `typing`, `__future__`
+`numpy`, `cv2`, `math`, `collections`, `heapq`, `functools`, `itertools`, `typing`, `__future__`, `pathlib`, `dataclasses`, `re`
 
 其它所有模块都会被 **拒绝 import**（包括 `os`, `sys`, `time`, `socket`,
 `subprocess`, `threading`, `requests`、以及 Windows 特定的 `winreg`/`nt`/`_winapi` 等）。

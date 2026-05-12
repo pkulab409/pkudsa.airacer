@@ -49,7 +49,7 @@ import numpy as np  # noqa: E402
 BLOCKED_PREFIXES: frozenset = frozenset([
     'os', 'sys', 'socket', 'subprocess', 'multiprocessing',
     'threading', 'time', 'datetime', 'io', 'builtins',
-    'ctypes', 'winreg', 'nt', '_winapi', 'pathlib',
+    'ctypes', 'winreg', 'nt', '_winapi',
     'shutil', 'tempfile', 'glob', 'fnmatch',
     'requests', 'urllib', 'http', 'ftplib', 'smtplib',
     'signal', 'gc', 'inspect', 'importlib',
@@ -59,7 +59,7 @@ BLOCKED_PREFIXES: frozenset = frozenset([
 ALLOWED_BASES: frozenset = frozenset([
     'numpy', 'np', 'cv2', 'math', 'collections',
     'heapq', 'functools', 'itertools',
-    'typing', '__future__',
+    'typing', '__future__', 'pathlib', 'dataclasses', 're',
 ])
 
 
@@ -72,7 +72,7 @@ class SandboxImportHook(importlib.abc.MetaPathFinder):
             raise ImportError(
                 f"[Sandbox] '{fullname}' is not allowed in student code. "
                 f"Allowed libraries: numpy, cv2, math, collections, "
-                f"heapq, functools, itertools, typing, __future__."
+                f"heapq, functools, itertools, typing, __future__, pathlib, dataclasses, re."
             )
         return None  # not intercepted — fall through to the next finder
 
