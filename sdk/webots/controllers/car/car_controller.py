@@ -11,8 +11,10 @@ from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple, List
 
 import math
+import os
 import pathlib
 import re
+import json
 
 import cv2
 import numpy as np
@@ -616,7 +618,20 @@ def run() -> None:
         use_driver = False
 
     timestep = int(robot.getBasicTimeStep())
-
+    # --- Check if this car is configured in race_config ---
+    # Only control cars that appear in RACE_CONFIG_PATH; others idle.
+    config_path = os.environ.get('RACE_CONFIG_PATH')
+    if config_path:
+        try:
+            with open(config_path, encoding='utf-8') as f:
+                cfg = json.load(f)
+            my_node = robot.getName()
+            if not any(c.get('car_slot') == my_node for c in cfg.get('cars', [])):
+                while (driver.step() if use_driver else robot.step(timestep)) != -1:
+                    pass
+                return
+        except Exception:
+            pass  # If config read fails, proceed anyway (backward compatible)
     left_camera = get_device(robot, [LEFT_CAMERA_NAME])
     right_camera = get_device(robot, [RIGHT_CAMERA_NAME])
     gps = get_device(robot, ["gps", "GPS"])

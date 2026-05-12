@@ -136,7 +136,7 @@ sdk/
 
 | 文件 | 用途 |
 |---|---|
-| `sdk/examples/team_controller_tutorial.py` | **复制一份到别处**，改成你自己的 controller（示例基于 OpenCV/`cv2`） |
+| `sdk/examples/team_controller_tutorial.py` | **复制一份到别处**，改成你自己的 controller（示例基于 OpenCV/`cv2`，含立体视觉 Hough 循线 + 置信度平滑） |
 | `sdk/rules.yaml` | 一般**不需要改**；如你自研工具链想收紧/放宽规则再调 |
 
 ---
@@ -189,6 +189,9 @@ python sdk/run_local.py --code-path sdk/my_controller.py --skip-validate
 
 # 无渲染、快速模式（适合 headless / 批量测试）
 python sdk/run_local.py --code-path sdk/my_controller.py --fast --minimize
+
+# 无弹窗批量模式（适合脚本自动化）
+python sdk/run_local.py --code-path sdk/my_controller.py --batch
 ```
 
 > ⚠️ 启动后 Webots 窗口里可能一开始小车是静止的——这是正常现象，前 1~2 秒是摄像头激活与沙箱启动时间。
@@ -244,10 +247,12 @@ def control(
     left_img: np.ndarray,    # (480, 640, 3), uint8, BGR
     right_img: np.ndarray,   # (480, 640, 3), uint8, BGR
     timestamp: float,        # 秒
-) -> tuple[float, float]:
+) -> tuple:                  # (steering, speed)
     ...
-    return steering, speed   # ∈ [-1, 1],  ∈ [0, 1]
+    return steering, speed   # steering ∈ [-1, 1]（负左正右），speed ∈ [0, 1]
 ```
+
+> 💡 返回值类型注解写 `tuple` / `tuple[float, float]` / `Tuple[float, float]` 均可；校验器只检查运行时实际返回值是否为长度为 2 的序列且两个元素可转为 float。
 
 ### 6.2 可用库（沙箱白名单）
 
@@ -268,20 +273,29 @@ def control(
 
 > 💡 **提速技巧**：避免每帧分配新大数组、避免 Python 循环做像素遍历，优先 numpy 向量化 / `cv2` 原生函数。
 
-### 6.4 一个最简 PID 循线示例
+### 6.4 教学版控制器示例（team_controller_tutorial.py）
 
-完整可读版见 `sdk/examples/team_controller_tutorial.py`。里面有：
+完整可读版见 `sdk/examples/team_controller_tutorial.py`。它是一个**立体视觉 Hough 循线控制器**，采用左右双摄像头融合策略，里面有：
 
-- 参数集中在文件顶部常量区，**全是你可以微调的旋钮**
-- `_estimate_track_center_x`：行扫描找赛道中心
-- PID 只给了 Kp/Kd，默认 Ki=0（积分容易让直道飘）
-- 转向大时自动降速
+- 参数集中在文件顶部 **「可修改配置区」**，**全是你可以微调的旋钮**，包括：
+  - `BASE_SPEED` / `MIN_SPEED` / `MAX_SPEED`：速度范围
+  - `STEER_GAIN`：转向增益（越大越灵敏）
+  - `CANNY_LOW` / `CANNY_HIGH`：边缘检测阈值
+  - `HOUGH_VOTE` / `HOUGH_MIN_LENGTH` / `HOUGH_MAX_GAP`：Hough 变换参数
+  - `ROI_*_RATIO`：感兴趣区域比例
+  - `OFFSET_SMOOTHING` / `STEER_SMOOTHING`：平滑系数
+- `lane_center_offset()`：Canny 边缘检测 + Hough 线段检测，输出归一化偏移量与置信度
+- `combine_offsets()`：左右摄像头置信度加权融合
+- `compute_control()`：核心控制逻辑（转向 + 速度 + 转向灯），含置信度自适应和帧间平滑
+- 转向大时自动降速（`decide_speed()`）
+- `control()` 函数维护跨帧状态字典 `_state`，满足 SDK 接口要求
 
 建议的调参路径：
-1. 先只调 `TRACK_THRESHOLD`，让黑白赛道分得干净
-2. 再调 `KP`，让转弯响应及时但不振荡
-3. 最后补 `KD` 抑振
-4. 速度策略最后优化
+1. 先调 `CANNY_LOW` / `CANNY_HIGH`，让边缘检测能稳定找到赛道边线
+2. 再调 `HOUGH_VOTE` / `HOUGH_MIN_LENGTH`，筛掉噪声线段
+3. 调 `STEER_GAIN` 让转弯响应及时但不振荡
+4. 补 `OFFSET_SMOOTHING` / `STEER_SMOOTHING` 抑制抖动
+5. 速度策略（`BASE_SPEED` / `SPEED_TURN_PENALTY`）最后优化
 
 ---
 
@@ -354,21 +368,25 @@ CI 脚本里推荐 `--strict`，把 warning 也当拦截线。
 
 | Code | 级别 | 含义 | 典型修法 |
 |---|---|---|---|
-| E001 | error | 文件过大 | 删除未用数据/注释；不要在源码里塞图像 |
+| E000 | error | 文件不存在 | 检查 `--code-path` 路径是否正确 |
+| E001 | error | 文件过大（默认上限 100 KB） | 删除未用数据/注释；不要在源码里塞图像 |
+| E002 | error | 文件编码错误（必须 UTF-8） | 用编辑器另存为 UTF-8 |
 | E003 | error | 语法错误 | 按报错行修 |
 | E004 | error | 导入了黑名单模块 | 换成白名单内的等价实现 |
 | E005 | error | 相对 import | 只能写绝对 import，且目标必须在白名单 |
-| E006 | error | 调用了禁用内置（eval/open/`__import__`…） | 线上一定会被拦，老实写代码 |
+| E006 | error | 调用了禁用内置（`eval`/`open`/`__import__`…） | 线上一定会被拦，老实写代码 |
 | E007 | error | 访问了沙箱逃逸属性（`__globals__`/`__subclasses__` 等） | 这在线上 RESTRICTED_BUILTINS 下会失败 |
-| E008 | error | 缺少 `control` 函数 | 按 6.1 定义 |
+| E008 | error | 缺少可调用的 `control` 函数 | 按 6.1 定义 |
 | E010 | error | 模块加载时触发非法 import | 检查顶层 import，移除黑名单项 |
 | E011 | error | 模块加载失败（非 ImportError） | 看报错信息，通常是顶层代码抛异常 |
-| E012 | error | 返回值格式错 | 必须 `return steering, speed` 两个 float |
+| E012 | error | 返回值格式错 | 必须 `return steering, speed` 两个可转为 float 的值 |
 | W004 | warn | 未知 import（非黑非白） | 若不是白名单内的，线上会 ImportError |
 | W007 | warn | 访问了一般可疑 dunder（`__loader__`/`__spec__`/`__import__`） | 一般无需修；如你在做 meta 编程请确认 |
+| W008 | warn | `control` 函数形参数量不是 3 | 检查签名是否为 `(left_img, right_img, timestamp)` |
 | W011 | warn | `control()` 调用抛异常 | 线上会捕获并回落到 (0, 0)，但仍建议修好 |
-| W013 | warn | 返回值越界 | 自觉 clip 到 [-1, 1] / [0, 1] |
-| W014 | warn | 耗时接近/超过 20 ms | 优化算法或减少每帧分配（看 `meta.p95_call_ms`） |
+| W012 | warn | 未安装 numpy，mock 使用占位对象 | `pip install numpy` 后重新验证 |
+| W013 | warn | 返回值越界 | 自觉 clip 到 `[-1, 1]` / `[0, 1]` |
+| W014 | warn | p95 耗时超过 20 ms，或平均耗时超过 14 ms（0.7×20 ms） | 优化算法或减少每帧分配（看 `meta.p95_call_ms`） |
 
 ---
 
@@ -523,3 +541,4 @@ python sdk/run_local.py --code-path sdk/my_controller.py `
 | v0.2 | 2026-05-05 | 将工作文件从仓库根迁到 `sdk/my_controller.py`；补充 Webots 自动发现（任意盘符）、race_config session 字段默认值、非 ASCII 路径自动兜底（%TEMP%）、FAQ Q7；Q1/Q2/Q3 命令示例统一为 `sdk/my_controller.py` |
 | v0.3 | 2026-05-05 | 接入 `track_basic` / `track_complex` 新赛道与 Car 系列 PROTO（CarPhoenix … CarShadow）；新增 `sdk/worlds.py` 作为赛道/车型目录；`run_local.py` 支持 `--list-worlds`、`--world` 短名、自动校验 `--car-slot`；默认赛道改为 `basic`；新增 §5.4 选择赛道和车型；FAQ Q5 重写 |
 | v0.4 | 2026-05-08 | **SDK 自包含**：Webots 资产（worlds / protos / controllers）从 `simnode/webots/` 迁入 `sdk/webots/`；线上沙箱黑白名单源头 `car_sandbox.py` 也移至 `sdk/`；`run_local.py` 生成的 `race_config.json` 改落在 `sdk/.local/`；学生现在仅需拷贝 `sdk/` 目录即可完整开展本地测试；`sdk/tests/test_consistency.py` 从 `simnode.*` 改为 import 同包的 `car_sandbox`。 |
+| v0.5 | 2026-05-12 | **文档对齐实际代码**：§4 目录说明更新 tutorial 描述（立体视觉 Hough 循线）；§5.3 补充 `--batch` 变体；§6.1 接口说明补充返回类型注解提示；§6.4 重写为与 `team_controller_tutorial.py` 实际实现一致的参数说明与调参路径；§7.4 错误码表补充 E000/E002/W008/W012，修正 W014 触发条件（p95 > 20 ms 或均值 > 14 ms）。 |
