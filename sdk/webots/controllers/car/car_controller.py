@@ -605,6 +605,36 @@ def set_indicator_with_leds(left_led, right_led, signal: str) -> None:
         right_led.set(right_val)
 
 
+def _load_student_control_fn(config_path: str, my_node: str):
+    """从 race_config.json 中找到本车的 code_path，加载并返回其 control 函数。
+    找不到或加载失败则返回 None。"""
+    try:
+        with open(config_path, encoding='utf-8') as f:
+            cfg = json.load(f)
+        my_entry = next(
+            (c for c in cfg.get('cars', []) if c.get('car_slot') == my_node),
+            None,
+        )
+        if my_entry is None:
+            return None
+        student_path = my_entry.get('code_path')
+        if not student_path:
+            return None
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location("_student_ctrl", student_path)
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        fn = getattr(mod, 'control', None)
+        if callable(fn):
+            print(f"[car_controller] 已加载学生控制器: {student_path}")
+            return fn
+        print(f"[car_controller][warn] {student_path} 中未找到 control() 函数，使用内置逻辑")
+        return None
+    except Exception as e:
+        print(f"[car_controller][warn] 加载学生控制器失败: {e}，使用内置逻辑")
+        return None
+
+
 def run() -> None:
     try:
         from vehicle import Driver  # type: ignore
@@ -621,6 +651,7 @@ def run() -> None:
     # --- Check if this car is configured in race_config ---
     # Only control cars that appear in RACE_CONFIG_PATH; others idle.
     config_path = os.environ.get('RACE_CONFIG_PATH')
+    student_control_fn = None  # 学生 control() 函数，None 则使用内置逻辑
     if config_path:
         try:
             with open(config_path, encoding='utf-8') as f:
@@ -630,6 +661,8 @@ def run() -> None:
                 while (driver.step() if use_driver else robot.step(timestep)) != -1:
                     pass
                 return
+            # 尝试加载学生控制器
+            student_control_fn = _load_student_control_fn(config_path, my_node)
         except Exception:
             pass  # If config read fails, proceed anyway (backward compatible)
     left_camera = get_device(robot, [LEFT_CAMERA_NAME])
@@ -672,14 +705,46 @@ def run() -> None:
 
     vision_state = VisionState()
     track_centerline = load_track_centerline()
+    _sim_timestamp: float = 0.0
 
     while (driver.step() if use_driver else robot.step(timestep)) != -1:
+        _sim_timestamp += timestep / 1000.0
         left_frame = camera_to_bgr(left_camera) if left_camera is not None else None
         right_frame = camera_to_bgr(right_camera) if right_camera is not None else None
-        if right_frame is not None and not frame_has_lane_features(right_frame):
-            right_frame = None
         if left_frame is None and right_frame is None:
             continue
+
+        # ── 学生控制器路径 ──────────────────────────────────────────────────
+        if student_control_fn is not None:
+            _left = left_frame if left_frame is not None else np.zeros((480, 640, 3), np.uint8)
+            _right = right_frame if right_frame is not None else np.zeros((480, 640, 3), np.uint8)
+            try:
+                result = student_control_fn(_left, _right, _sim_timestamp)
+                raw_steering = float(result[0])
+                raw_speed    = float(result[1])
+            except Exception as e:
+                print(f"[car_controller][warn] 学生 control() 出错: {e}")
+                raw_steering, raw_speed = 0.0, 0.0
+            # speed 归一化 → km/h（Driver API）或保持原值（Robot API）
+            steer_angle = clamp(raw_steering * MAX_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE)
+            if use_driver:
+                driver.setCruisingSpeed(raw_speed * MAX_SPEED)
+                driver.setSteeringAngle(steer_angle)
+            else:
+                if fl_steer is not None:
+                    fl_steer.setPosition(steer_angle)
+                if fr_steer is not None:
+                    fr_steer.setPosition(steer_angle)
+                if left_motor is not None and right_motor is not None:
+                    base = 8000.0 * clamp(raw_speed, 0.0, 1.0)
+                    diff = raw_steering * 4000.0
+                    left_motor.setVelocity(base + diff)
+                    right_motor.setVelocity(base - diff)
+            continue  # 跳过内置逻辑
+
+        # ── 内置控制器路径（无学生代码时回退）─────────────────────────────
+        if right_frame is not None and not frame_has_lane_features(right_frame):
+            right_frame = None
 
         position = None
         heading = None
