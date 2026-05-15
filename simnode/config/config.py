@@ -11,7 +11,7 @@ _BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
 
 
 _DEFAULTS = {
-    "SIMNODE_HOST":           "0.0.0.0:8001",
+    "SIMNODE_HOST":           "0.0.0.0:5000",
     "RECORDINGS_DIR":         str(_BASE_DIR.parent / "recordings"),
     "WEBOTS_BINARY":          "/usr/bin/webots",
     "WEBOTS_WORLD":           str(_BASE_DIR / "webots" / "worlds" / "airacer.wbt"),

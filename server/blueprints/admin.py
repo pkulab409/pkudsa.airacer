@@ -31,7 +31,6 @@ import secrets
 import sqlite3
 from typing import Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -80,6 +79,9 @@ from server.utils.simnode_client import (
 )
 from server.utils.simnode_client import (
     cancel_race as simnode_cancel_race,
+)
+from server.utils.simnode_client import (
+    get_race_frame_async as _get_race_frame_async,  # 复用共享连接池
 )
 from server.utils.simnode_client import (
     get_race_result as simnode_get_result,
@@ -296,7 +298,20 @@ _zone_running_session: dict[str, str] = {}
 
 
 def _get_running_session_id(zone_id: str) -> Optional[str]:
-    return _zone_running_session.get(zone_id)
+    sid = _zone_running_session.get(zone_id)
+    if sid:
+        return sid
+    # Fallback after a server restart: read running_session from the database
+    try:
+        with get_db(DB_PATH) as conn:
+            row = db_get_running_session(conn, zone_id)
+        if row:
+            sid = row["id"]
+            _zone_running_session[zone_id] = sid  # repopulate in-memory cache
+            return sid
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -918,19 +933,17 @@ async def close_event(_auth=Depends(require_admin)):
 
 @router.get("/live-frame/{session_id}")
 async def get_live_frame(session_id: str, _auth=Depends(require_admin)):
+    """Proxy overhead camera frame from simnode. Reuses shared HTTP connection pool."""
     try:
-        async with httpx.AsyncClient(proxy=None, trust_env=False) as client:
-            resp = await client.get(
-                f"{_SIMNODE_URL}/race/{session_id}/frame",
-                timeout=3.0,
-            )
-        if resp.status_code == 404:
-            raise HTTPException(status_code=404, detail="No frame available yet")
-        resp.raise_for_status()
+        resp = await _get_race_frame_async(session_id)
+        if resp is None:
+            raise HTTPException(status_code=503, detail="Simnode unreachable")
         return Response(
-            content=resp.content,
+            content=resp,
             media_type="image/jpeg",
             headers={"Cache-Control": "no-store"},
         )
-    except httpx.RequestError:
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(status_code=503, detail="Simnode unreachable")

@@ -9,6 +9,7 @@ import json
 import math
 import datetime
 import pathlib
+import tempfile
 
 from controller import Supervisor
 
@@ -255,11 +256,11 @@ telemetry_path = os.path.join(recording_path, 'telemetry.jsonl')
 tel_file = open(telemetry_path, 'a', encoding='utf-8')
 frame_count = 0
 
-# Overhead camera — saves live_view.jpg every 10 steps for the admin panel
+# Overhead camera — saves live_view.jpg every 2 steps for smooth admin panel (~8 fps)
 _overhead_cam = robot.getDevice("overhead_cam")
 if _overhead_cam:
-    _overhead_cam.enable(timestep * 10)
-_FRAME_SAVE_INTERVAL = 10
+    _overhead_cam.enable(timestep * 2)
+_FRAME_SAVE_INTERVAL = 2
 _live_view_path = os.path.join(recording_path, 'live_view.jpg')
 
 
@@ -416,9 +417,27 @@ while robot.step(timestep) != -1:
     write_telemetry_frame(sim_time, cars, events_this_frame)
 
     # --- Save overhead camera frame every N steps ---
+    _frame_saved = False
     if _overhead_cam and frame_count % _FRAME_SAVE_INTERVAL == 0:
         try:
             _overhead_cam.saveImage(_live_view_path, 75)
+            _frame_saved = True
+        except Exception:
+            pass
+
+    # --- Write live.json (atomic, no network) every N steps for simnode cache ---
+    if frame_count % _FRAME_SAVE_INTERVAL == 0:
+        try:
+            live = {
+                "t": round(sim_time, 3),
+                "cars": [snapshot(c) for c in cars],
+                "frame_saved": _frame_saved,
+            }
+            tmp_path = os.path.join(recording_path, ".live.json.tmp")
+            live_path = os.path.join(recording_path, "live.json")
+            with open(tmp_path, "w", encoding="utf-8") as lf:
+                json.dump(live, lf, ensure_ascii=False)
+            os.replace(tmp_path, live_path)  # atomic on Windows
         except Exception:
             pass
 

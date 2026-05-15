@@ -1770,15 +1770,25 @@
                         "badge badge-state-" +
                         (msg.state || "idle").toLowerCase() +
                         " ms-auto";
-                    sb.textContent = msg.state || "--";
+                    // 启动预热状态：backend 收到 running 但 Webots 尚未产出第一帧数据
+                    if (msg.warmup && msg.state === "running") {
+                        sb.textContent = "仿真引擎启动中...";
+                    } else {
+                        sb.textContent = msg.state || "--";
+                    }
                 }
 
                 _currentSid = msg.session_id || "";
                 setText("live-session-id", truncateSid(msg.session_id) || "--");
-                setText(
-                    "live-sim-time",
-                    msg.sim_time != null ? msg.sim_time.toFixed(1) + "s" : "--",
-                );
+                // 预热期间显示 "启动中...", 否则显示仿真时间
+                if (msg.warmup && msg.state === "running") {
+                    setText("live-sim-time", "启动中...");
+                } else {
+                    setText(
+                        "live-sim-time",
+                        msg.sim_time != null ? msg.sim_time.toFixed(1) + "s" : "--",
+                    );
+                }
                 var stage = msg.session_type || msg.current_stage;
                 setText("live-stage", STAGE_NAMES[stage] || stage || "--");
                 setText(
@@ -1786,7 +1796,7 @@
                     msg.vehicles ? Object.keys(msg.vehicles).length : "--",
                 );
 
-                renderVehicles(msg.vehicles);
+                renderVehicles(msg.vehicles, msg.warmup);
             }
 
             function setCtrlBadge(state) {
@@ -1810,7 +1820,7 @@
                 });
             }
 
-            function renderVehicles(vehicles) {
+            function renderVehicles(vehicles, warmup) {
                 var tbody = document.getElementById("live-vehicles-tbody");
                 if (!tbody) return;
                 if (!vehicles || !Object.keys(vehicles).length) {
@@ -1849,7 +1859,7 @@
             /* ── Overhead polling ── */
             function startOverhead() {
                 stopOverhead();
-                _overheadTmr = setInterval(pollOverhead, 1000);
+                _overheadTmr = setInterval(pollOverhead, 500);
             }
             function stopOverhead() {
                 clearInterval(_overheadTmr);

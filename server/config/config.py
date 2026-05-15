@@ -17,7 +17,7 @@ _DEFAULTS = {
     "ADMIN_PASSWORD": "12345",
     "SERVER_HOST": "127.0.0.1",
     "SERVER_PORT": "8000",
-    "SIMNODE_URL": "http://localhost:8001",  # Sim Node HTTP 基地址
+    "SIMNODE_URL": "http://localhost:5000",  # Sim Node HTTP 基地址
 }
 
 _config: dict = {}

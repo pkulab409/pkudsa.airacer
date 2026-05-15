@@ -182,5 +182,5 @@ class RaceManager:
         return None
 
     def get_stream_url(self, race_id: str, host: str = None) -> str:
-        h = host or Config.get("SIMNODE_HOST", "localhost:8001")
+        h = host or Config.get("SIMNODE_HOST", "localhost:5000")
         return f"ws://{h}/race/{race_id}/stream"

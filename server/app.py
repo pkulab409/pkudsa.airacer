@@ -139,17 +139,16 @@ async def _serve_test_queue() -> None:
 async def _sim_live_loop() -> None:
     from server.blueprints.admin import _get_running_session_id
     from server.race.state_machine import all_running_zones
-    from server.utils.simnode_client import get_race_live_info
+    from server.utils.simnode_client import get_race_live_info_async  # 改用异步版
     from server.ws.admin import manager
 
     while True:
-        await asyncio.sleep(0.5)
         for zone_id, sm in all_running_zones():
             session_id = _get_running_session_id(zone_id)
             if not session_id:
                 continue
             try:
-                info = await asyncio.to_thread(get_race_live_info, session_id)
+                info = await get_race_live_info_async(session_id, timeout=1.5)
                 # Re-check after blocking call to avoid overwriting a final state
                 if info and sm.is_running():
                     base = manager._last_msg_per_zone.get(zone_id, {})
@@ -162,15 +161,21 @@ async def _sim_live_loop() -> None:
                             "speed": car.get("speed"),
                             "status": car.get("status"),
                         }
+                    # 区分"仿真引擎启动中"和"正常运行"两种状态：
+                    # sim_time 为 None 说明 Webots 还没开始写 live.json（仿真引擎正在加载）
+                    sim_time = info.get("sim_time")
+                    warmup = (sim_time is None)
                     await manager.broadcast(
                         {
                             **base,
                             "type": "sim_status",
                             "zone_id": zone_id,
                             "webots_pid": info.get("webots_pid"),
-                            "sim_time": info.get("sim_time") or 0,
+                            "sim_time": sim_time or 0,
                             "vehicles": vehicles,
+                            "warmup": warmup,   # 前端可据此显示"仿真引擎启动中..."
                         }
                     )
             except Exception:
                 pass
+        await asyncio.sleep(0.2)
