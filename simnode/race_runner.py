@@ -140,9 +140,12 @@ class RaceRunner:
         env = os.environ.copy()
         env["RACE_CONFIG_PATH"] = config_path
 
-        # Always use --batch (suppress dialogs); rendering is required for the overhead Camera.
-        # On a headless server, ensure a virtual display (e.g. Xvfb) is available.
-        args = [webots_bin, "--batch", world_file]
+        # Use --minimize on Windows (headless=false) so the overhead Camera can render.
+        # --batch disables ALL GPU rendering → Camera.saveImage() produces black frames.
+        if headless:
+            args = [webots_bin, "--batch", "--no-sandbox", world_file]
+        else:
+            args = [webots_bin, "--minimize", world_file]
 
         logger.info(f"启动 Webots: {args}")
         self._webots_proc = subprocess.Popen(

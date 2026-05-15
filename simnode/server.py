@@ -1,12 +1,15 @@
 import asyncio
+import base64
 import json
 import logging
 import pathlib
+import threading
+import time as _time
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from simnode.race_manager import RaceManager
@@ -27,6 +30,12 @@ app.add_middleware(
 # WebSocket 连接池：race_id → set[WebSocket]
 _ws_connections: Dict[str, set] = {}
 _ws_lock = asyncio.Lock()
+
+# ---- In-memory caches (avoid slow disk I/O for /live and /frame) ----
+_live_cache: Dict[str, dict] = {}
+_frame_cache: Dict[str, bytes] = {}
+_cache_lock = threading.Lock()
+_active_race_ids: set = set()
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +120,7 @@ async def create_race(body: RaceCreateRequest):
         logger.exception(f"启动比赛 {body.race_id} 失败")
         raise HTTPException(status_code=500, detail=str(e))
 
-    host = Config.get("SIMNODE_HOST", "localhost:8001")
+    host = Config.get("SIMNODE_HOST", "localhost:5000")
     stream_url = f"ws://{host}/race/{body.race_id}/stream"
 
     return RaceCreateResponse(
@@ -165,7 +174,7 @@ async def get_race_result(race_id: str):
 
 
 # ---------------------------------------------------------------------------
-# GET /race/{race_id}/live  — real-time PID + latest telemetry frame
+# GET /race/{race_id}/live  — real-time PID + latest telemetry frame (cached)
 # ---------------------------------------------------------------------------
 
 @app.get("/race/{race_id}/live")
@@ -175,40 +184,25 @@ async def get_race_live(race_id: str):
     if status is None:
         raise HTTPException(status_code=404, detail=f"Race not found: {race_id}")
 
+    # Always use in-memory cache (updated by background thread every 0.3s).
+    # No disk fallback — slow disk I/O on Windows was causing multi-second delays.
+    with _cache_lock:
+        cached = _live_cache.get(race_id)
+    if cached is not None:
+        return cached
+
+    # Cache not ready yet — return pid-only stub so frontend doesn't block
     pid = manager.get_webots_pid(race_id)
-
-    recordings_dir = pathlib.Path(Config.get("RECORDINGS_DIR", "./recordings")).resolve()
-    telemetry_file = recordings_dir / race_id / "telemetry.jsonl"
-    sim_time = None
-    cars_live: List[Dict] = []
-
-    if telemetry_file.exists():
-        try:
-            with open(telemetry_file, "rb") as f:
-                f.seek(0, 2)
-                size = f.tell()
-                if size > 0:
-                    chunk = min(size, 4096)
-                    f.seek(-chunk, 2)
-                    data = f.read().decode("utf-8", errors="replace")
-                    lines = [ln for ln in data.split("\n") if ln.strip()]
-                    if lines:
-                        last = json.loads(lines[-1])
-                        sim_time = last.get("t")
-                        cars_live = last.get("cars", [])
-        except Exception:
-            pass
-
     return {
         "race_id":    race_id,
         "webots_pid": pid,
-        "sim_time":   sim_time,
-        "cars":       cars_live,
+        "sim_time":   None,
+        "cars":       [],
     }
 
 
 # ---------------------------------------------------------------------------
-# GET /race/{race_id}/frame  — latest overhead camera JPEG
+# GET /race/{race_id}/frame  — latest overhead camera JPEG (cached)
 # ---------------------------------------------------------------------------
 
 @app.get("/race/{race_id}/frame")
@@ -217,15 +211,17 @@ async def get_race_frame(race_id: str):
     status = manager.get_race_status(race_id)
     if status is None:
         raise HTTPException(status_code=404, detail=f"Race not found: {race_id}")
-    recordings_dir = pathlib.Path(Config.get("RECORDINGS_DIR", "./recordings")).resolve()
-    frame_file = recordings_dir / race_id / "live_view.jpg"
-    if not frame_file.exists():
-        raise HTTPException(status_code=404, detail="No frame available yet")
-    return FileResponse(
-        str(frame_file),
-        media_type="image/jpeg",
-        headers={"Cache-Control": "no-store"},
-    )
+
+    # Always use in-memory cache (updated by background thread every 0.3s).
+    # No disk fallback — slow disk I/O on Windows was causing multi-second delays.
+    with _cache_lock:
+        cached = _frame_cache.get(race_id)
+    if cached is not None:
+        return Response(content=cached, media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"})
+
+    # Frame not available yet in cache
+    raise HTTPException(status_code=404, detail="No frame available yet")
 
 
 # ---------------------------------------------------------------------------
@@ -279,3 +275,80 @@ async def stream_race(websocket: WebSocket, race_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "simnode"}
+
+
+# ---------------------------------------------------------------------------
+# Background cache updater (runs in a thread, reads telemetry+frame from disk)
+# ---------------------------------------------------------------------------
+
+def _cache_updater_loop():
+    """Background thread: refresh live/frame caches for all running races.
+    Reads live.json (tiny atomic overwrite from supervisor, ~1 KB) and
+    live_view.jpg (overhead camera frame). No network, minimal disk I/O.
+    """
+    recordings_dir = pathlib.Path(Config.get("RECORDINGS_DIR", "./recordings")).resolve()
+    while True:
+        try:
+            manager = RaceManager()
+            races = manager.get_all_races()
+            for race_id, status in races:
+                if status != "running":
+                    continue
+                race_dir = recordings_dir / race_id
+                # Read live.json (atomic, <1 KB, overwritten every 128 ms by supervisor)
+                live_file = race_dir / "live.json"
+                if live_file.exists():
+                    try:
+                        with open(live_file, "r", encoding="utf-8") as f:
+                            live = json.load(f)
+                        pid = manager.get_webots_pid(race_id)
+                        with _cache_lock:
+                            _live_cache[race_id] = {
+                                "race_id": race_id,
+                                "webots_pid": pid,
+                                "sim_time": live.get("t"),
+                                "cars": live.get("cars", []),
+                            }
+                    except Exception:
+                        pass
+                # Read live_view.jpg (overhead camera JPEG)
+                frm_file = race_dir / "live_view.jpg"
+                if frm_file.exists():
+                    try:
+                        with open(frm_file, "rb") as f:
+                            data = f.read()
+                        with _cache_lock:
+                            _frame_cache[race_id] = data
+                    except Exception:
+                        pass
+            _time.sleep(0.05)  # poll every 50ms for minimal latency
+        except Exception:
+            _time.sleep(0.5)
+
+
+_cache_thread = threading.Thread(target=_cache_updater_loop, daemon=True)
+_cache_thread.start()
+
+# ---------------------------------------------------------------------------
+# POST /race/{race_id}/push  — supervisor HTTP push (bypasses disk I/O)
+# ---------------------------------------------------------------------------
+
+class PushFrame(BaseModel):
+    t: float = 0
+    cars: list = []
+    frame_b64: Optional[str] = None   # base64-encoded JPEG from overhead camera
+
+@app.post("/race/{race_id}/push")
+async def push_telemetry(race_id: str, body: PushFrame):
+    """Called by the Webots supervisor every few steps.
+    Stores telemetry + optional frame directly in memory cache.
+    This avoids slow disk I/O on Windows for the hot /live and /frame paths."""
+    with _cache_lock:
+        _live_cache[race_id] = {
+            "race_id": race_id,
+            "sim_time": body.t,
+            "cars": body.cars,
+        }
+        if body.frame_b64:
+            _frame_cache[race_id] = base64.b64decode(body.frame_b64)
+    return {"status": "ok"}
