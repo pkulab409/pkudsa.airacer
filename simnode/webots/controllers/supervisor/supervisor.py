@@ -36,20 +36,20 @@ cars_config    = config['cars']  # list of dicts
 # ---------------------------------------------------------------------------
 
 CHECKPOINTS = [
-    {"id": 0, "cx":  0.0,  "cy":   0.0, "half_w": 4.0, "half_h": 1.0, "track_heading":  0.0},   # CP0 - start/finish
-    {"id": 1, "cx": 40.0,  "cy":   0.0, "half_w": 1.0, "half_h": 4.0, "track_heading":  1.57},  # CP1
-    {"id": 2, "cx": 50.0,  "cy": -40.0, "half_w": 4.0, "half_h": 1.0, "track_heading":  3.14},  # CP2
-    {"id": 3, "cx":  0.0,  "cy": -40.0, "half_w": 1.0, "half_h": 4.0, "track_heading": -1.57},  # CP3
+    {"id": 0, "cx": 56.0,  "cy": -29.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 0.0},
+    {"id": 1, "cx": 199.0, "cy": 0.0,   "half_w": 12.0, "half_h": 12.0, "track_heading": 1.57},
+    {"id": 2, "cx": 199.0, "cy": 103.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 1.57},
+    {"id": 3, "cx": 158.0, "cy": 160.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 3.14},
+    {"id": 4, "cx": 92.0,  "cy": 159.0, "half_w": 12.0, "half_h": 12.0, "track_heading": -1.57},
+    {"id": 5, "cx": 47.5,  "cy": 60.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": -1.57},
+    {"id": 6, "cx": -5.0,  "cy": 150.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 3.14},
+    {"id": 7, "cx": -22.0, "cy": 98.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": -1.0},
+    {"id": 8, "cx": -18.0, "cy": 40.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": 0.2},
 ]
 
 
 def in_checkpoint(x, y, cp):
     return abs(x - cp['cx']) < cp['half_w'] and abs(y - cp['cy']) < cp['half_h']
-
-
-def heading_matches(heading, track_heading, tol=math.pi / 2):
-    diff = abs((heading - track_heading + math.pi) % (2 * math.pi) - math.pi)
-    return diff < tol
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +70,7 @@ for cc in cars_config:
         "speed":               0.0,
         "lap":                 0,
         "lap_progress":        0.0,
+        "checkpoints_passed":  0,          # Total checkpoints crossed (including CP0)
         "status":              "normal",   # "normal" | "stopped" | "disqualified"
         "boost_remaining":     0.0,
         "checkpoint_next":     1,          # After CP0 triggers start, wait for CP1 next
@@ -107,7 +108,7 @@ def check_checkpoints(car, sim_time, events):
           Waiting for first CP0 crossing to start the lap timer.
           On crossing CP0 → set lap_started=True, record lap_start_time,
           set checkpoint_next=1.
-      - car['lap_started'] == True, checkpoint_next == 1/2/3:
+      - car['lap_started'] == True, checkpoint_next >= 1:
           Waiting for intermediate checkpoints in order.
           On crossing the expected CP → advance checkpoint_next.
       - car['lap_started'] == True, checkpoint_next == 0 (back to start/finish):
@@ -120,15 +121,16 @@ def check_checkpoints(car, sim_time, events):
 
     if not in_checkpoint(x, y, cp):
         return
-    if not heading_matches(heading, cp['track_heading']):
-        return
 
+    # Detect: must cross the checkpoint in correct sequence order only
     if cp_idx == 0 and not car['lap_started']:
         # First crossing of start/finish line — begin lap timing
         car['lap_started'] = True
         car['lap_start_time'] = sim_time
         car['checkpoint_next'] = 1
         car['lap_progress'] = 0.0
+        car['checkpoints_passed'] += 1
+        print(f"[CP] {car['team_id']} passed CP0 (start), total cp={car['checkpoints_passed']}")
         events.append({
             "type": "lap_start",
             "team_id": car['team_id'],
@@ -139,6 +141,7 @@ def check_checkpoints(car, sim_time, events):
         # Intermediate checkpoint — progress equals the fraction already covered
         car['checkpoint_next'] = (cp_idx + 1) % len(CHECKPOINTS)
         car['lap_progress'] = cp_idx * 0.25
+        car['checkpoints_passed'] += 1
         events.append({
             "type": "checkpoint",
             "team_id": car['team_id'],
@@ -156,6 +159,7 @@ def check_checkpoints(car, sim_time, events):
         car['lap_start_time'] = sim_time
         car['lap_progress'] = 0.0
         car['checkpoint_next'] = 1
+        car['checkpoints_passed'] += 1
 
         events.append({
             "type": "lap_complete",
@@ -256,6 +260,15 @@ telemetry_path = os.path.join(recording_path, 'telemetry.jsonl')
 tel_file = open(telemetry_path, 'a', encoding='utf-8')
 frame_count = 0
 
+# DEBUG log file
+_debug_log = os.path.join(recording_path, '_debug_supervisor.log')
+with open(_debug_log, 'w') as _df:
+    _df.write(f"INIT: session={session_id}, cars={len(cars_config)}, checkpoints={len(CHECKPOINTS)}\n")
+    for i, cp in enumerate(CHECKPOINTS):
+        _df.write(f"  CP{i}: ({cp['cx']},{cp['cy']}) hw={cp['half_w']} hh={cp['half_h']} th={cp['track_heading']}\n")
+    for c in cars:
+        _df.write(f"  CAR: slot={c['car_slot']} team={c['team_id']} node={'OK' if c['node'] else 'NONE'}\n")
+
 # Overhead camera — saves live_view.jpg every 2 steps for smooth admin panel (~8 fps)
 _overhead_cam = robot.getDevice("overhead_cam")
 if _overhead_cam:
@@ -266,15 +279,16 @@ _live_view_path = os.path.join(recording_path, 'live_view.jpg')
 
 def snapshot(car):
     return {
-        "team_id":         car['team_id'],
-        "x":               round(car['x'], 3),
-        "y":               round(car['y'], 3),
-        "heading":         round(car['heading'], 4),
-        "speed":           round(car['speed'], 2),
-        "lap":             car['lap'],
-        "lap_progress":    car['lap_progress'],
-        "status":          car['status'],
-        "boost_remaining": round(car['boost_remaining'], 2),
+        "team_id":             car['team_id'],
+        "x":                   round(car['x'], 3),
+        "y":                   round(car['y'], 3),
+        "heading":             round(car['heading'], 4),
+        "speed":               round(car['speed'], 2),
+        "lap":                 car['lap'],
+        "lap_progress":        car['lap_progress'],
+        "checkpoints_passed":  car['checkpoints_passed'],
+        "status":              car['status'],
+        "boost_remaining":     round(car['boost_remaining'], 2),
     }
 
 

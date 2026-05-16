@@ -2,6 +2,7 @@
 function updateLeaderboard(el, frame, teams, metadata) {
   if (!frame || !frame.cars) return;
   const sorted = [...frame.cars].sort((a, b) => {
+    if ((b.checkpoints_passed || 0) !== (a.checkpoints_passed || 0)) return (b.checkpoints_passed || 0) - (a.checkpoints_passed || 0);
     if (b.lap !== a.lap) return b.lap - a.lap;
     if (b.lap_progress !== a.lap_progress) return b.lap_progress - a.lap_progress;
     return (b.speed || 0) - (a.speed || 0);
@@ -24,6 +25,8 @@ function updateLeaderboard(el, frame, teams, metadata) {
       ? '—'
       : car.speed.toFixed(1) + ' m/s';
 
+    const cpStr = car.checkpoints_passed != null ? `${car.checkpoints_passed}` : '—';
+
     const lapStr = car.lap != null ? `${car.lap}/${totalLaps}` : '—';
 
     const bestLap = car.best_lap_time != null
@@ -33,6 +36,7 @@ function updateLeaderboard(el, frame, teams, metadata) {
     return `<tr class="${i === 0 ? 'leader' : ''}">
       <td class="lb-rank">${i + 1}</td>
       <td class="lb-name">${name}${statusBadge}</td>
+      <td class="lb-lap">${cpStr}</td>
       <td class="lb-lap">${lapStr}</td>
       <td class="lb-best">${bestLap}</td>
       <td class="lb-speed">${speedStr}</td>
@@ -46,6 +50,7 @@ function updateLeaderboard(el, frame, teams, metadata) {
         <tr>
           <th>#</th>
           <th>队伍</th>
+          <th>检查点</th>
           <th>圈次</th>
           <th>最快圈</th>
           <th>速度</th>

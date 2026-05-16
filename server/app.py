@@ -158,6 +158,7 @@ async def _sim_live_loop() -> None:
                         tid = car.get("team_id", "")
                         vehicles[tid] = {
                             "lap": car.get("lap"),
+                            "checkpoints_passed": car.get("checkpoints_passed"),
                             "speed": car.get("speed"),
                             "status": car.get("status"),
                         }
