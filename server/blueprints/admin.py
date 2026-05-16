@@ -265,11 +265,17 @@ async def _broadcast(
 
 
 def _build_cars(teams_data: list) -> list:
-    """Pure file I/O: read each team's code file and base64-encode it."""
+    """Pure file I/O: read each team's code file and base64-encode it.
+
+    When a team has no submitted code (code_path is empty/missing),
+    sends the SDK example_controller as default so the car follows lanes.
+    The simnode controller has a built-in OpenCV lane-detection fallback
+    for cases where student code fails to load.
+    """
     template = (
         pathlib.Path(__file__).resolve().parent.parent.parent
         / "sdk"
-        / "team_controller.py"
+        / "example_controller.py"
     )
     cars = []
     for idx, t in enumerate(teams_data):
