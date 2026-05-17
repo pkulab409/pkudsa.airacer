@@ -438,6 +438,10 @@ def run() -> None:
                     left_motor.setVelocity(0.0)
                 if right_motor is not None:
                     right_motor.setVelocity(0.0)
+                if fl_steer is not None:
+                    fl_steer.setPosition(0.0)
+                if fr_steer is not None:
+                    fr_steer.setPosition(0.0)
             continue
 
         left_frame = camera_to_bgr(left_camera) if left_camera is not None else None
@@ -472,36 +476,20 @@ def run() -> None:
                     right_motor.setVelocity(base - diff)
             continue  # 跳过内置逻辑
 
-        # ── 内置 OpenCV 控制器（无学生代码时回退）──────────────────────
-        if right_frame is not None and not frame_has_lane_features(right_frame):
-            right_frame = None
-
-        decision = compute_control(left_frame, right_frame, vision_state)
-
-        if left_frame is not None:
-            vision_state.prev_left_gray = cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY)
-        if right_frame is not None:
-            vision_state.prev_right_gray = cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY)
-        steer_angle = clamp(decision.steering * MOTOR_MAX, -MOTOR_MAX, MOTOR_MAX)
-
+        # ── 无学生代码时静止不动 ──────────────────────────────────────
         if use_driver:
-            driver.setCruisingSpeed(decision.speed)
-            driver.setSteeringAngle(steer_angle)
-            if not set_indicator_with_driver(driver, decision.signal):
-                set_indicator_with_leds(left_indicator_led, right_indicator_led, decision.signal)
+            driver.setCruisingSpeed(0.0)
+            driver.setSteeringAngle(0.0)
         else:
+            if left_motor is not None:
+                left_motor.setVelocity(0.0)
+            if right_motor is not None:
+                right_motor.setVelocity(0.0)
             if fl_steer is not None:
-                fl_steer.setPosition(steer_angle)
+                fl_steer.setPosition(0.0)
             if fr_steer is not None:
-                fr_steer.setPosition(steer_angle)
-            if left_motor is not None and right_motor is not None:
-                wheel_speed = decision.speed / MAX_SPEED
-                wheel_speed = clamp(wheel_speed, 0.0, 1.0)
-                base = 8000.0 * wheel_speed
-                diff = decision.steering * 4000.0
-                left_motor.setVelocity(base + diff)
-                right_motor.setVelocity(base - diff)
-            set_indicator_with_leds(left_indicator_led, right_indicator_led, decision.signal)
+                fr_steer.setPosition(0.0)
+        continue
 
 
 if __name__ == "__main__":

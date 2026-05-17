@@ -84,6 +84,17 @@ class RaceRunner:
             car_slot  = car.get("car_slot", team_id)
             code_b64  = car.get("code_b64", "")
 
+            if not code_b64:
+                # 队伍未提交代码 — 不写入代码文件，car_controller 会使小车静止不动
+                car_configs.append({
+                    "car_slot":  car_slot,
+                    "team_id":   team_id,
+                    "team_name": team_name,
+                    "code_path": "",   # 空路径 → car_controller 找不到，fallback 为静止
+                })
+                logger.info(f"队伍 {team_id} 未提交代码，小车将静止不动")
+                continue
+
             try:
                 code_bytes = base64.b64decode(code_b64)
                 code_str   = code_bytes.decode("utf-8")

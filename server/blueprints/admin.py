@@ -268,26 +268,15 @@ def _build_cars(teams_data: list) -> list:
     """Pure file I/O: read each team's code file and base64-encode it.
 
     When a team has no submitted code (code_path is empty/missing),
-    sends the SDK example_controller as default so the car follows lanes.
-    The simnode controller has a built-in OpenCV lane-detection fallback
-    for cases where student code fails to load.
+    sends empty code so the car stays stationary.
     """
-    template = (
-        pathlib.Path(__file__).resolve().parent.parent.parent
-        / "sdk"
-        / "example_controller.py"
-    )
     cars = []
     for idx, t in enumerate(teams_data):
         code_path = t.get("code_path")
         if code_path and pathlib.Path(code_path).exists():
             code_b64 = base64.b64encode(pathlib.Path(code_path).read_bytes()).decode()
         else:
-            code_b64 = (
-                base64.b64encode(template.read_bytes()).decode()
-                if template.exists()
-                else ""
-            )
+            code_b64 = ""   # 队伍未提交代码，小车静止不动
         cars.append(
             {
                 "car_slot": f"car_{idx + 1}",
