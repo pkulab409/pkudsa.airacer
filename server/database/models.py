@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS race_points (
     session_id TEXT NOT NULL,
     rank       INTEGER,
     points     INTEGER,
+    best_lap_time REAL,
     PRIMARY KEY (team_id, session_id)
 );
 """
@@ -82,6 +83,7 @@ _MIGRATIONS = [
     "ALTER TABLE submissions ADD COLUMN is_race_active  INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE race_sessions ADD COLUMN zone_id       TEXT REFERENCES zones(id)",
     "ALTER TABLE zones       ADD COLUMN state           TEXT NOT NULL DEFAULT 'REGISTRATION'",
+    "ALTER TABLE race_points ADD COLUMN best_lap_time REAL",
 ]
 
 

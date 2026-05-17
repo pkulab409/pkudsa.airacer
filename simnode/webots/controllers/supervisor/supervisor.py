@@ -73,7 +73,7 @@ for cc in cars_config:
         "checkpoints_passed":  0,          # Total checkpoints crossed (including CP0)
         "status":              "normal",   # "normal" | "stopped" | "disqualified"
         "boost_remaining":     0.0,
-        "checkpoint_next":     1,          # After CP0 triggers start, wait for CP1 next
+        "checkpoint_next":     0,          # Start waiting for CP0 (start/finish line)
         "lap_started":         False,      # True once the car has crossed CP0 for the first time
         "lap_start_time":      0.0,
         "best_lap_time":       None,
@@ -88,7 +88,12 @@ for cc in cars_config:
 # ---------------------------------------------------------------------------
 
 def send_cmd_to_car(car, cmd_dict):
-    field = car['node'].getField('customData')
+    node = car.get('node')
+    if node is None:
+        return
+    field = node.getField('customData')
+    if field is None:
+        return
     field.setSFString(json.dumps(cmd_dict))
 
 
@@ -172,14 +177,16 @@ def check_checkpoints(car, sim_time, events):
         # Check if this car has finished all laps
         if car['lap'] >= total_laps and car['finish_time'] is None:
             car['finish_time'] = sim_time
+            print(f"[DEBUG] {car['team_id']} FINISHED! lap={car['lap']} total_laps={total_laps} sim_time={sim_time:.1f} session_type={session_type}")
             events.append({
                 "type": "car_finished",
                 "team_id": car['team_id'],
                 "finish_time": round(sim_time, 3),
                 "total_laps": car['lap'],
             })
-            if session_type == "qualifying":
-                # Permanently stop the car after finishing in qualifying
+            if session_type in ("qualifying", "placement"):
+                # Permanently stop the car after finishing
+                print(f"[DEBUG] {car['team_id']} sending STOP command (session_type={session_type})")
                 send_cmd_to_car(car, {"cmd": "stop", "duration": 9999})
                 car['status'] = 'stopped'
 
@@ -208,6 +215,9 @@ def check_car_collisions(cars, sim_time, events):
                 if severity == "major":
                     for car in (ca, cb):
                         if car['status'] == 'disqualified':
+                            continue
+                        # Don't penalise a car that has already finished
+                        if car['finish_time'] is not None:
                             continue
                         car['collision_major_count'] += 1
                         if car['collision_major_count'] >= 3:
@@ -354,8 +364,8 @@ def check_race_end(cars, sim_time, events):
                     "grace_end_time": round(car['finish_time'] + 60.0, 3),
                 })
 
-    # Group race: end after 60-second grace period
-    if session_type != "qualifying" and grace_started:
+    # Group race: end after 60-second grace period, or after 120 s global timeout
+    if session_type != "qualifying" and session_type != "placement" and grace_started:
         if sim_time - grace_start_time >= 60.0:
             final_rankings = compute_final_rankings(cars)
             events.append({
@@ -366,16 +376,33 @@ def check_race_end(cars, sim_time, events):
             finish_reason = "grace_period_expired"
             race_finished = True
 
-    # Qualifying: end when all cars have finished or are stopped/disqualified,
-    # or when the global timeout (5 minutes) is reached.
-    if session_type == "qualifying":
-        QUALIFYING_TIMEOUT = 300.0  # seconds
-        timed_out = sim_time >= QUALIFYING_TIMEOUT
+    # Non-qualifying: global timeout (120 s) in case no car ever finishes
+    if session_type not in ("qualifying", "placement") and not grace_started:
+        if sim_time >= 120.0:
+            final_rankings = compute_final_rankings(cars)
+            events.append({
+                "type":            "race_end",
+                "reason":          "global_timeout",
+                "final_rankings":  final_rankings,
+            })
+            finish_reason = "global_timeout"
+            race_finished = True
+
+    # Qualifying / Placement: end when all cars have finished or are stopped/disqualified,
+    # or when the timeout is reached.
+    if session_type in ("qualifying", "placement"):
+        timeout_s = 600.0
+        timed_out = sim_time >= timeout_s
         all_done = all(
             c['finish_time'] is not None or c['status'] in ('stopped', 'disqualified')
             for c in cars
         )
+        # DEBUG: log car states every 200 frames
+        if frame_count % 200 == 0:
+            for c in cars:
+                print(f"[DEBUG RACE_END] {c['team_id']} lap={c['lap']} ft={'SET' if c['finish_time'] is not None else 'NONE'} status={c['status']} all_done={all_done} sim_time={sim_time:.1f}/{timeout_s}")
         if all_done or timed_out:
+            print(f"[DEBUG] RACE END: all_done={all_done} timed_out={timed_out} sim_time={sim_time:.1f}")
             final_rankings = compute_final_rankings(cars)
             reason = "all_cars_done" if all_done else "timeout"
             events.append({
@@ -390,79 +417,93 @@ def check_race_end(cars, sim_time, events):
 # Main loop
 # ---------------------------------------------------------------------------
 
-while robot.step(timestep) != -1:
-    sim_time = robot.getTime()
-    events_this_frame = []
+try:
+    while robot.step(timestep) != -1:
+        sim_time = robot.getTime()
+        events_this_frame = []
 
-    # --- Update car states ---
-    for car in cars:
-        pos = car['node'].getPosition()
-        car['x'], car['y'] = pos[0], pos[1]          # x/y ground plane in ENU
+        # --- Update car states ---
+        for car in cars:
+            node = car.get('node')
+            if node is None:
+                continue
+            pos = node.getPosition()
+            car['x'], car['y'] = pos[0], pos[1]          # x/y ground plane in ENU
 
-        ori = car['node'].getOrientation()            # row-major 3x3 rotation matrix
-        car['heading'] = math.atan2(-ori[3], ori[0])
+            ori = node.getOrientation()                   # row-major 3x3 rotation matrix
+            car['heading'] = math.atan2(-ori[3], ori[0])
 
-        vel = car['node'].getVelocity()               # [vx, vy, vz, wx, wy, wz]
-        car['speed'] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
+            vel = node.getVelocity()                      # [vx, vy, vz, wx, wy, wz]
+            car['speed'] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
 
-        # Expire stop penalty
-        if car['status'] == 'stopped' and car['stop_end_time'] is not None:
-            if sim_time >= car['stop_end_time']:
-                car['status'] = 'normal'
-                car['stop_end_time'] = None
-                clear_cmd(car)
+            # Expire stop penalty (only for cars that haven't finished yet)
+            if car['status'] == 'stopped' and car['stop_end_time'] is not None and car['finish_time'] is None:
+                if sim_time >= car['stop_end_time']:
+                    car['status'] = 'normal'
+                    car['stop_end_time'] = None
+                    clear_cmd(car)
 
-        # Drain boost timer
-        if car['boost_remaining'] > 0:
-            car['boost_remaining'] = max(0.0, car['boost_remaining'] - timestep / 1000.0)
+            # Drain boost timer
+            if car['boost_remaining'] > 0:
+                car['boost_remaining'] = max(0.0, car['boost_remaining'] - timestep / 1000.0)
 
-    # --- Checkpoint detection (skip disqualified) ---
-    for car in cars:
-        if car['status'] != 'disqualified':
-            check_checkpoints(car, sim_time, events_this_frame)
+        # --- Checkpoint detection (skip disqualified AND finished cars) ---
+        for car in cars:
+            if car['status'] != 'disqualified' and car['finish_time'] is None:
+                check_checkpoints(car, sim_time, events_this_frame)
 
-    # --- Collision detection ---
-    check_car_collisions(cars, sim_time, events_this_frame)
+        # --- Collision detection ---
+        check_car_collisions(cars, sim_time, events_this_frame)
 
-    # --- Race-end check ---
-    check_race_end(cars, sim_time, events_this_frame)
+        # --- Race-end check ---
+        check_race_end(cars, sim_time, events_this_frame)
 
-    # --- Write telemetry ---
-    write_telemetry_frame(sim_time, cars, events_this_frame)
+        # --- Write telemetry ---
+        write_telemetry_frame(sim_time, cars, events_this_frame)
 
-    # --- Save overhead camera frame every N steps ---
-    _frame_saved = False
-    if _overhead_cam and frame_count % _FRAME_SAVE_INTERVAL == 0:
-        try:
-            _overhead_cam.saveImage(_live_view_path, 75)
-            _frame_saved = True
-        except Exception:
-            pass
+        # --- Save overhead camera frame every N steps ---
+        _frame_saved = False
+        if _overhead_cam and frame_count % _FRAME_SAVE_INTERVAL == 0:
+            try:
+                _overhead_cam.saveImage(_live_view_path, 75)
+                _frame_saved = True
+            except Exception:
+                pass
 
-    # --- Write live.json (atomic, no network) every N steps for simnode cache ---
-    if frame_count % _FRAME_SAVE_INTERVAL == 0:
-        try:
-            live = {
-                "t": round(sim_time, 3),
-                "cars": [snapshot(c) for c in cars],
-                "frame_saved": _frame_saved,
-            }
-            tmp_path = os.path.join(recording_path, ".live.json.tmp")
-            live_path = os.path.join(recording_path, "live.json")
-            with open(tmp_path, "w", encoding="utf-8") as lf:
-                json.dump(live, lf, ensure_ascii=False)
-            os.replace(tmp_path, live_path)  # atomic on Windows
-        except Exception:
-            pass
+        # --- Write live.json (atomic, no network) every N steps for simnode cache ---
+        if frame_count % _FRAME_SAVE_INTERVAL == 0:
+            try:
+                live = {
+                    "t": round(sim_time, 3),
+                    "cars": [snapshot(c) for c in cars],
+                    "frame_saved": _frame_saved,
+                }
+                tmp_path = os.path.join(recording_path, ".live.json.tmp")
+                live_path = os.path.join(recording_path, "live.json")
+                with open(tmp_path, "w", encoding="utf-8") as lf:
+                    json.dump(live, lf, ensure_ascii=False)
+                os.replace(tmp_path, live_path)  # atomic on Windows
+            except Exception:
+                pass
 
-    # Admin graceful-stop signal
-    if not race_finished and os.path.exists(os.path.join(recording_path, 'STOP')):
+        # Admin graceful-stop signal
+        if not race_finished and os.path.exists(os.path.join(recording_path, 'STOP')):
+            final_rankings = compute_final_rankings(cars)
+            finish_reason  = "admin_stop"
+            race_finished  = True
+
+        if race_finished:
+            break
+
+except Exception as exc:
+    import traceback
+    print(f"[FATAL] Supervisor crashed: {exc}")
+    traceback.print_exc()
+    if not final_rankings:
         final_rankings = compute_final_rankings(cars)
-        finish_reason  = "admin_stop"
-        race_finished  = True
+    if finish_reason == "supervisor_stop":
+        finish_reason = "supervisor_crash"
 
-    if race_finished:
-        break
 
 # ---------------------------------------------------------------------------
 # Cleanup
@@ -470,3 +511,7 @@ while robot.step(timestep) != -1:
 
 tel_file.close()
 write_metadata(finish_reason, final_rankings)
+
+# Tell Webots to quit the simulation so the process exits immediately
+print(f"[SUPERVISOR] Quitting simulation (reason={finish_reason})")
+robot.simulationQuit(0)

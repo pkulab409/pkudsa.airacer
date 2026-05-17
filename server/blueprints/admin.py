@@ -700,11 +700,23 @@ async def _handle_finished(
     )
 
     now = datetime.datetime.now().isoformat()
+    _POINTS_TABLE = {1: 10, 2: 7, 3: 5, 4: 3}
     with get_db(DB_PATH) as conn:
         db_mark_session_finished(conn, session_id, now)
         from server.database.action import update_race_session as _update_race_session
 
         _update_race_session(conn, session_id, result=result)
+
+        # Write race points for each team from final_rankings
+        final_rankings = result.get("final_rankings", [])
+        for entry in final_rankings:
+            rank = entry.get("rank", 99)
+            team_id = entry.get("team_id")
+            if team_id:
+                points = _POINTS_TABLE.get(rank, 1)
+                from server.database.action import upsert_race_points as _upsert_rp
+                _upsert_rp(conn, session_id, team_id, rank, points,
+                           best_lap_time=entry.get("best_lap"))
 
     _zone_running_session.pop(zone_id, None)
     await _broadcast(

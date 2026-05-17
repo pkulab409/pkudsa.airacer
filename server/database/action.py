@@ -75,8 +75,7 @@ def db_delete_zone(conn, zone_id: str) -> bool:
             sub_params = list(sub_ids)
             # Delete test_runs for these submissions
             conn.execute(
-                f"DELETE FROM test_runs WHERE submission_id IN ({sub_placeholders})",
-                sub_params,
+                f"DELETE FROM test_runs WHERE submission_id IN ({sub_placeholders})", sub_params
             )
 
         # Delete submissions for these teams
@@ -121,13 +120,16 @@ def db_get_zone_teams(conn, zone_id: str) -> List[Dict]:
 
 def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
     rows = conn.execute(
-        """SELECT rp.team_id, t.name, SUM(rp.points) AS total_points
+        """SELECT rp.team_id, t.name,
+                  SUM(rp.points) AS total_score,
+                  MIN(rp.best_lap_time) AS best_lap_time,
+                  COUNT(DISTINCT rp.session_id) AS finished_sessions
            FROM race_points rp
            JOIN teams t ON rp.team_id = t.id
            JOIN race_sessions rs ON rp.session_id = rs.id
            WHERE rs.zone_id = ?
            GROUP BY rp.team_id
-           ORDER BY total_points DESC""",
+           ORDER BY total_score DESC""",
         (zone_id,),
     ).fetchall()
     return [dict(r) for r in rows]
@@ -546,22 +548,27 @@ def get_race_session(conn, race_id: str) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def upsert_race_points(conn, race_id: str, team_id: str, rank: int, points: int) -> None:
+def upsert_race_points(conn, race_id: str, team_id: str, rank: int, points: int,
+                       best_lap_time: Optional[float] = None) -> None:
     conn.execute(
-        """INSERT INTO race_points (team_id, session_id, rank, points)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(team_id, session_id) DO UPDATE SET rank=excluded.rank, points=excluded.points""",
-        (team_id, race_id, rank, points),
+        """INSERT INTO race_points (team_id, session_id, rank, points, best_lap_time)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(team_id, session_id) DO UPDATE SET
+               rank=excluded.rank, points=excluded.points, best_lap_time=excluded.best_lap_time""",
+        (team_id, race_id, rank, points, best_lap_time),
     )
 
 
 def get_standings(conn) -> List[Dict]:
     rows = conn.execute(
-        """SELECT rp.team_id, t.name, SUM(rp.points) as total_points
+        """SELECT rp.team_id, t.name,
+                  SUM(rp.points) as total_score,
+                  MIN(rp.best_lap_time) AS best_lap_time,
+                  COUNT(DISTINCT rp.session_id) AS finished_sessions
                FROM race_points rp
                JOIN teams t ON rp.team_id = t.id
                GROUP BY rp.team_id
-               ORDER BY total_points DESC"""
+               ORDER BY total_score DESC"""
     ).fetchall()
     return [dict(r) for r in rows]
 

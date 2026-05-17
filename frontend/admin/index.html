@@ -1208,6 +1208,7 @@
             var _standingsTmr = null;
             var _overheadTmr = null;
             var _currentSid = "";   // 原始完整 session ID，用于摄像头 API
+            var _prevState = "";    // 上一次比赛状态，用于检测比赛结束
 
             /* ================================================================
    AUTH HELPER
@@ -1777,6 +1778,27 @@
                         sb.textContent = msg.state || "--";
                     }
                 }
+
+                // ── Race-end detection ──
+                var isRaceEnd = msg.state === "recording_ready" ||
+                    (msg.state || "").endsWith("_FINISHED") ||
+                    (msg.state || "").endsWith("_DONE") ||
+                    msg.state === "closed";
+                if (isRaceEnd && _prevState === "running") {
+                    // Race just finished — stop overhead, reset live, show toast
+                    stopOverhead();
+                    _currentSid = "";
+                    setText("live-session-id", "--");
+                    setText("live-sim-time", "--");
+                    setText("live-stage", "--");
+                    setText("live-vehicle-count", "--");
+                    renderVehicles(null, false);
+                    toast("比赛已结束，回放和积分榜已更新", "success");
+                    loadStandings();
+                    loadSessionQueue();
+                    loadRecordings();
+                }
+                _prevState = msg.state;
 
                 _currentSid = msg.session_id || "";
                 setText("live-session-id", truncateSid(msg.session_id) || "--");

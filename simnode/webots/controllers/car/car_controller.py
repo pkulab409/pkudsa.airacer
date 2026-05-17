@@ -28,7 +28,7 @@ MAX_SPEED = 22.0
 SPEED_TURN_PENALTY = 0.65
 CONF_SPEED_BOOST = 0.35
 STEER_GAIN = 2.8
-MAX_STEER_ANGLE = 0.85
+MAX_STEER_ANGLE = 0.70
 SIGNAL_THRESHOLD = 0.25
 FULL_CONFIDENCE_LINE_COUNT = 8.0
 MIN_EDGE_DENSITY = 0.003
@@ -37,6 +37,7 @@ STRAIGHT_DEADBAND = 0.02
 OFFSET_SMOOTHING = 0.7
 STEER_SMOOTHING = 0.6
 MIN_CONFIDENCE = 0.15
+MOTOR_MAX = 0.95           # hard clamp to prevent Webots "too big requested position" warning
 
 
 @dataclass
@@ -422,6 +423,9 @@ def run() -> None:
                 cmd = json.loads(custom_data)
                 if cmd.get('cmd') == 'disqualify':
                     disqualified = True
+                elif cmd.get('cmd') == 'stop':
+                    # Supervisor requested permanent stop (race finished)
+                    disqualified = True  # reuse death path — brakes+idle
             except (json.JSONDecodeError, ValueError):
                 pass
 
@@ -452,7 +456,7 @@ def run() -> None:
             except Exception as e:
                 print(f"[car_controller][warn] 学生 control() 出错: {e}")
                 raw_steering, raw_speed = 0.0, 0.0
-            steer_angle = clamp(raw_steering * MAX_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE)
+            steer_angle = clamp(raw_steering * MOTOR_MAX, -MOTOR_MAX, MOTOR_MAX)
             if use_driver:
                 driver.setCruisingSpeed(raw_speed * MAX_SPEED)
                 driver.setSteeringAngle(steer_angle)
@@ -478,7 +482,7 @@ def run() -> None:
             vision_state.prev_left_gray = cv2.cvtColor(left_frame, cv2.COLOR_BGR2GRAY)
         if right_frame is not None:
             vision_state.prev_right_gray = cv2.cvtColor(right_frame, cv2.COLOR_BGR2GRAY)
-        steer_angle = clamp(decision.steering * MAX_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE)
+        steer_angle = clamp(decision.steering * MOTOR_MAX, -MOTOR_MAX, MOTOR_MAX)
 
         if use_driver:
             driver.setCruisingSpeed(decision.speed)
