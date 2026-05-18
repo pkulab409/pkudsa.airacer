@@ -21,11 +21,68 @@ from server.database.models import get_db
 from server.services.race_service import on_test_run_ended
 from server.utils.simnode_client import (
     get_race_result as simnode_get_result,
+)
+from server.utils.simnode_client import (
     get_race_status as simnode_get_status,
+)
+from server.utils.simnode_client import (
     start_race as simnode_start_race,
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# 背压重试：simnode 并发槽满时等待而不要立刻失败
+# ---------------------------------------------------------------------------
+
+# SimNode 的 MAX_CONCURRENT_RACES 默认 4，一场测试约 60~90 秒，
+# 最坏情况 4 场都刚启动 ≈ 6 分钟。给 10 分钟足够覆盖。
+_RETRY_BACKOFF_START = 2.0  # 首次重试前等待 2 秒
+_RETRY_BACKOFF_MAX = 60.0  # 单次最长等待 60 秒
+_RETRY_TOTAL_TIMEOUT = 600.0  # 总计最多等 10 分钟
+
+
+async def _start_race_with_retry(
+    race_id: str,
+    session_type: str,
+    total_laps: int,
+    cars: list,
+    slot_name: str = "",
+) -> None:
+    """
+    调用 simnode_start_race，如果 simnode 并发槽满（HTTP 409）则等待重试。
+
+    只重试 "并发满"（409）场景；网络不可达等致命错误立即抛出。
+    """
+    waited = 0.0
+    delay = _RETRY_BACKOFF_START
+
+    while True:
+        try:
+            await asyncio.to_thread(
+                simnode_start_race, race_id, session_type, total_laps, cars
+            )
+            return  # 成功
+        except RuntimeError as exc:
+            msg = str(exc)
+            # 409 = SimNode 并发槽满
+            if "409" in msg or "并发" in msg:
+                if waited >= _RETRY_TOTAL_TIMEOUT:
+                    raise RuntimeError(
+                        f"SimNode 持续繁忙，已等待 {waited:.0f}s，放弃: {msg}"
+                    ) from exc
+                logger.info(
+                    "SimNode 并发已满，%s 秒后重试 (已等待 %.0fs, slot=%s)",
+                    delay,
+                    waited,
+                    slot_name,
+                )
+                await asyncio.sleep(delay)
+                waited += delay
+                delay = min(delay * 2, _RETRY_BACKOFF_MAX)
+                continue
+            # 其他 RuntimeError（网络不通等）不重试
+            raise
 
 
 async def _test_worker_loop() -> None:
@@ -46,7 +103,8 @@ async def _test_worker_loop() -> None:
             try:
                 with get_db(DB_PATH) as conn:
                     update_test_run(
-                        conn, task["test_run_id"],
+                        conn,
+                        task["test_run_id"],
                         status="error",
                         finish_reason="worker_exception",
                     )
@@ -79,12 +137,14 @@ async def _run_single_test(task: dict) -> None:
 
     # 2. 构建单车 cars 列表
     code_b64 = base64.b64encode(code_path.read_bytes()).decode()
-    cars = [{
-        "car_slot":  "car_1",
-        "team_id":   team["id"],
-        "team_name": team["name"],
-        "code_b64":  code_b64,
-    }]
+    cars = [
+        {
+            "car_slot": "car_1",
+            "team_id": team["id"],
+            "team_name": team["name"],
+            "code_b64": code_b64,
+        }
+    ]
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     race_id = f"test_{team_id}_{task['slot_name']}_{timestamp}"
@@ -94,9 +154,15 @@ async def _run_single_test(task: dict) -> None:
     with get_db(DB_PATH) as conn:
         update_test_run(conn, test_run_id, status="running", started_at=now)
 
-    # 4. 调用 Sim Node
+    # 4. 调用 Sim Node（并发满时自动重试等待）
     try:
-        await asyncio.to_thread(simnode_start_race, race_id, "test", 3, cars)
+        await _start_race_with_retry(
+            race_id,
+            "test",
+            3,
+            cars,
+            slot_name=task.get("slot_name", ""),
+        )
     except RuntimeError as exc:
         _mark_error(test_run_id, f"simnode_unreachable: {exc}")
         return
