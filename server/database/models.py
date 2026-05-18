@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS test_runs (
     collisions_minor  INTEGER,
     collisions_major  INTEGER,
     timeout_warnings  INTEGER,
-    finish_reason     TEXT
+    finish_reason     TEXT,
+    world_key         TEXT NOT NULL DEFAULT 'complex'
 );
 
 CREATE TABLE IF NOT EXISTS race_sessions (
@@ -84,6 +85,7 @@ _MIGRATIONS = [
     "ALTER TABLE race_sessions ADD COLUMN zone_id       TEXT REFERENCES zones(id)",
     "ALTER TABLE zones       ADD COLUMN state           TEXT NOT NULL DEFAULT 'REGISTRATION'",
     "ALTER TABLE race_points ADD COLUMN best_lap_time REAL",
+    "ALTER TABLE test_runs   ADD COLUMN world_key        TEXT NOT NULL DEFAULT 'complex'",
 ]
 
 

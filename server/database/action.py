@@ -10,7 +10,6 @@ import json
 import uuid
 from typing import Dict, List, Optional
 
-
 # ---------------------------------------------------------------------------
 # Zone
 # ---------------------------------------------------------------------------
@@ -35,7 +34,9 @@ def db_get_zone(conn, zone_id: str) -> Optional[Dict]:
     return dict(row) if row else None
 
 
-def db_create_zone(conn, id: str, name: str, description: str, total_laps: int, created_at: str):
+def db_create_zone(
+    conn, id: str, name: str, description: str, total_laps: int, created_at: str
+):
     conn.execute(
         "INSERT INTO zones (id, name, description, total_laps, created_at) VALUES (?,?,?,?,?)",
         (id, name, description, total_laps, created_at),
@@ -49,8 +50,10 @@ def db_delete_zone(conn, zone_id: str) -> bool:
 
     # Collect all team IDs in this zone
     team_ids = [
-        r[0] for r in
-        conn.execute("SELECT id FROM teams WHERE zone_id=?", (zone_id,)).fetchall()
+        r[0]
+        for r in conn.execute(
+            "SELECT id FROM teams WHERE zone_id=?", (zone_id,)
+        ).fetchall()
     ]
 
     if team_ids:
@@ -64,8 +67,8 @@ def db_delete_zone(conn, zone_id: str) -> bool:
 
         # Collect submission IDs for these teams
         sub_ids = [
-            r[0] for r in
-            conn.execute(
+            r[0]
+            for r in conn.execute(
                 f"SELECT id FROM submissions WHERE team_id IN ({placeholders})", params
             ).fetchall()
         ]
@@ -75,7 +78,8 @@ def db_delete_zone(conn, zone_id: str) -> bool:
             sub_params = list(sub_ids)
             # Delete test_runs for these submissions
             conn.execute(
-                f"DELETE FROM test_runs WHERE submission_id IN ({sub_placeholders})", sub_params
+                f"DELETE FROM test_runs WHERE submission_id IN ({sub_placeholders})",
+                sub_params,
             )
 
         # Delete submissions for these teams
@@ -84,9 +88,7 @@ def db_delete_zone(conn, zone_id: str) -> bool:
         )
 
         # Delete the teams
-        conn.execute(
-            f"DELETE FROM teams WHERE id IN ({placeholders})", params
-        )
+        conn.execute(f"DELETE FROM teams WHERE id IN ({placeholders})", params)
 
     # Delete race_sessions belonging to this zone
     conn.execute("DELETE FROM race_sessions WHERE zone_id=?", (zone_id,))
@@ -187,7 +189,9 @@ def db_get_zone_detailed(conn, zone_id: str) -> Optional[Dict]:
 
 
 def db_get_teams_by_zone(
-    conn, zone_id: str, include_stats: bool = False,
+    conn,
+    zone_id: str,
+    include_stats: bool = False,
 ) -> List[Dict]:
     """获取赛区所有队伍，可选包含统计数据。"""
     if not include_stats:
@@ -250,8 +254,12 @@ def db_get_teams_with_code(conn, team_ids: List[str]) -> List[Dict]:
 
 
 def db_upsert_session(
-    conn, session_id: str, session_type: str,
-    team_ids: List[str], total_laps: int, zone_id: str,
+    conn,
+    session_id: str,
+    session_type: str,
+    team_ids: List[str],
+    total_laps: int,
+    zone_id: str,
 ):
     conn.execute(
         """INSERT INTO race_sessions
@@ -315,12 +323,21 @@ def db_mark_session_aborted(conn, session_id: str, phase: str, now: str):
 
 
 def create_team(
-    conn, team_id: str, name: str, password_hash: str,
+    conn,
+    team_id: str,
+    name: str,
+    password_hash: str,
     zone_id: str = "default",
 ) -> None:
     conn.execute(
         "INSERT INTO teams (id, name, password_hash, zone_id, created_at) VALUES (?, ?, ?, ?, ?)",
-        (team_id, name, password_hash, zone_id, datetime.datetime.now(datetime.UTC).isoformat()),
+        (
+            team_id,
+            name,
+            password_hash,
+            zone_id,
+            datetime.datetime.now(datetime.UTC).isoformat(),
+        ),
     )
 
 
@@ -352,12 +369,18 @@ def list_teams(conn) -> List[Dict]:
 
 
 def create_submission(
-    conn, team_id: str, code_path: str, submitted_at: str,
+    conn,
+    team_id: str,
+    code_path: str,
+    submitted_at: str,
     slot_name: str = "main",
 ) -> str:
     """创建提交（委托给 db_create_submission_with_slot）。"""
     return db_create_submission_with_slot(
-        conn, team_id, code_path, slot_name,
+        conn,
+        team_id,
+        code_path,
+        slot_name,
         submitted_at=submitted_at,
     )
 
@@ -372,9 +395,7 @@ def get_active_submission(conn, team_id: str) -> Optional[Dict]:
     return dict(row) if row else None
 
 
-def db_get_submission_by_slot(
-    conn, team_id: str, slot_name: str
-) -> Optional[Dict]:
+def db_get_submission_by_slot(conn, team_id: str, slot_name: str) -> Optional[Dict]:
     """获取指定 slot 的最新活跃提交。"""
     row = conn.execute(
         """SELECT id, code_path, submitted_at, is_race_active
@@ -387,7 +408,10 @@ def db_get_submission_by_slot(
 
 
 def db_create_submission_with_slot(
-    conn, team_id: str, code_path: str, slot_name: str,
+    conn,
+    team_id: str,
+    code_path: str,
+    slot_name: str,
     submitted_at: Optional[str] = None,
 ) -> str:
     """创建提交：禁用该 slot 旧版本 + 创建新提交，自动处理 is_race_active。"""
@@ -411,8 +435,14 @@ def db_create_submission_with_slot(
         """INSERT INTO submissions
            (id, team_id, code_path, submitted_at, is_active, slot_name, is_race_active)
            VALUES (?, ?, ?, ?, 1, ?, ?)""",
-        (submission_id, team_id, code_path, now, slot_name,
-         1 if not has_race_active else 0),
+        (
+            submission_id,
+            team_id,
+            code_path,
+            now,
+            slot_name,
+            1 if not has_race_active else 0,
+        ),
     )
 
     # 如果该 team 没有任何 race_active 提交，则自动激活新提交
@@ -430,7 +460,9 @@ def db_create_submission_with_slot(
 
 
 def db_activate_submission_slot(
-    conn, team_id: str, slot_name: str,
+    conn,
+    team_id: str,
+    slot_name: str,
 ) -> bool:
     """激活指定 slot 为竞速提交（禁用同 team 其他 slot 的竞速活跃）。"""
     target = conn.execute(
@@ -473,19 +505,27 @@ def db_get_submission_by_id(conn, submission_id: str) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def create_test_run(conn, submission_id: str, queued_at: str) -> int:
+def create_test_run(
+    conn, submission_id: str, queued_at: str, world_key: str = "complex"
+) -> int:
     cur = conn.execute(
-        "INSERT INTO test_runs (submission_id, status, queued_at) VALUES (?, 'queued', ?)",
-        (submission_id, queued_at),
+        "INSERT INTO test_runs (submission_id, status, queued_at, world_key) VALUES (?, 'queued', ?, ?)",
+        (submission_id, queued_at, world_key),
     )
     return cur.lastrowid
 
 
 def update_test_run(conn, test_run_id: int, **kwargs) -> None:
     allowed = {
-        "status", "started_at", "finished_at", "laps_completed",
-        "best_lap_time", "collisions_minor", "collisions_major",
-        "timeout_warnings", "finish_reason",
+        "status",
+        "started_at",
+        "finished_at",
+        "laps_completed",
+        "best_lap_time",
+        "collisions_minor",
+        "collisions_major",
+        "timeout_warnings",
+        "finish_reason",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed}
     if not fields:
@@ -509,8 +549,13 @@ def get_latest_test_run(conn, submission_id: str) -> Optional[Dict]:
 
 
 def create_race_session(
-    conn, race_id: str, session_type: str, team_ids: List[str],
-    total_laps: int, phase: str, started_at: str,
+    conn,
+    race_id: str,
+    session_type: str,
+    team_ids: List[str],
+    total_laps: int,
+    phase: str,
+    started_at: str,
 ) -> None:
     conn.execute(
         """INSERT INTO race_sessions (id, type, team_ids, total_laps, phase, started_at)
@@ -548,8 +593,14 @@ def get_race_session(conn, race_id: str) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def upsert_race_points(conn, race_id: str, team_id: str, rank: int, points: int,
-                       best_lap_time: Optional[float] = None) -> None:
+def upsert_race_points(
+    conn,
+    race_id: str,
+    team_id: str,
+    rank: int,
+    points: int,
+    best_lap_time: Optional[float] = None,
+) -> None:
     conn.execute(
         """INSERT INTO race_points (team_id, session_id, rank, points, best_lap_time)
                VALUES (?, ?, ?, ?, ?)
@@ -598,7 +649,11 @@ def db_get_placement_rankings(conn, zone_id: str) -> list[dict]:
     rankings: list[dict] = []
     seen: set[str] = set()
     for (result_json,) in rows:
-        data = json.loads(result_json) if isinstance(result_json, str) else (result_json or {})
+        data = (
+            json.loads(result_json)
+            if isinstance(result_json, str)
+            else (result_json or {})
+        )
         for entry in data.get("final_rankings", []):
             tid = entry.get("team_id")
             if not tid or tid in seen:
@@ -627,17 +682,26 @@ def db_get_stage_session_results(conn, zone_id: str, stage: str) -> list[dict]:
 
     results: list[dict] = []
     for sid, result_json in rows:
-        data = json.loads(result_json) if isinstance(result_json, str) else (result_json or {})
+        data = (
+            json.loads(result_json)
+            if isinstance(result_json, str)
+            else (result_json or {})
+        )
         rankings: list[dict] = []
         for entry in data.get("final_rankings", []):
-            rankings.append({
-                "team_id": entry.get("team_id"),
-                "rank": entry.get("rank", 99),
-                "finish_time": (entry.get("finish_time")
-                                or entry.get("race_time")
-                                or entry.get("total_time")),
-                "best_lap_time": (entry.get("best_lap_time")
-                                  or entry.get("best_lap")),
-            })
+            rankings.append(
+                {
+                    "team_id": entry.get("team_id"),
+                    "rank": entry.get("rank", 99),
+                    "finish_time": (
+                        entry.get("finish_time")
+                        or entry.get("race_time")
+                        or entry.get("total_time")
+                    ),
+                    "best_lap_time": (
+                        entry.get("best_lap_time") or entry.get("best_lap")
+                    ),
+                }
+            )
         results.append({"session_id": sid, "rankings": rankings})
     return results

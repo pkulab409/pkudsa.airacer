@@ -50,6 +50,7 @@ def start_race(
     session_type: str,
     total_laps: int,
     cars: List[Dict[str, Any]],
+    world: str = "complex",
     timeout: int = 10,
 ) -> Dict[str, Any]:
     """
@@ -61,6 +62,7 @@ def start_race(
         "session_type": session_type,
         "total_laps": total_laps,
         "cars": cars,
+        "world": world,
     }
     # start_race 是冷启动路径，用同步客户端避免事件循环依赖
     try:
@@ -133,7 +135,9 @@ def get_race_result(race_id: str, timeout: int = 5) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-async def get_race_live_info_async(race_id: str, timeout: float = 1.5) -> Optional[Dict]:
+async def get_race_live_info_async(
+    race_id: str, timeout: float = 1.5
+) -> Optional[Dict]:
     """异步版：Return real-time info from simnode. 用于热路径避免阻塞线程池。"""
     try:
         client = _get_async_client()

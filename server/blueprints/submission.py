@@ -36,6 +36,7 @@ from server.database.models import get_db
 router = APIRouter()
 
 VALID_SLOTS = ("main", "dev", "backup")
+VALID_WORLDS = ("basic", "complex")
 
 # ---------------------------------------------------------------------------
 # Password hashing (direct bcrypt, no passlib)
@@ -61,7 +62,11 @@ _test_queue_lock = threading.Lock()
 
 
 def enqueue_test(
-    submission_id: str, test_run_id: int, slot_name: str, team_id: str
+    submission_id: str,
+    test_run_id: int,
+    slot_name: str,
+    team_id: str,
+    world_key: str = "complex",
 ) -> int:
     with _test_queue_lock:
         _test_queue.append(
@@ -70,6 +75,7 @@ def enqueue_test(
                 "test_run_id": test_run_id,
                 "slot_name": slot_name,
                 "team_id": team_id,
+                "world_key": world_key,
             }
         )
         return len(_test_queue)
@@ -137,6 +143,7 @@ class TestRequest(BaseModel):
     team_id: str
     password: str
     slot_name: str  # which slot to request test for
+    world: str = "complex"  # "basic" | "complex"
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +302,13 @@ async def request_test(body: TestRequest):
             detail=f"slot_name must be one of: {', '.join(VALID_SLOTS)}",
         )
 
+    world_key = body.world.lower()
+    if world_key not in VALID_WORLDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"world must be one of: {', '.join(VALID_WORLDS)}",
+        )
+
     # 赛程已开始则拒绝测试
     from server.race.state_machine import all_running_zones
 
@@ -336,8 +350,10 @@ async def request_test(body: TestRequest):
             )
 
         queued_at = datetime.datetime.now().isoformat()
-        test_run_id = create_test_run(conn, submission["id"], queued_at)
-        queue_pos = enqueue_test(submission["id"], test_run_id, slot, body.team_id)
+        test_run_id = create_test_run(conn, submission["id"], queued_at, world_key)
+        queue_pos = enqueue_test(
+            submission["id"], test_run_id, slot, body.team_id, world_key
+        )
 
     return {
         "status": "queued",
@@ -396,6 +412,7 @@ async def get_test_status(
                         "timeout_warnings": run["timeout_warnings"],
                         "finish_reason": run["finish_reason"],
                         "finished_at": run["finished_at"],
+                        "world_key": run.get("world_key", "complex"),
                     }
 
             slots_data[slot] = {

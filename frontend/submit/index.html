@@ -590,6 +590,53 @@
                     </div>
                 </div>
 
+                <!-- ── TRACK SELECTOR ── -->
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-header card-section-header p-3">
+                        <h5 class="mb-0">
+                            <i class="bi bi-geo-alt me-2"></i>测试赛道
+                        </h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="d-flex gap-3 align-items-center">
+                            <label
+                                class="form-check-label d-flex align-items-center gap-2"
+                                style="cursor: pointer"
+                            >
+                                <input
+                                    type="radio"
+                                    name="world-select"
+                                    value="basic"
+                                    class="form-check-input"
+                                    onchange="S.world = this.value"
+                                />
+                                <span class="fw-semibold">基础椭圆赛道</span>
+                                <span class="text-muted small"
+                                    >(Basic Oval)</span
+                                >
+                            </label>
+                            <label
+                                class="form-check-label d-flex align-items-center gap-2"
+                                style="cursor: pointer"
+                            >
+                                <input
+                                    type="radio"
+                                    name="world-select"
+                                    value="complex"
+                                    class="form-check-input"
+                                    checked
+                                    onchange="S.world = this.value"
+                                />
+                                <span class="fw-semibold">复杂赛道</span>
+                                <span class="text-muted small">(Complex)</span>
+                            </label>
+                        </div>
+                        <div class="text-muted mt-2" style="font-size: 0.78rem">
+                            选择测试时将使用的赛道。点击槽位卡上的"申请测试"按钮时会一并提交此选项。
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ── UPLOAD CARD ── -->
                 <div class="card mb-4 shadow-sm">
                     <div class="card-header card-section-header p-3">
@@ -859,6 +906,7 @@
                 zoneId: null,
                 zoneName: null,
                 file: null,
+                world: "complex",
                 pollTimer: null,
             };
 
@@ -1329,7 +1377,15 @@
                     return `<div class="text-muted" style="font-size:.8rem;">暂无测试报告</div>`;
                 }
                 const r = slot.test;
+                const worldLabel = {
+                    basic: "基础椭圆赛道",
+                    complex: "复杂赛道",
+                };
                 const rows = [
+                    [
+                        "测试赛道",
+                        worldLabel[r.world_key] ?? (r.world_key || "—"),
+                    ],
                     ["完成圈数", r.laps_completed ?? "—"],
                     [
                         "最快圈时",
@@ -1546,6 +1602,7 @@
                             team_id: S.teamId,
                             password: S.password,
                             slot_name: slotName,
+                            world: S.world,
                         }),
                     });
                     data = await resp.json();

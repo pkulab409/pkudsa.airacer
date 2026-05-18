@@ -47,6 +47,7 @@ async def _start_race_with_retry(
     session_type: str,
     total_laps: int,
     cars: list,
+    world: str = "complex",
     slot_name: str = "",
 ) -> None:
     """
@@ -60,7 +61,7 @@ async def _start_race_with_retry(
     while True:
         try:
             await asyncio.to_thread(
-                simnode_start_race, race_id, session_type, total_laps, cars
+                simnode_start_race, race_id, session_type, total_laps, cars, world
             )
             return  # 成功
         except RuntimeError as exc:
@@ -155,12 +156,14 @@ async def _run_single_test(task: dict) -> None:
         update_test_run(conn, test_run_id, status="running", started_at=now)
 
     # 4. 调用 Sim Node（并发满时自动重试等待）
+    world_key = task.get("world_key", "complex")
     try:
         await _start_race_with_retry(
             race_id,
             "test",
             3,
             cars,
+            world=world_key,
             slot_name=task.get("slot_name", ""),
         )
     except RuntimeError as exc:
