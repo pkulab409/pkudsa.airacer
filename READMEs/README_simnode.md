@@ -19,7 +19,7 @@
 SIMNODE_HOST:         "0.0.0.0:8001"
 RECORDINGS_DIR:       "/data/airacer/recordings"
 WEBOTS_BINARY:        "/usr/bin/webots"
-WEBOTS_WORLD:         "/opt/airacer/simnode/webots/worlds/airacer.wbt"
+WEBOTS_WORLD:         "/opt/airacer/simnode/webots/worlds/track_complex.wbt"
 RACE_TIMEOUT_SECONDS: 600
 ```
 

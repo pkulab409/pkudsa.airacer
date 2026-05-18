@@ -10,11 +10,11 @@ LOG_LEVEL:            "INFO"
 # --- Webots 路径（按实际安装路径修改）---
 # Windows 本地 demo：
 WEBOTS_BINARY:        "D:/Webots/msys64/mingw64/bin/webotsw.exe"
-WEBOTS_WORLD:         "simnode/webots/worlds/airacer.wbt"
+WEBOTS_WORLD:         "simnode/webots/worlds/track_complex.wbt"
 
 # Linux 服务器部署时替换为：
 # WEBOTS_BINARY:      "/usr/bin/webots"
-# WEBOTS_WORLD:       "/opt/airacer/simnode/webots/worlds/airacer.wbt"
+# WEBOTS_WORLD:       "/opt/airacer/simnode/webots/worlds/track_complex.wbt"
 # RECORDINGS_DIR:     "/data/airacer/recordings"
 
 # --- 渲染模式 ---

@@ -14,7 +14,7 @@ _DEFAULTS = {
     "SIMNODE_HOST":           "0.0.0.0:5000",
     "RECORDINGS_DIR":         str(_BASE_DIR.parent / "recordings"),
     "WEBOTS_BINARY":          "/usr/bin/webots",
-    "WEBOTS_WORLD":           str(_BASE_DIR / "webots" / "worlds" / "airacer.wbt"),
+    "WEBOTS_WORLD":           str(_BASE_DIR / "webots" / "worlds" / "track_complex.wbt"),
     "RACE_TIMEOUT_SECONDS":   600,
     "LOG_LEVEL":              "INFO",
 }

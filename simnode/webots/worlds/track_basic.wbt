@@ -368,8 +368,8 @@ Solid {
 }
 Robot {
   children [
-    Camera {
-      translation 40 125 80
+    DEF OVERHEAD_CAM Camera {
+      translation 40 125 25
       rotation 0 1 0 0
       name "overhead_cam"
       fieldOfView 1.1

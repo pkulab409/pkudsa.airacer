@@ -145,7 +145,7 @@ class RaceRunner:
 
     def _launch_webots(self, config_path: str) -> None:
         webots_bin  = Config.get("WEBOTS_BINARY", "/usr/bin/webots")
-        world_file  = Config.get("WEBOTS_WORLD",  "./simnode/webots/worlds/airacer.wbt")
+        world_file  = Config.get("WEBOTS_WORLD",  "./simnode/webots/worlds/track_complex.wbt")
         headless    = Config.get("WEBOTS_HEADLESS", True)
 
         env = os.environ.copy()

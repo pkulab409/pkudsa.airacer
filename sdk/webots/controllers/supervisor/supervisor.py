@@ -255,8 +255,10 @@ telemetry_path = os.path.join(recording_path, 'telemetry.jsonl')
 tel_file = open(telemetry_path, 'a', encoding='utf-8')
 frame_count = 0
 
-# Overhead camera — saves live_view.jpg every 10 steps for the admin panel
+# Overhead camera — follow car_1 from above, fixed height
 _overhead_cam = robot.getDevice("overhead_cam")
+_overhead_cam_node = robot.getFromDef("OVERHEAD_CAM")
+_cam_height = 25.0        # meters above track surface
 if _overhead_cam:
     _overhead_cam.enable(timestep * 10)
 _FRAME_SAVE_INTERVAL = 10
@@ -400,6 +402,13 @@ while robot.step(timestep) != -1:
         # Drain boost timer
         if car['boost_remaining'] > 0:
             car['boost_remaining'] = max(0.0, car['boost_remaining'] - timestep / 1000.0)
+
+    # --- Move overhead camera to follow car_1 ---
+    if _overhead_cam_node and len(cars) > 0 and cars[0]['node'] is not None:
+        car_pos = cars[0]['node'].getPosition()
+        _overhead_cam_node.getField('translation').setSFVec3f(
+            [car_pos[0], car_pos[1], _cam_height]
+        )
 
     # --- Checkpoint detection (skip disqualified) ---
     for car in cars:

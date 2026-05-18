@@ -285,8 +285,13 @@ with open(_debug_log, 'w') as _df:
     for c in cars:
         _df.write(f"  CAR: slot={c['car_slot']} team={c['team_id']} node={'OK' if c['node'] else 'NONE'}\n")
 
-# Overhead camera — saves live_view.jpg every 2 steps for smooth admin panel (~8 fps)
+# Overhead camera — rotate among active cars every 20 seconds, fixed height above track
 _overhead_cam = robot.getDevice("overhead_cam")
+_overhead_cam_node = robot.getFromDef("OVERHEAD_CAM")
+_cam_height = 25.0              # meters above track surface
+_cam_switch_interval = 20.0     # seconds between camera switches
+_cam_last_switch_time = 0.0   # first switch at t=10s
+_cam_active_index = 0
 if _overhead_cam:
     _overhead_cam.enable(timestep * 2)
 _FRAME_SAVE_INTERVAL = 2
@@ -457,6 +462,24 @@ try:
             # Drain boost timer
             if car['boost_remaining'] > 0:
                 car['boost_remaining'] = max(0.0, car['boost_remaining'] - timestep / 1000.0)
+
+        # --- Move overhead camera to follow active car, rotate every 20s ---
+        if _overhead_cam_node and len(cars) > 0:
+            # Collect participating cars (has code, not disqualified, not finished)
+            active_cars = [c for c in cars
+                           if c.get('has_code')
+                           and c['node'] is not None
+                           and c['status'] not in ('disqualified', 'finished')]
+            if active_cars:
+                # Switch to next active car every _cam_switch_interval seconds
+                if sim_time - _cam_last_switch_time >= _cam_switch_interval:
+                    _cam_active_index = (_cam_active_index + 1) % len(active_cars)
+                    _cam_last_switch_time = sim_time
+                target = active_cars[_cam_active_index]
+                car_pos = target['node'].getPosition()
+                _overhead_cam_node.getField('translation').setSFVec3f(
+                    [car_pos[0], car_pos[1], _cam_height]
+                )
 
         # --- Checkpoint detection (skip disqualified AND finished cars) ---
         for car in cars:

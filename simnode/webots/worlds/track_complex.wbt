@@ -781,9 +781,9 @@ YieldSign {
 }
 Robot {
   children [
-    Camera {
-      translation 75 65 100
-      rotation 0 1 0 0
+    DEF OVERHEAD_CAM Camera {
+      translation 56 -29 25
+      rotation 0 1 0 1.5708
       name "overhead_cam"
       fieldOfView 1.1
       width 640
