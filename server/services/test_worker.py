@@ -94,30 +94,27 @@ async def _start_race_with_retry(
 
 
 async def _test_worker_loop() -> None:
-    """主循环：每 2 秒取队列头部任务，串行处理。"""
+    """主循环：每 2 秒取队列头部任务，全部发射给 simnode，由其背压排队。"""
     from server.blueprints.submission import dequeue_test
+
+    running: set[asyncio.Task] = set()
 
     while True:
         await asyncio.sleep(2)
+
+        # 清理已完成的任务
+        done = {t for t in running if t.done()}
+        for t in done:
+            if t.exception():
+                logger.exception(f"测试 worker 异常: {t.exception()}")
+            running.discard(t)
 
         task = dequeue_test()
         if task is None:
             continue
 
-        try:
-            await _run_single_test(task)
-        except Exception:
-            logger.exception(f"测试 worker 异常: {task}")
-            try:
-                with get_db(DB_PATH) as conn:
-                    update_test_run(
-                        conn,
-                        task["test_run_id"],
-                        status="error",
-                        finish_reason="worker_exception",
-                    )
-            except Exception:
-                pass
+        coro = _run_single_test(task)
+        running.add(asyncio.create_task(coro))
 
 
 async def _run_single_test(task: dict) -> None:
@@ -224,28 +221,26 @@ def _mark_error(test_run_id: int, reason: str) -> None:
 
 
 async def _race_event_worker_loop() -> None:
-    """主循环：每 2 秒取 race 队列头部，串行处理。"""
+    """主循环：每 2 秒取 race 队列头部，全部发射给 simnode。"""
     from server.blueprints.races import _dequeue_race
-    from server.database.action import update_race as db_update_race
+
+    running = set()
 
     while True:
         await asyncio.sleep(2)
+
+        done = {t for t in running if t.done()}
+        for t in done:
+            if t.exception():
+                logger.exception('race worker err: ' + str(t.exception()))
+            running.discard(t)
 
         race_id = _dequeue_race()
         if race_id is None:
             continue
 
-        try:
-            await _run_single_race_event(race_id)
-        except Exception:
-            logger.exception(f"race event worker 异常: {race_id}")
-            try:
-                with get_db(DB_PATH) as conn:
-                    db_update_race(
-                        conn, race_id, status="error", finish_reason="worker_exception"
-                    )
-            except Exception:
-                pass
+        coro = _run_single_race_event(race_id)
+        running.add(asyncio.create_task(coro))
 
 
 async def _run_single_race_event(race_id: str) -> None:
