@@ -859,6 +859,7 @@
                 zoneId: null,
                 zoneName: null,
                 file: null,
+                world: "complex",
                 pollTimer: null,
             };
 
@@ -1546,6 +1547,7 @@
                             team_id: S.teamId,
                             password: S.password,
                             slot_name: slotName,
+                            world: S.world,
                         }),
                     });
                     data = await resp.json();

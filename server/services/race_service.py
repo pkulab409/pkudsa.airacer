@@ -22,14 +22,15 @@ logger = logging.getLogger(__name__)
 # （对应 Avalon battle_service.update_battle_result）
 # ---------------------------------------------------------------------------
 
+
 def on_race_ended(race_id: str, result: Dict[str, Any]) -> None:
     """
     比赛正常结束时，将结果写入数据库。
     由 Backend 的 WebSocket 回调调用（收到 race_ended 消息后）。
     """
-    finish_reason  = result.get("finish_reason", "unknown")
+    finish_reason = result.get("finish_reason", "unknown")
     final_rankings = result.get("final_rankings", [])
-    finished_at    = datetime.datetime.now().isoformat()
+    finished_at = datetime.datetime.now().isoformat()
 
     _POINTS_TABLE = {1: 10, 2: 7, 3: 5, 4: 3}
 
@@ -59,41 +60,41 @@ def on_race_ended(race_id: str, result: Dict[str, Any]) -> None:
 # 处理测试跑完成（对应 Avalon 私有对局记录写入）
 # ---------------------------------------------------------------------------
 
+
 def on_test_run_ended(
     test_run_id: int,
     result: Dict[str, Any],
 ) -> None:
     """
     测试跑结束后写入 test_runs 表。
+
+    字段映射说明（Sim Node 返回 → test_runs 表）:
+      final_rankings[0].laps               → laps_completed
+      final_rankings[0].best_lap           → best_lap_time
+      final_rankings[0].collision_major_count → collisions_major
+      result.finish_reason                 → finish_reason
+
+    注意：Sim Node 的 metadata.json 不含 events 列表，
+    因此 collisions_minor / timeout_warnings 无法从现有数据源获取，
+    保留为 0（等后续 simnode 侧补充后再接入）。
     """
     finished_at = datetime.datetime.now().isoformat()
-    rankings    = result.get("final_rankings", [])
+    rankings = result.get("final_rankings", [])
 
-    laps_completed   = 0
-    best_lap_time    = None
+    laps_completed = 0
+    best_lap_time = None
     collisions_minor = 0
     collisions_major = 0
     timeout_warnings = 0
 
     if rankings:
         first = rankings[0]
-        laps_completed = first.get("laps_completed", 0)
-        if "best_lap_time" in first:
-            best_lap_time = first["best_lap_time"]
-        elif "lap_times" in first:
-            lap_times = [t for t in first.get("lap_times", []) if t is not None]
-            best_lap_time = min(lap_times) if lap_times else None
-
-    for event in result.get("events", []):
-        etype = event.get("event_type") or event.get("type")
-        if etype == "Collision":
-            sev = event.get("event_data", {}).get("severity", "minor")
-            if sev == "major":
-                collisions_major += 1
-            else:
-                collisions_minor += 1
-        elif etype == "TimeoutWarn":
-            timeout_warnings += 1
+        # Sim Node 返回 "laps"，不是 "laps_completed"
+        laps_completed = first.get("laps", 0)
+        # Sim Node 返回 "best_lap"，不是 "best_lap_time"
+        best_lap_time = first.get("best_lap")
+        # Sim Node 的碰撞计数只有 major（无 minor 分项）
+        collisions_major = first.get("collision_major_count", 0)
 
     try:
         with get_db(DB_PATH) as conn:

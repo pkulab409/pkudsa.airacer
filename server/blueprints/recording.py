@@ -8,12 +8,13 @@ GET /api/recordings/{session_id}/telemetry  — telemetry.jsonl stream
 
 import json
 import pathlib
-from typing import Iterator
+from typing import Dict, Iterator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from server.config.config import RECORDINGS_DIR
+from server.config.config import DB_PATH, RECORDINGS_DIR
+from server.database.models import get_db
 
 router = APIRouter(prefix="/api/recordings")
 
@@ -25,6 +26,7 @@ def _recordings_root() -> pathlib.Path:
 # ---------------------------------------------------------------------------
 # List recordings
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_recordings():
@@ -50,23 +52,45 @@ async def list_recordings():
         except (json.JSONDecodeError, OSError):
             continue
 
-        results.append({
-            "session_id":     subdir.name,
-            "session_type":   meta.get("session_type"),
-            "zone_id":        meta.get("zone_id"),
-            "recorded_at":    meta.get("recorded_at") or meta.get("finished_at"),
-            "finish_reason":  meta.get("finish_reason"),
-            "teams":          meta.get("teams", []),
-            "final_rankings": meta.get("final_rankings", []),
-        })
+        results.append(
+            {
+                "session_id": subdir.name,
+                "session_type": meta.get("session_type"),
+                "zone_id": meta.get("zone_id"),
+                "recorded_at": meta.get("recorded_at") or meta.get("finished_at"),
+                "finish_reason": meta.get("finish_reason"),
+                "teams": meta.get("teams", []),
+                "final_rankings": meta.get("final_rankings", []),
+            }
+        )
 
     results.sort(key=lambda r: r.get("recorded_at") or "", reverse=True)
+
+    # 批量查 DB 获取可读名称
+    session_ids = [r["session_id"] for r in results]
+    if session_ids:
+        placeholders = ",".join("?" * len(session_ids))
+        try:
+            with get_db(DB_PATH) as conn:
+                rows = conn.execute(
+                    f"SELECT id, name FROM race_sessions WHERE id IN ({placeholders})",
+                    session_ids,
+                ).fetchall()
+            name_map: Dict[str, str] = {}
+            for r in rows:
+                name_map[r["id"]] = r["name"] if r["name"] else None
+            for r in results:
+                r["name"] = name_map.get(r["session_id"])
+        except Exception:
+            pass  # DB 查不到也不影响
+
     return results
 
 
 # ---------------------------------------------------------------------------
 # Metadata for a single session
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{session_id}/metadata")
 async def get_metadata(session_id: str):
@@ -86,6 +110,7 @@ async def get_metadata(session_id: str):
 # Telemetry stream
 # ---------------------------------------------------------------------------
 
+
 @router.get("/{session_id}/telemetry")
 async def get_telemetry(session_id: str):
     """
@@ -94,8 +119,8 @@ async def get_telemetry(session_id: str):
     Only available once metadata.json exists (recording is complete).
     Returns 404 if the recording is missing or still in progress.
     """
-    session_dir    = _recordings_root() / session_id
-    meta_file      = session_dir / "metadata.json"
+    session_dir = _recordings_root() / session_id
+    meta_file = session_dir / "metadata.json"
     telemetry_file = session_dir / "telemetry.jsonl"
 
     if not meta_file.exists():

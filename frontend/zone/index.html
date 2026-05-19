@@ -1,926 +1,1094 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>赛区详情 - AI Racer</title>
-  <!-- Bootstrap 5 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <!-- Google Fonts: Poppins + Rajdhani -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap">
-  <!-- Project stylesheet -->
-  <link rel="stylesheet" href="/static/style.css">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>赛区详情 - AI Racer</title>
+        <!-- Bootstrap 5 -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        />
+        <!-- Bootstrap Icons -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <!-- Google Fonts: Poppins + Rajdhani -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap"
+        />
+        <!-- Project stylesheet -->
+        <link rel="stylesheet" href="/static/style.css" />
 
-  <style>
-    /* ── Base ─────────────────────────────────────── */
-    body {
-      font-family: 'Poppins', system-ui, sans-serif;
-      background: #f8f9fa;
-      color: #212529;
-    }
+        <style>
+            /* ── Base ─────────────────────────────────────── */
+            body {
+                font-family: "Poppins", system-ui, sans-serif;
+                background: #f8f9fa;
+                color: #212529;
+            }
 
-    /* ── Navbar ───────────────────────────────────── */
-    .navbar-brand {
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 1.5rem;
-      letter-spacing: 0.04em;
-      color: #fff !important;
-    }
-    .navbar-brand span {
-      color: #ff4d4d;
-    }
-    .navbar {
-      background: #1a1a2e !important;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-    }
-    .navbar .nav-link {
-      color: rgba(255,255,255,0.8) !important;
-      font-weight: 500;
-      font-size: 0.9rem;
-      transition: color 0.2s;
-    }
-    .navbar .nav-link:hover,
-    .navbar .nav-link.active {
-      color: #ff4d4d !important;
-    }
+            /* ── Navbar ───────────────────────────────────── */
+            .navbar-brand {
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 1.5rem;
+                letter-spacing: 0.04em;
+                color: #fff !important;
+            }
+            .navbar-brand span {
+                color: #ff4d4d;
+            }
+            .navbar {
+                background: #1a1a2e !important;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+            }
+            .navbar .nav-link {
+                color: rgba(255, 255, 255, 0.8) !important;
+                font-weight: 500;
+                font-size: 0.9rem;
+                transition: color 0.2s;
+            }
+            .navbar .nav-link:hover,
+            .navbar .nav-link.active {
+                color: #ff4d4d !important;
+            }
 
-    /* ── Page header ──────────────────────────────── */
-    .page-header {
-      background: linear-gradient(135deg, #7a0000, #c0392b, #e74c3c);
-      background-size: 400% 400%;
-      animation: gradientShift 12s ease infinite;
-      color: white;
-      border-radius: 12px;
-      padding: 28px 36px;
-      margin-bottom: 32px;
-      box-shadow: 0 6px 24px rgba(192,57,43,0.25);
-      position: relative;
-      overflow: hidden;
-    }
-    @keyframes gradientShift {
-      0%   { background-position: 0% 50%; }
-      50%  { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    .page-header::after {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -30%;
-      width: 70%;
-      height: 200%;
-      background: rgba(255,255,255,0.07);
-      transform: rotate(25deg);
-      pointer-events: none;
-    }
-    .page-header h1 {
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 2.4rem;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.25);
-      margin: 0 0 8px;
-    }
-    .zone-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-    }
-    .phase-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 16px;
-      border-radius: 50px;
-      font-size: 0.82rem;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-    }
-    .phase-badge.placement   { background: rgba(255,193,7,0.2);  color: #ffc107;  border: 1px solid rgba(255,193,7,0.4);  }
-    .phase-badge.group_stage { background: rgba(13,202,240,0.2); color: #0dcaf0;  border: 1px solid rgba(13,202,240,0.4); }
-    .phase-badge.semi        { background: rgba(111,66,193,0.2); color: #b97fff;  border: 1px solid rgba(111,66,193,0.4); }
-    .phase-badge.final       { background: rgba(255,77,77,0.25); color: #ff6b6b;  border: 1px solid rgba(255,77,77,0.4);  }
-    .phase-badge.registration{ background: rgba(40,167,69,0.2);  color: #5ce65c;  border: 1px solid rgba(40,167,69,0.4);  }
-    .phase-badge.completed   { background: rgba(108,117,125,0.2);color: #adb5bd;  border: 1px solid rgba(108,117,125,0.4);}
-    .phase-badge.unknown     { background: rgba(255,255,255,0.1);color: #fff;     border: 1px solid rgba(255,255,255,0.2);}
+            /* ── Page header ──────────────────────────────── */
+            .page-header {
+                background: linear-gradient(135deg, #7a0000, #c0392b, #e74c3c);
+                background-size: 400% 400%;
+                animation: gradientShift 12s ease infinite;
+                color: white;
+                border-radius: 12px;
+                padding: 28px 36px;
+                margin-bottom: 32px;
+                box-shadow: 0 6px 24px rgba(192, 57, 43, 0.25);
+                position: relative;
+                overflow: hidden;
+            }
+            @keyframes gradientShift {
+                0% {
+                    background-position: 0% 50%;
+                }
+                50% {
+                    background-position: 100% 50%;
+                }
+                100% {
+                    background-position: 0% 50%;
+                }
+            }
+            .page-header::after {
+                content: "";
+                position: absolute;
+                top: -50%;
+                right: -30%;
+                width: 70%;
+                height: 200%;
+                background: rgba(255, 255, 255, 0.07);
+                transform: rotate(25deg);
+                pointer-events: none;
+            }
+            .page-header h1 {
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 2.4rem;
+                text-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+                margin: 0 0 8px;
+            }
+            .zone-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: center;
+            }
+            .phase-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 16px;
+                border-radius: 50px;
+                font-size: 0.82rem;
+                font-weight: 700;
+                letter-spacing: 0.4px;
+                text-transform: uppercase;
+            }
+            .phase-badge.placement {
+                background: rgba(255, 193, 7, 0.2);
+                color: #ffc107;
+                border: 1px solid rgba(255, 193, 7, 0.4);
+            }
+            .phase-badge.group_stage {
+                background: rgba(13, 202, 240, 0.2);
+                color: #0dcaf0;
+                border: 1px solid rgba(13, 202, 240, 0.4);
+            }
+            .phase-badge.semi {
+                background: rgba(111, 66, 193, 0.2);
+                color: #b97fff;
+                border: 1px solid rgba(111, 66, 193, 0.4);
+            }
+            .phase-badge.final {
+                background: rgba(255, 77, 77, 0.25);
+                color: #ff6b6b;
+                border: 1px solid rgba(255, 77, 77, 0.4);
+            }
+            .phase-badge.registration {
+                background: rgba(40, 167, 69, 0.2);
+                color: #5ce65c;
+                border: 1px solid rgba(40, 167, 69, 0.4);
+            }
+            .phase-badge.completed {
+                background: rgba(108, 117, 125, 0.2);
+                color: #adb5bd;
+                border: 1px solid rgba(108, 117, 125, 0.4);
+            }
+            .phase-badge.unknown {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
 
-    .team-count-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.25);
-      color: #fff;
-      padding: 5px 14px;
-      border-radius: 50px;
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
+            .team-count-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                background: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                color: #fff;
+                padding: 5px 14px;
+                border-radius: 50px;
+                font-size: 0.82rem;
+                font-weight: 600;
+            }
 
-    /* ── Phase progress bar ───────────────────────── */
-    .phase-flow-card {
-      border-radius: 12px;
-      border: none;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.07);
-      margin-bottom: 28px;
-      overflow: hidden;
-    }
-    .phase-flow-card .card-header {
-      background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
-      border-bottom: 1px solid #e9ecef;
-      padding: 14px 24px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      color: #495057;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .phase-flow {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0;
-      padding: 24px 28px;
-    }
-    .phase-node {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      position: relative;
-    }
-    .phase-circle {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      font-weight: 700;
-      border: 3px solid #dee2e6;
-      background: #f8f9fa;
-      color: #adb5bd;
-      transition: all 0.3s;
-    }
-    .phase-circle.active {
-      border-color: #dc3545;
-      background: linear-gradient(135deg, #dc3545, #c0392b);
-      color: #fff;
-      box-shadow: 0 0 0 5px rgba(220,53,69,0.2);
-      animation: pulseBorder 2s ease infinite;
-    }
-    .phase-circle.done {
-      border-color: #198754;
-      background: #198754;
-      color: #fff;
-    }
-    @keyframes pulseBorder {
-      0%, 100% { box-shadow: 0 0 0 5px rgba(220,53,69,0.2); }
-      50%       { box-shadow: 0 0 0 9px rgba(220,53,69,0.08); }
-    }
-    .phase-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #6c757d;
-      text-align: center;
-      max-width: 70px;
-      line-height: 1.2;
-    }
-    .phase-label.active { color: #dc3545; font-weight: 700; }
-    .phase-label.done   { color: #198754; }
-    .phase-arrow {
-      width: 40px;
-      height: 3px;
-      background: #dee2e6;
-      margin: 0 4px;
-      margin-bottom: 22px; /* align with circle center */
-      position: relative;
-      flex-shrink: 0;
-    }
-    .phase-arrow::after {
-      content: '';
-      position: absolute;
-      right: -1px;
-      top: -4px;
-      border-left: 8px solid #dee2e6;
-      border-top: 5px solid transparent;
-      border-bottom: 5px solid transparent;
-    }
-    .phase-arrow.done {
-      background: #198754;
-    }
-    .phase-arrow.done::after {
-      border-left-color: #198754;
-    }
-    .phase-arrow.active {
-      background: linear-gradient(90deg, #198754, #dc3545);
-    }
-    .phase-arrow.active::after {
-      border-left-color: #dc3545;
-    }
+            /* ── Phase progress bar ───────────────────────── */
+            .phase-flow-card {
+                border-radius: 12px;
+                border: none;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+                margin-bottom: 28px;
+                overflow: hidden;
+            }
+            .phase-flow-card .card-header {
+                background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
+                border-bottom: 1px solid #e9ecef;
+                padding: 14px 24px;
+                font-weight: 700;
+                font-size: 0.9rem;
+                color: #495057;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .phase-flow {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 0;
+                padding: 24px 28px;
+            }
+            .phase-node {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                position: relative;
+            }
+            .phase-circle {
+                width: 46px;
+                height: 46px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.1rem;
+                font-weight: 700;
+                border: 3px solid #dee2e6;
+                background: #f8f9fa;
+                color: #adb5bd;
+                transition: all 0.3s;
+            }
+            .phase-circle.active {
+                border-color: #dc3545;
+                background: linear-gradient(135deg, #dc3545, #c0392b);
+                color: #fff;
+                box-shadow: 0 0 0 5px rgba(220, 53, 69, 0.2);
+                animation: pulseBorder 2s ease infinite;
+            }
+            .phase-circle.done {
+                border-color: #198754;
+                background: #198754;
+                color: #fff;
+            }
+            @keyframes pulseBorder {
+                0%,
+                100% {
+                    box-shadow: 0 0 0 5px rgba(220, 53, 69, 0.2);
+                }
+                50% {
+                    box-shadow: 0 0 0 9px rgba(220, 53, 69, 0.08);
+                }
+            }
+            .phase-label {
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: #6c757d;
+                text-align: center;
+                max-width: 70px;
+                line-height: 1.2;
+            }
+            .phase-label.active {
+                color: #dc3545;
+                font-weight: 700;
+            }
+            .phase-label.done {
+                color: #198754;
+            }
+            .phase-arrow {
+                width: 40px;
+                height: 3px;
+                background: #dee2e6;
+                margin: 0 4px;
+                margin-bottom: 22px; /* align with circle center */
+                position: relative;
+                flex-shrink: 0;
+            }
+            .phase-arrow::after {
+                content: "";
+                position: absolute;
+                right: -1px;
+                top: -4px;
+                border-left: 8px solid #dee2e6;
+                border-top: 5px solid transparent;
+                border-bottom: 5px solid transparent;
+            }
+            .phase-arrow.done {
+                background: #198754;
+            }
+            .phase-arrow.done::after {
+                border-left-color: #198754;
+            }
+            .phase-arrow.active {
+                background: linear-gradient(90deg, #198754, #dc3545);
+            }
+            .phase-arrow.active::after {
+                border-left-color: #dc3545;
+            }
 
-    /* ── Ranking card ─────────────────────────────── */
-    .ranking-card {
-      border-radius: 12px;
-      border: none;
-      box-shadow: 0 5px 25px rgba(0,0,0,0.07);
-      overflow: hidden;
-      margin-bottom: 28px;
-      transition: box-shadow 0.3s;
-    }
-    .ranking-card:hover {
-      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-    }
-    .ranking-card .card-header {
-      background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
-      border-bottom: 1px solid #e9ecef;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .ranking-card .card-header .card-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      color: #495057;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin: 0;
-    }
-    .auto-refresh-hint {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      color: #adb5bd;
-    }
-    .auto-refresh-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #28a745;
-      animation: dotPulse 2s infinite;
-    }
-    @keyframes dotPulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
+            /* ── Ranking card ─────────────────────────────── */
+            .ranking-card {
+                border-radius: 12px;
+                border: none;
+                box-shadow: 0 5px 25px rgba(0, 0, 0, 0.07);
+                overflow: hidden;
+                margin-bottom: 28px;
+                transition: box-shadow 0.3s;
+            }
+            .ranking-card:hover {
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            }
+            .ranking-card .card-header {
+                background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
+                border-bottom: 1px solid #e9ecef;
+                padding: 14px 24px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .ranking-card .card-header .card-title {
+                font-weight: 700;
+                font-size: 0.9rem;
+                color: #495057;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin: 0;
+            }
+            .auto-refresh-hint {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 0.75rem;
+                color: #adb5bd;
+            }
+            .auto-refresh-dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: #28a745;
+                animation: dotPulse 2s infinite;
+            }
+            @keyframes dotPulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.4;
+                }
+            }
 
-    /* ── Ranking table ────────────────────────────── */
-    .ranking-table {
-      margin-bottom: 0;
-    }
-    .ranking-table thead {
-      background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
-    }
-    .ranking-table th {
-      font-weight: 700;
-      font-size: 0.78rem;
-      color: #6c757d;
-      border-top: none;
-      padding: 14px 16px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .ranking-table td {
-      vertical-align: middle;
-      padding: 12px 16px;
-      border-color: #f1f3f5;
-    }
+            /* ── Ranking table ────────────────────────────── */
+            .ranking-table {
+                margin-bottom: 0;
+            }
+            .ranking-table thead {
+                background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
+            }
+            .ranking-table th {
+                font-weight: 700;
+                font-size: 0.78rem;
+                color: #6c757d;
+                border-top: none;
+                padding: 14px 16px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .ranking-table td {
+                vertical-align: middle;
+                padding: 12px 16px;
+                border-color: #f1f3f5;
+            }
 
-    /* Top 3 rows */
-    tr.rank-gold {
-      background: linear-gradient(90deg, rgba(255,215,0,0.12), rgba(255,215,0,0.04));
-      box-shadow: inset 0 0 0 1px rgba(255,215,0,0.25);
-    }
-    tr.rank-silver {
-      background: linear-gradient(90deg, rgba(192,192,192,0.12), rgba(192,192,192,0.04));
-      box-shadow: inset 0 0 0 1px rgba(192,192,192,0.22);
-    }
-    tr.rank-bronze {
-      background: linear-gradient(90deg, rgba(205,127,50,0.12), rgba(205,127,50,0.04));
-      box-shadow: inset 0 0 0 1px rgba(205,127,50,0.22);
-    }
-    tr.rank-gold:hover,
-    tr.rank-silver:hover,
-    tr.rank-bronze:hover {
-      background: linear-gradient(90deg, rgba(220,53,69,0.05), rgba(220,53,69,0.02));
-    }
+            /* Top 3 rows */
+            tr.rank-gold {
+                background: linear-gradient(
+                    90deg,
+                    rgba(255, 215, 0, 0.12),
+                    rgba(255, 215, 0, 0.04)
+                );
+                box-shadow: inset 0 0 0 1px rgba(255, 215, 0, 0.25);
+            }
+            tr.rank-silver {
+                background: linear-gradient(
+                    90deg,
+                    rgba(192, 192, 192, 0.12),
+                    rgba(192, 192, 192, 0.04)
+                );
+                box-shadow: inset 0 0 0 1px rgba(192, 192, 192, 0.22);
+            }
+            tr.rank-bronze {
+                background: linear-gradient(
+                    90deg,
+                    rgba(205, 127, 50, 0.12),
+                    rgba(205, 127, 50, 0.04)
+                );
+                box-shadow: inset 0 0 0 1px rgba(205, 127, 50, 0.22);
+            }
+            tr.rank-gold:hover,
+            tr.rank-silver:hover,
+            tr.rank-bronze:hover {
+                background: linear-gradient(
+                    90deg,
+                    rgba(220, 53, 69, 0.05),
+                    rgba(220, 53, 69, 0.02)
+                );
+            }
 
-    /* Medal */
-    .medal {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      width: 38px;
-      height: 38px;
-      font-size: 1.05rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-      position: relative;
-      overflow: hidden;
-    }
-    .medal::after {
-      content: '';
-      position: absolute;
-      top: -25%;
-      left: -25%;
-      width: 150%;
-      height: 150%;
-      background: linear-gradient(45deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%);
-      transform: rotate(30deg);
-    }
-    .medal-gold   { background: linear-gradient(135deg, #FFD700, #FFC800); }
-    .medal-silver { background: linear-gradient(135deg, #E0E0E0, #C0C0C0); }
-    .medal-bronze { background: linear-gradient(135deg, #CD7F32, #A05A2C); }
+            /* Medal */
+            .medal {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                width: 38px;
+                height: 38px;
+                font-size: 1.05rem;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+                position: relative;
+                overflow: hidden;
+            }
+            .medal::after {
+                content: "";
+                position: absolute;
+                top: -25%;
+                left: -25%;
+                width: 150%;
+                height: 150%;
+                background: linear-gradient(
+                    45deg,
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.3) 50%,
+                    rgba(255, 255, 255, 0) 100%
+                );
+                transform: rotate(30deg);
+            }
+            .medal-gold {
+                background: linear-gradient(135deg, #ffd700, #ffc800);
+            }
+            .medal-silver {
+                background: linear-gradient(135deg, #e0e0e0, #c0c0c0);
+            }
+            .medal-bronze {
+                background: linear-gradient(135deg, #cd7f32, #a05a2c);
+            }
 
-    .rank-num {
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #6c757d;
-    }
+            .rank-num {
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 0.95rem;
+                color: #6c757d;
+            }
 
-    /* Team name */
-    .team-name {
-      font-weight: 600;
-      font-size: 0.95rem;
-      color: #212529;
-    }
-    .top3 .team-name {
-      font-weight: 700;
-    }
+            /* Team name */
+            .team-name {
+                font-weight: 600;
+                font-size: 0.95rem;
+                color: #212529;
+            }
+            .top3 .team-name {
+                font-weight: 700;
+            }
 
-    /* Score pill */
-    .score-pill {
-      display: inline-block;
-      background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
-      border: 1px solid #e9ecef;
-      padding: 4px 14px;
-      border-radius: 50px;
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 1rem;
-      color: #495057;
-    }
-    .top3 .score-pill {
-      background: linear-gradient(90deg, #fff8e1, #ffe082);
-      border-color: #ffd54f;
-      color: #7a5c00;
-    }
+            /* Score pill */
+            .score-pill {
+                display: inline-block;
+                background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
+                border: 1px solid #e9ecef;
+                padding: 4px 14px;
+                border-radius: 50px;
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 1rem;
+                color: #495057;
+            }
+            .top3 .score-pill {
+                background: linear-gradient(90deg, #fff8e1, #ffe082);
+                border-color: #ffd54f;
+                color: #7a5c00;
+            }
 
-    /* Points progress bar */
-    .points-bar-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .points-bar-outer {
-      flex: 1;
-      height: 8px;
-      background: #e9ecef;
-      border-radius: 4px;
-      overflow: hidden;
-      min-width: 60px;
-    }
-    .points-bar-inner {
-      height: 100%;
-      border-radius: 4px;
-      background: linear-gradient(90deg, #dc3545, #e74c3c);
-      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-      width: 0;
-    }
-    .top3 .points-bar-inner {
-      background: linear-gradient(90deg, #f59e0b, #fbbf24);
-    }
-    .points-num {
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 1rem;
-      color: #495057;
-      min-width: 36px;
-      text-align: right;
-    }
+            /* Points progress bar */
+            .points-bar-wrap {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .points-bar-outer {
+                flex: 1;
+                height: 8px;
+                background: #e9ecef;
+                border-radius: 4px;
+                overflow: hidden;
+                min-width: 60px;
+            }
+            .points-bar-inner {
+                height: 100%;
+                border-radius: 4px;
+                background: linear-gradient(90deg, #dc3545, #e74c3c);
+                transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                width: 0;
+            }
+            .top3 .points-bar-inner {
+                background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            }
+            .points-num {
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 1rem;
+                color: #495057;
+                min-width: 36px;
+                text-align: right;
+            }
 
-    /* Crown pulse */
-    .crown {
-      color: #FFD700;
-      margin-left: 5px;
-      animation: crownPulse 2.2s ease infinite;
-      display: inline-block;
-    }
-    @keyframes crownPulse {
-      0%, 100% { transform: scale(1); }
-      50%       { transform: scale(1.15); }
-    }
+            /* Crown pulse */
+            .crown {
+                color: #ffd700;
+                margin-left: 5px;
+                animation: crownPulse 2.2s ease infinite;
+                display: inline-block;
+            }
+            @keyframes crownPulse {
+                0%,
+                100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.15);
+                }
+            }
 
-    /* ── Teams grid ───────────────────────────────── */
-    .teams-card {
-      border-radius: 12px;
-      border: none;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.07);
-      margin-bottom: 28px;
-      overflow: hidden;
-    }
-    .teams-card .card-header {
-      background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
-      border-bottom: 1px solid #e9ecef;
-      padding: 14px 24px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      color: #495057;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .teams-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
-      padding: 20px 24px;
-    }
-    .team-card {
-      background: #fff;
-      border: 1px solid #e9ecef;
-      border-radius: 10px;
-      padding: 16px 18px;
-      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-    }
-    .team-card:hover {
-      border-color: #dc3545;
-      transform: translateY(-3px);
-      box-shadow: 0 6px 18px rgba(220,53,69,0.1);
-    }
-    .team-card-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-      color: #212529;
-      margin-bottom: 4px;
-    }
-    .team-card-id {
-      font-size: 0.78rem;
-      font-family: monospace;
-      color: #6c757d;
-    }
-    .team-card-date {
-      font-size: 0.75rem;
-      color: #adb5bd;
-      margin-top: 8px;
-    }
+            /* ── Teams grid ───────────────────────────────── */
+            .teams-card {
+                border-radius: 12px;
+                border: none;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+                margin-bottom: 28px;
+                overflow: hidden;
+            }
+            .teams-card .card-header {
+                background: linear-gradient(90deg, #f8f9fa, #f1f3f5);
+                border-bottom: 1px solid #e9ecef;
+                padding: 14px 24px;
+                font-weight: 700;
+                font-size: 0.9rem;
+                color: #495057;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .teams-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 16px;
+                padding: 20px 24px;
+            }
+            .team-card {
+                background: #fff;
+                border: 1px solid #e9ecef;
+                border-radius: 10px;
+                padding: 16px 18px;
+                transition:
+                    border-color 0.2s,
+                    transform 0.2s,
+                    box-shadow 0.2s;
+            }
+            .team-card:hover {
+                border-color: #dc3545;
+                transform: translateY(-3px);
+                box-shadow: 0 6px 18px rgba(220, 53, 69, 0.1);
+            }
+            .team-card-name {
+                font-weight: 700;
+                font-size: 0.95rem;
+                color: #212529;
+                margin-bottom: 4px;
+            }
+            .team-card-id {
+                font-size: 0.78rem;
+                font-family: monospace;
+                color: #6c757d;
+            }
+            .team-card-date {
+                font-size: 0.75rem;
+                color: #adb5bd;
+                margin-top: 8px;
+            }
 
-    /* ── Empty / loading states ───────────────────── */
-    .empty-state {
-      padding: 60px 0;
-      text-align: center;
-      color: #adb5bd;
-    }
-    .empty-state i {
-      font-size: 3rem;
-      margin-bottom: 12px;
-      display: block;
-    }
-    .empty-state p {
-      margin: 0;
-      font-size: 0.95rem;
-    }
-    .loading-spinner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 40px;
-      color: #adb5bd;
-      font-size: 0.9rem;
-    }
+            /* ── Empty / loading states ───────────────────── */
+            .empty-state {
+                padding: 60px 0;
+                text-align: center;
+                color: #adb5bd;
+            }
+            .empty-state i {
+                font-size: 3rem;
+                margin-bottom: 12px;
+                display: block;
+            }
+            .empty-state p {
+                margin: 0;
+                font-size: 0.95rem;
+            }
+            .loading-spinner {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 40px;
+                color: #adb5bd;
+                font-size: 0.9rem;
+            }
 
-    /* ── Zone selector (no-id state) ──────────────── */
-    .zone-selector-card {
-      border-radius: 12px;
-      border: none;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.07);
-      padding: 32px;
-      margin-bottom: 28px;
-    }
-    .zone-selector-title {
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 700;
-      font-size: 1.4rem;
-      color: #212529;
-      margin-bottom: 20px;
-    }
-    .zone-list-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 14px;
-    }
-    .zone-list-item {
-      border: 1px solid #e9ecef;
-      border-radius: 10px;
-      padding: 16px 18px;
-      text-decoration: none;
-      color: inherit;
-      background: #fff;
-      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
-      display: block;
-    }
-    .zone-list-item:hover {
-      border-color: #dc3545;
-      transform: translateY(-3px);
-      box-shadow: 0 6px 18px rgba(220,53,69,0.1);
-      color: inherit;
-    }
-    .zone-list-item-name {
-      font-weight: 700;
-      font-size: 1rem;
-      color: #212529;
-      margin-bottom: 4px;
-    }
-    .zone-list-item-teams {
-      font-size: 0.8rem;
-      color: #6c757d;
-    }
+            /* ── Zone selector (no-id state) ──────────────── */
+            .zone-selector-card {
+                border-radius: 12px;
+                border: none;
+                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+                padding: 32px;
+                margin-bottom: 28px;
+            }
+            .zone-selector-title {
+                font-family: "Rajdhani", sans-serif;
+                font-weight: 700;
+                font-size: 1.4rem;
+                color: #212529;
+                margin-bottom: 20px;
+            }
+            .zone-list-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 14px;
+            }
+            .zone-list-item {
+                border: 1px solid #e9ecef;
+                border-radius: 10px;
+                padding: 16px 18px;
+                text-decoration: none;
+                color: inherit;
+                background: #fff;
+                transition:
+                    border-color 0.2s,
+                    transform 0.2s,
+                    box-shadow 0.2s;
+                display: block;
+            }
+            .zone-list-item:hover {
+                border-color: #dc3545;
+                transform: translateY(-3px);
+                box-shadow: 0 6px 18px rgba(220, 53, 69, 0.1);
+                color: inherit;
+            }
+            .zone-list-item-name {
+                font-weight: 700;
+                font-size: 1rem;
+                color: #212529;
+                margin-bottom: 4px;
+            }
+            .zone-list-item-teams {
+                font-size: 0.8rem;
+                color: #6c757d;
+            }
 
-    /* ── Footer ───────────────────────────────────── */
-    footer {
-      background: #1a1a2e;
-      color: rgba(255,255,255,0.5);
-      padding: 28px 0;
-      margin-top: 48px;
-      font-size: 0.85rem;
-    }
-    footer a {
-      color: rgba(255,255,255,0.6);
-      text-decoration: none;
-    }
-    footer a:hover { color: #ff4d4d; }
+            /* ── Footer ───────────────────────────────────── */
+            footer {
+                background: #1a1a2e;
+                color: rgba(255, 255, 255, 0.5);
+                padding: 28px 0;
+                margin-top: 48px;
+                font-size: 0.85rem;
+            }
+            footer a {
+                color: rgba(255, 255, 255, 0.6);
+                text-decoration: none;
+            }
+            footer a:hover {
+                color: #ff4d4d;
+            }
 
-    /* ── Responsive ───────────────────────────────── */
-    @media (max-width: 768px) {
-      .page-header h1 { font-size: 1.7rem; }
-      .phase-flow { overflow-x: auto; flex-wrap: nowrap; padding: 20px 16px; }
-      .ranking-table { min-width: 520px; }
-    }
-  </style>
-</head>
-<body>
+            /* ── Responsive ───────────────────────────────── */
+            @media (max-width: 768px) {
+                .page-header h1 {
+                    font-size: 1.7rem;
+                }
+                .phase-flow {
+                    overflow-x: auto;
+                    flex-wrap: nowrap;
+                    padding: 20px 16px;
+                }
+                .ranking-table {
+                    min-width: 520px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- ── Navbar ──────────────────────────────────────── -->
+        <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+            <div class="container">
+                <a class="navbar-brand" href="/">AI <span>Racer</span></a>
+                <button
+                    class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#navbarMain"
+                >
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarMain">
+                    <ul class="navbar-nav ms-auto gap-1">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">首页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/zone/">赛区</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/submit/">提交代码</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/race/">比赛回放</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/">管理后台</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
 
-<!-- ── Navbar ──────────────────────────────────────── -->
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top">
-  <div class="container">
-    <a class="navbar-brand" href="/">AI <span>Racer</span></a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarMain">
-      <ul class="navbar-nav ms-auto gap-1">
-        <li class="nav-item"><a class="nav-link" href="/">首页</a></li>
-        <li class="nav-item"><a class="nav-link" href="/live/">比赛实况</a></li>
-        <li class="nav-item"><a class="nav-link active" href="/zone/">赛区</a></li>
-        <li class="nav-item"><a class="nav-link" href="/submit/">提交代码</a></li>
-        <li class="nav-item"><a class="nav-link" href="/race/">比赛回放</a></li>
-        <li class="nav-item"><a class="nav-link" href="/admin/">管理后台</a></li>
-      </ul>
-    </div>
-  </div>
-</nav>
+        <!-- ── Main content ────────────────────────────────── -->
+        <main class="container py-4" id="main-content">
+            <!-- No-id state: zone selector -->
+            <div id="zone-selector" style="display: none">
+                <div class="zone-selector-card card">
+                    <div class="zone-selector-title">
+                        <i class="bi bi-grid-3x3-gap me-2 text-danger"></i
+                        >选择赛区
+                    </div>
+                    <p class="text-muted mb-4" style="font-size: 0.9rem">
+                        URL 中未指定赛区
+                        ID（<code>?id=zone_id</code>），请从以下赛区中选择：
+                    </p>
+                    <div id="zone-list-body">
+                        <div class="loading-spinner">
+                            <div
+                                class="spinner-border spinner-border-sm text-danger"
+                            ></div>
+                            <span>加载赛区列表...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<!-- ── Main content ────────────────────────────────── -->
-<main class="container py-4" id="main-content">
+            <!-- Zone detail -->
+            <div id="zone-detail" style="display: none">
+                <!-- Page header -->
+                <div class="page-header">
+                    <h1 id="zone-name">
+                        <span
+                            class="spinner-border spinner-border-sm me-2"
+                        ></span
+                        >加载中...
+                    </h1>
+                    <div class="zone-meta mt-2">
+                        <span class="phase-badge unknown" id="phase-badge">
+                            <i class="bi bi-hourglass-split"></i>
+                            <span id="phase-text">—</span>
+                        </span>
+                        <span class="team-count-badge" id="team-count-badge">
+                            <i class="bi bi-people-fill"></i>
+                            <span id="team-count-text">— 支队伍</span>
+                        </span>
+                    </div>
+                </div>
 
-  <!-- No-id state: zone selector -->
-  <div id="zone-selector" style="display:none">
-    <div class="zone-selector-card card">
-      <div class="zone-selector-title">
-        <i class="bi bi-grid-3x3-gap me-2 text-danger"></i>选择赛区
-      </div>
-      <p class="text-muted mb-4" style="font-size:0.9rem">
-        URL 中未指定赛区 ID（<code>?id=zone_id</code>），请从以下赛区中选择：
-      </p>
-      <div id="zone-list-body">
-        <div class="loading-spinner">
-          <div class="spinner-border spinner-border-sm text-danger"></div>
-          <span>加载赛区列表...</span>
-        </div>
-      </div>
-    </div>
-  </div>
+                <!-- Phase flow -->
+                <div class="card phase-flow-card">
+                    <div class="card-header">
+                        <i class="bi bi-diagram-3 me-2"></i>赛制阶段
+                    </div>
+                    <div id="phase-flow-body">
+                        <div class="loading-spinner">
+                            <div
+                                class="spinner-border spinner-border-sm text-danger"
+                            ></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
 
-  <!-- Zone detail -->
-  <div id="zone-detail" style="display:none">
+                <!-- Standings table -->
+                <div class="card ranking-card">
+                    <div class="card-header">
+                        <span class="card-title">
+                            <i class="bi bi-trophy-fill text-danger me-2"></i
+                            >积分榜
+                        </span>
+                        <button
+                            class="btn btn-sm btn-outline-secondary"
+                            onclick="refreshStandings()"
+                            title="刷新积分"
+                        >
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table ranking-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th width="10%">排名</th>
+                                        <th width="35%">队伍名称</th>
+                                        <th width="55%">积分</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="standings-body">
+                                    <tr>
+                                        <td colspan="3">
+                                            <div class="loading-spinner">
+                                                <div
+                                                    class="spinner-border spinner-border-sm text-danger"
+                                                ></div>
+                                                <span>加载积分榜...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Page header -->
-    <div class="page-header">
-      <h1 id="zone-name"><span class="spinner-border spinner-border-sm me-2"></span>加载中...</h1>
-      <div class="zone-meta mt-2">
-        <span class="phase-badge unknown" id="phase-badge">
-          <i class="bi bi-hourglass-split"></i>
-          <span id="phase-text">—</span>
-        </span>
-        <span class="team-count-badge" id="team-count-badge">
-          <i class="bi bi-people-fill"></i>
-          <span id="team-count-text">— 支队伍</span>
-        </span>
-      </div>
-    </div>
+                <!-- Teams grid -->
+                <div class="card teams-card">
+                    <div class="card-header">
+                        <i class="bi bi-people-fill text-danger me-2"></i
+                        >参赛队伍
+                    </div>
+                    <div id="teams-body">
+                        <div class="loading-spinner">
+                            <div
+                                class="spinner-border spinner-border-sm text-danger"
+                            ></div>
+                            <span>加载队伍列表...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /#zone-detail -->
+        </main>
 
-    <!-- Phase flow -->
-    <div class="card phase-flow-card">
-      <div class="card-header">
-        <i class="bi bi-diagram-3 me-2"></i>赛制阶段
-      </div>
-      <div id="phase-flow-body">
-        <div class="loading-spinner">
-          <div class="spinner-border spinner-border-sm text-danger"></div>
-          <span>加载中...</span>
-        </div>
-      </div>
-    </div>
+        <!-- ── Footer ──────────────────────────────────────── -->
+        <footer>
+            <div
+                class="container d-flex justify-content-between align-items-center flex-wrap gap-3"
+            >
+                <div>
+                    <span
+                        style="
+                            font-family: &quot;Rajdhani&quot;, sans-serif;
+                            font-weight: 700;
+                            font-size: 1.1rem;
+                            color: rgba(255, 255, 255, 0.8);
+                        "
+                    >
+                        AI <span style="color: #ff4d4d">Racer</span>
+                    </span>
+                    <span class="ms-2"
+                        >· PKU 数据结构与算法 · 赛车大赛平台</span
+                    >
+                </div>
+                <div>
+                    <a href="/">首页</a>
+                    <span class="mx-2">·</span>
+                    <a href="/submit/">提交代码</a>
+                    <span class="mx-2">·</span>
+                    <a href="/race/">比赛回放</a>
+                </div>
+            </div>
+        </footer>
 
-    <!-- Standings table -->
-    <div class="card ranking-card">
-      <div class="card-header">
-        <span class="card-title">
-          <i class="bi bi-trophy-fill text-danger me-2"></i>积分榜
-        </span>
-        <div class="auto-refresh-hint">
-          <span class="auto-refresh-dot"></span>每 30 秒自动刷新
-        </div>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table ranking-table mb-0">
-            <thead>
-              <tr>
-                <th width="10%">排名</th>
-                <th width="35%">队伍名称</th>
-                <th width="55%">积分</th>
-              </tr>
-            </thead>
-            <tbody id="standings-body">
-              <tr>
-                <td colspan="3">
-                  <div class="loading-spinner">
-                    <div class="spinner-border spinner-border-sm text-danger"></div>
-                    <span>加载积分榜...</span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+        <!-- Bootstrap 5 JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Teams grid -->
-    <div class="card teams-card">
-      <div class="card-header">
-        <i class="bi bi-people-fill text-danger me-2"></i>参赛队伍
-      </div>
-      <div id="teams-body">
-        <div class="loading-spinner">
-          <div class="spinner-border spinner-border-sm text-danger"></div>
-          <span>加载队伍列表...</span>
-        </div>
-      </div>
-    </div>
+        <script>
+            // ── Constants ─────────────────────────────────────
+            const PHASE_ORDER = [
+                "registration",
+                "placement",
+                "group_stage",
+                "semi",
+                "final",
+                "completed",
+            ];
+            const PHASE_LABELS = {
+                registration: "报名阶段",
+                placement: "排位赛",
+                group_stage: "分组赛",
+                semi: "半决赛",
+                final: "决赛",
+                completed: "已结束",
+            };
+            const PHASE_ICONS = {
+                registration: "bi-pencil-square",
+                placement: "bi-stopwatch",
+                group_stage: "bi-collection",
+                semi: "bi-diagram-2",
+                final: "bi-trophy",
+                completed: "bi-check-circle",
+            };
 
-  </div><!-- /#zone-detail -->
+            // Map detailed backend RaceState values to frontend phase keys
+            function stateToPhase(state) {
+                const s = state || "";
+                if (s === "REGISTRATION") return "registration";
+                if (s === "IDLE") return "idle";
+                if (s.startsWith("PLACEMENT")) return "placement";
+                if (s.startsWith("GROUP_STAGE")) return "group_stage";
+                if (s.startsWith("SEMI")) return "semi";
+                if (s.startsWith("FINAL")) return "final";
+                if (s === "CLOSED") return "completed";
+                return s;
+            }
 
-</main>
+            // ── State ─────────────────────────────────────────
+            let zoneId = null;
+            let maxPoints = 1; // for progress bar scaling
 
-<!-- ── Footer ──────────────────────────────────────── -->
-<footer>
-  <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
-    <div>
-      <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:1.1rem;color:rgba(255,255,255,0.8)">
-        AI <span style="color:#ff4d4d">Racer</span>
-      </span>
-      <span class="ms-2">· PKU 数据结构与算法 · 赛车大赛平台</span>
-    </div>
-    <div>
-      <a href="/">首页</a>
-      <span class="mx-2">·</span>
-      <a href="/submit/">提交代码</a>
-      <span class="mx-2">·</span>
-      <a href="/race/">比赛回放</a>
-    </div>
-  </div>
-</footer>
+            // ── Init ──────────────────────────────────────────
+            document.addEventListener("DOMContentLoaded", () => {
+                const params = new URLSearchParams(window.location.search);
+                zoneId = params.get("id") || "";
 
-<!-- Bootstrap 5 JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+                if (!zoneId) {
+                    showZoneSelector();
+                } else {
+                    showZoneDetail();
+                    loadZone();
+                }
+            });
 
-<script>
-// ── Constants ─────────────────────────────────────
-const PHASE_ORDER = ['registration', 'placement', 'group_stage', 'semi', 'final', 'completed'];
-const PHASE_LABELS = {
-  registration:  '报名阶段',
-  placement:     '排位赛',
-  group_stage:   '分组赛',
-  semi:          '半决赛',
-  final:         '决赛',
-  completed:     '已结束',
-};
-const PHASE_ICONS = {
-  registration:  'bi-pencil-square',
-  placement:     'bi-stopwatch',
-  group_stage:   'bi-collection',
-  semi:         'bi-diagram-2',
-  final:        'bi-trophy',
-  completed:    'bi-check-circle',
-};
+            // ── Zone selector ─────────────────────────────────
+            function showZoneSelector() {
+                document.getElementById("zone-selector").style.display = "";
+                document.getElementById("zone-detail").style.display = "none";
+                fetchZoneList();
+            }
 
-// Map detailed backend RaceState values to frontend phase keys
-function stateToPhase(state) {
-  const s = state || '';
-  if (s === 'REGISTRATION') return 'registration';
-  if (s === 'IDLE') return 'idle';
-  if (s.startsWith('PLACEMENT')) return 'placement';
-  if (s.startsWith('GROUP_STAGE')) return 'group_stage';
-  if (s.startsWith('SEMI')) return 'semi';
-  if (s.startsWith('FINAL')) return 'final';
-  if (s === 'CLOSED') return 'completed';
-  return s;
-}
+            async function fetchZoneList() {
+                const body = document.getElementById("zone-list-body");
+                try {
+                    const resp = await fetch("/api/zones");
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    const zones = await resp.json();
 
-// ── State ─────────────────────────────────────────
-let zoneId = null;
-let standingsTimer = null;
-let maxPoints = 1; // for progress bar scaling
+                    if (!zones || !zones.length) {
+                        body.innerHTML =
+                            '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无赛区数据</p></div>';
+                        return;
+                    }
 
-// ── Init ──────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(window.location.search);
-  zoneId = params.get('id') || '';
-
-  if (!zoneId) {
-    showZoneSelector();
-  } else {
-    showZoneDetail();
-    loadZone();
-    standingsTimer = setInterval(refreshStandings, 30000);
-  }
-});
-
-// ── Zone selector ─────────────────────────────────
-function showZoneSelector() {
-  document.getElementById('zone-selector').style.display = '';
-  document.getElementById('zone-detail').style.display = 'none';
-  fetchZoneList();
-}
-
-async function fetchZoneList() {
-  const body = document.getElementById('zone-list-body');
-  try {
-    const resp = await fetch('/api/zones');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const zones = await resp.json();
-
-    if (!zones || !zones.length) {
-      body.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无赛区数据</p></div>';
-      return;
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'zone-list-grid';
-    zones.forEach(z => {
-      const a = document.createElement('a');
-      a.className = 'zone-list-item';
-      a.href = '?id=' + encodeURIComponent(z.zone_id || z.id || '');
-      a.innerHTML = `
-        <div class="zone-list-item-name">${escHtml(z.name || z.zone_id || z.id || '赛区')}</div>
+                    const grid = document.createElement("div");
+                    grid.className = "zone-list-grid";
+                    zones.forEach((z) => {
+                        const a = document.createElement("a");
+                        a.className = "zone-list-item";
+                        a.href =
+                            "?id=" +
+                            encodeURIComponent(z.zone_id || z.id || "");
+                        a.innerHTML = `
+        <div class="zone-list-item-name">${escHtml(z.name || z.zone_id || z.id || "赛区")}</div>
         <div class="zone-list-item-teams">
           <i class="bi bi-people-fill me-1"></i>
-          ${z.team_count != null ? z.team_count + ' 支队伍' : '—'}
+          ${z.team_count != null ? z.team_count + " 支队伍" : "—"}
         </div>`;
-      grid.appendChild(a);
-    });
-    body.innerHTML = '';
-    body.appendChild(grid);
-  } catch (e) {
-    body.innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-circle text-danger"></i><p>加载失败：${escHtml(e.message)}</p></div>`;
-  }
-}
+                        grid.appendChild(a);
+                    });
+                    body.innerHTML = "";
+                    body.appendChild(grid);
+                } catch (e) {
+                    body.innerHTML = `<div class="empty-state"><i class="bi bi-exclamation-circle text-danger"></i><p>加载失败：${escHtml(e.message)}</p></div>`;
+                }
+            }
 
-// ── Zone detail ───────────────────────────────────
-function showZoneDetail() {
-  document.getElementById('zone-selector').style.display = 'none';
-  document.getElementById('zone-detail').style.display = '';
-}
+            // ── Zone detail ───────────────────────────────────
+            function showZoneDetail() {
+                document.getElementById("zone-selector").style.display = "none";
+                document.getElementById("zone-detail").style.display = "";
+            }
 
-async function loadZone() {
-  try {
-    const resp = await fetch(`/api/zones/${encodeURIComponent(zoneId)}`);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    renderHeader(data);
-    renderPhaseFlow(data);
-    renderStandings(data.standings || []);
-    renderTeams(data.teams || []);
-  } catch (e) {
-    document.getElementById('zone-name').textContent = '加载失败';
-    showError('zone-detail', `无法加载赛区数据：${e.message}`);
-  }
-}
+            async function loadZone() {
+                try {
+                    const resp = await fetch(
+                        `/api/zones/${encodeURIComponent(zoneId)}`,
+                    );
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    const data = await resp.json();
+                    renderHeader(data);
+                    renderPhaseFlow(data);
+                    renderStandings(data.standings || []);
+                    renderTeams(data.teams || []);
+                } catch (e) {
+                    document.getElementById("zone-name").textContent =
+                        "加载失败";
+                    showError("zone-detail", `无法加载赛区数据：${e.message}`);
+                }
+            }
 
-async function refreshStandings() {
-  try {
-    const resp = await fetch(`/api/zones/${encodeURIComponent(zoneId)}`);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    renderStandings(data.standings || []);
-  } catch (_) { /* silent fail on auto-refresh */ }
-}
+            async function refreshStandings() {
+                try {
+                    const resp = await fetch(
+                        `/api/zones/${encodeURIComponent(zoneId)}`,
+                    );
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    const data = await resp.json();
+                    renderStandings(data.standings || []);
+                } catch (e) {
+                    console.warn("刷新积分失败:", e);
+                }
+            }
 
-// ── Render: header ────────────────────────────────
-function renderHeader(data) {
-  // Zone name
-  const nameEl = document.getElementById('zone-name');
-  nameEl.textContent = data.name || data.zone_name || ('赛区 ' + zoneId);
+            // ── Render: header ────────────────────────────────
+            function renderHeader(data) {
+                // Zone name
+                const nameEl = document.getElementById("zone-name");
+                nameEl.textContent =
+                    data.name || data.zone_name || "赛区 " + zoneId;
 
-  // Phase badge
-  const state = data.state || data.phase || data.status || 'unknown';
-  const phase = stateToPhase(state);
-  const phaseLabel = PHASE_LABELS[phase] || state;
-  const badgeEl = document.getElementById('phase-badge');
-  badgeEl.className = 'phase-badge ' + phase;
-  badgeEl.innerHTML = `<i class="bi ${PHASE_ICONS[phase] || 'bi-circle'} me-1"></i><span>${escHtml(phaseLabel)}</span>`;
+                // Phase badge
+                const state =
+                    data.state || data.phase || data.status || "unknown";
+                const phase = stateToPhase(state);
+                const phaseLabel = PHASE_LABELS[phase] || state;
+                const badgeEl = document.getElementById("phase-badge");
+                badgeEl.className = "phase-badge " + phase;
+                badgeEl.innerHTML = `<i class="bi ${PHASE_ICONS[phase] || "bi-circle"} me-1"></i><span>${escHtml(phaseLabel)}</span>`;
 
-  // Team count
-  const teams = data.teams || [];
-  const teamCount = data.team_count != null ? data.team_count : teams.length;
-  document.getElementById('team-count-text').textContent = teamCount + ' 支队伍';
+                // Team count
+                const teams = data.teams || [];
+                const teamCount =
+                    data.team_count != null ? data.team_count : teams.length;
+                document.getElementById("team-count-text").textContent =
+                    teamCount + " 支队伍";
 
-  // Page title
-  document.title = (data.name || '赛区') + ' - AI Racer';
-}
+                // Page title
+                document.title = (data.name || "赛区") + " - AI Racer";
+            }
 
-// ── Render: phase flow ────────────────────────────
-function renderPhaseFlow(data) {
-  const body = document.getElementById('phase-flow-body');
-  const state = data.state || data.phase || data.status || 'unknown';
-  const phase = stateToPhase(state);
-  const currentIdx = PHASE_ORDER.indexOf(phase);
+            // ── Render: phase flow ────────────────────────────
+            function renderPhaseFlow(data) {
+                const body = document.getElementById("phase-flow-body");
+                const state =
+                    data.state || data.phase || data.status || "unknown";
+                const phase = stateToPhase(state);
+                const currentIdx = PHASE_ORDER.indexOf(phase);
 
-  const flow = document.createElement('div');
-  flow.className = 'phase-flow';
+                const flow = document.createElement("div");
+                flow.className = "phase-flow";
 
-  PHASE_ORDER.forEach((phase, idx) => {
-    // Node
-    const node = document.createElement('div');
-    node.className = 'phase-node';
+                PHASE_ORDER.forEach((phase, idx) => {
+                    // Node
+                    const node = document.createElement("div");
+                    node.className = "phase-node";
 
-    let circleClass = '';
-    let labelClass = '';
-    if (currentIdx === -1) {
-      // unknown state — show all neutral
-      circleClass = '';
-      labelClass = '';
-    } else if (idx < currentIdx) {
-      circleClass = 'done';
-      labelClass = 'done';
-    } else if (idx === currentIdx) {
-      circleClass = 'active';
-      labelClass = 'active';
-    }
+                    let circleClass = "";
+                    let labelClass = "";
+                    if (currentIdx === -1) {
+                        // unknown state — show all neutral
+                        circleClass = "";
+                        labelClass = "";
+                    } else if (idx < currentIdx) {
+                        circleClass = "done";
+                        labelClass = "done";
+                    } else if (idx === currentIdx) {
+                        circleClass = "active";
+                        labelClass = "active";
+                    }
 
-    const icon = PHASE_ICONS[phase] || 'bi-circle';
-    node.innerHTML = `
+                    const icon = PHASE_ICONS[phase] || "bi-circle";
+                    node.innerHTML = `
       <div class="phase-circle ${circleClass}">
         <i class="bi ${icon}"></i>
       </div>
       <div class="phase-label ${labelClass}">${PHASE_LABELS[phase]}</div>`;
-    flow.appendChild(node);
+                    flow.appendChild(node);
 
-    // Arrow (not after last)
-    if (idx < PHASE_ORDER.length - 1) {
-      const arrow = document.createElement('div');
-      let arrowClass = '';
-      if (currentIdx !== -1) {
-        if (idx < currentIdx) arrowClass = 'done';
-        else if (idx === currentIdx) arrowClass = 'active';
-      }
-      arrow.className = 'phase-arrow ' + arrowClass;
-      flow.appendChild(arrow);
-    }
-  });
+                    // Arrow (not after last)
+                    if (idx < PHASE_ORDER.length - 1) {
+                        const arrow = document.createElement("div");
+                        let arrowClass = "";
+                        if (currentIdx !== -1) {
+                            if (idx < currentIdx) arrowClass = "done";
+                            else if (idx === currentIdx) arrowClass = "active";
+                        }
+                        arrow.className = "phase-arrow " + arrowClass;
+                        flow.appendChild(arrow);
+                    }
+                });
 
-  body.innerHTML = '';
-  body.appendChild(flow);
-}
+                body.innerHTML = "";
+                body.appendChild(flow);
+            }
 
-// ── Render: standings ─────────────────────────────
-function renderStandings(standings) {
-  const body = document.getElementById('standings-body');
+            // ── Render: standings ─────────────────────────────
+            function renderStandings(standings) {
+                const body = document.getElementById("standings-body");
 
-  if (!standings || !standings.length) {
-    body.innerHTML = `
+                if (!standings || !standings.length) {
+                    body.innerHTML = `
       <tr>
         <td colspan="3">
           <div class="empty-state">
@@ -929,45 +1097,57 @@ function renderStandings(standings) {
           </div>
         </td>
       </tr>`;
-    return;
-  }
+                    return;
+                }
 
-  // Compute max points for bar scaling
-  maxPoints = Math.max(1, ...standings.map(s => Number(s.points || s.score || 0)));
+                // Compute max points for bar scaling
+                maxPoints = Math.max(
+                    1,
+                    ...standings.map((s) => Number(s.points || s.score || 0)),
+                );
 
-  let html = '';
-  standings.forEach((s, i) => {
-    const rank = i + 1;
-    const pts  = Number(s.points != null ? s.points : (s.score != null ? s.score : 0));
-    const name = escHtml(s.team_name || s.name || s.team_id || ('队伍 ' + rank));
-    const barW = maxPoints > 0 ? Math.round((pts / maxPoints) * 100) : 0;
+                let html = "";
+                standings.forEach((s, i) => {
+                    const rank = i + 1;
+                    const pts = Number(
+                        s.points != null
+                            ? s.points
+                            : s.score != null
+                              ? s.score
+                              : 0,
+                    );
+                    const name = escHtml(
+                        s.team_name || s.name || s.team_id || "队伍 " + rank,
+                    );
+                    const barW =
+                        maxPoints > 0 ? Math.round((pts / maxPoints) * 100) : 0;
 
-    let rankCell = '';
-    let rowClass = '';
-    let top3Class = '';
+                    let rankCell = "";
+                    let rowClass = "";
+                    let top3Class = "";
 
-    if (rank === 1) {
-      rowClass  = 'rank-gold';
-      top3Class = 'top3';
-      rankCell  = `<span class="medal medal-gold">🥇</span>`;
-    } else if (rank === 2) {
-      rowClass  = 'rank-silver';
-      top3Class = 'top3';
-      rankCell  = `<span class="medal medal-silver">🥈</span>`;
-    } else if (rank === 3) {
-      rowClass  = 'rank-bronze';
-      top3Class = 'top3';
-      rankCell  = `<span class="medal medal-bronze">🥉</span>`;
-    } else {
-      rankCell = `<span class="rank-num">#${rank}</span>`;
-    }
+                    if (rank === 1) {
+                        rowClass = "rank-gold";
+                        top3Class = "top3";
+                        rankCell = `<span class="medal medal-gold">🥇</span>`;
+                    } else if (rank === 2) {
+                        rowClass = "rank-silver";
+                        top3Class = "top3";
+                        rankCell = `<span class="medal medal-silver">🥈</span>`;
+                    } else if (rank === 3) {
+                        rowClass = "rank-bronze";
+                        top3Class = "top3";
+                        rankCell = `<span class="medal medal-bronze">🥉</span>`;
+                    } else {
+                        rankCell = `<span class="rank-num">#${rank}</span>`;
+                    }
 
-    html += `
+                    html += `
       <tr class="${rowClass} ${top3Class}">
         <td>${rankCell}</td>
         <td>
           <span class="team-name">${name}</span>
-          ${rank === 1 ? '<i class="bi bi-crown-fill crown"></i>' : ''}
+          ${rank === 1 ? '<i class="bi bi-crown-fill crown"></i>' : ""}
         </td>
         <td>
           <div class="points-bar-wrap">
@@ -978,68 +1158,74 @@ function renderStandings(standings) {
           </div>
         </td>
       </tr>`;
-  });
+                });
 
-  body.innerHTML = html;
-}
+                body.innerHTML = html;
+            }
 
-// ── Render: teams grid ────────────────────────────
-function renderTeams(teams) {
-  const body = document.getElementById('teams-body');
+            // ── Render: teams grid ────────────────────────────
+            function renderTeams(teams) {
+                const body = document.getElementById("teams-body");
 
-  if (!teams || !teams.length) {
-    body.innerHTML = `<div class="empty-state"><i class="bi bi-people"></i><p>暂无队伍数据</p></div>`;
-    return;
-  }
+                if (!teams || !teams.length) {
+                    body.innerHTML = `<div class="empty-state"><i class="bi bi-people"></i><p>暂无队伍数据</p></div>`;
+                    return;
+                }
 
-  const grid = document.createElement('div');
-  grid.className = 'teams-grid';
+                const grid = document.createElement("div");
+                grid.className = "teams-grid";
 
-  teams.forEach(t => {
-    const name = t.team_name || t.name || t.team_id || '未知队伍';
-    const id   = t.team_id  || t.id  || '—';
-    const date = t.registered_at || t.created_at || '';
+                teams.forEach((t) => {
+                    const name =
+                        t.team_name || t.name || t.team_id || "未知队伍";
+                    const id = t.team_id || t.id || "—";
+                    const date = t.registered_at || t.created_at || "";
 
-    const card = document.createElement('div');
-    card.className = 'team-card';
-    card.innerHTML = `
+                    const card = document.createElement("div");
+                    card.className = "team-card";
+                    card.innerHTML = `
       <div class="team-card-name">${escHtml(name)}</div>
       <div class="team-card-id">${escHtml(id)}</div>
-      ${date ? `<div class="team-card-date"><i class="bi bi-calendar3 me-1"></i>${escHtml(formatDate(date))}</div>` : ''}`;
-    grid.appendChild(card);
-  });
+      ${date ? `<div class="team-card-date"><i class="bi bi-calendar3 me-1"></i>${escHtml(formatDate(date))}</div>` : ""}`;
+                    grid.appendChild(card);
+                });
 
-  body.innerHTML = '';
-  body.appendChild(grid);
-}
+                body.innerHTML = "";
+                body.appendChild(grid);
+            }
 
-// ── Helpers ───────────────────────────────────────
-function escHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+            // ── Helpers ───────────────────────────────────────
+            function escHtml(str) {
+                return String(str ?? "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
 
-function formatDate(raw) {
-  if (!raw) return '';
-  try {
-    const d = new Date(raw);
-    if (isNaN(d)) return String(raw);
-    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  } catch (_) { return String(raw); }
-}
+            function formatDate(raw) {
+                if (!raw) return "";
+                try {
+                    const d = new Date(raw);
+                    if (isNaN(d)) return String(raw);
+                    return d.toLocaleDateString("zh-CN", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                    });
+                } catch (_) {
+                    return String(raw);
+                }
+            }
 
-function showError(containerId, msg) {
-  // Append an error banner inside the container
-  const banner = document.createElement('div');
-  banner.className = 'alert alert-danger mt-3';
-  banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>${escHtml(msg)}`;
-  const el = document.getElementById(containerId);
-  if (el) el.prepend(banner);
-}
-</script>
-
-</body>
+            function showError(containerId, msg) {
+                // Append an error banner inside the container
+                const banner = document.createElement("div");
+                banner.className = "alert alert-danger mt-3";
+                banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>${escHtml(msg)}`;
+                const el = document.getElementById(containerId);
+                if (el) el.prepend(banner);
+            }
+        </script>
+    </body>
 </html>

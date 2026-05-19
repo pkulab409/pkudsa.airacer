@@ -72,7 +72,9 @@ conn.commit()
 
 zone_row = conn.execute("SELECT * FROM zones WHERE id = ?", (ZONE_ID,)).fetchone()
 if zone_row:
-    print(f"  Zone: {zone_row['name']}  (id={zone_row['id']})  laps={zone_row['total_laps']}")
+    print(
+        f"  Zone: {zone_row['name']}  (id={zone_row['id']})  laps={zone_row['total_laps']}"
+    )
 else:
     print("ERROR: 无法创建 zone")
     sys.exit(1)
@@ -156,6 +158,6 @@ print()
 print("  Frontend URLs:")
 print(f"    Admin:  http://localhost:8000/admin/")
 print(f"    Zone:   http://localhost:8000/zone/?id={ZONE_ID}")
-print(f"    Live:   http://localhost:8000/live/?zone={ZONE_ID}")
 print(f"    Submit: http://localhost:8000/submit/")
+print(f"    Test:   http://localhost:8000/testrace/")
 print("=" * 50)

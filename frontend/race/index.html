@@ -1,778 +1,990 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Racer — 回放中心</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>AI Racer — 回放中心</title>
 
-<!-- Bootstrap 5 -->
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-<!-- Bootstrap Icons -->
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<!-- Google Fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap"
-      rel="stylesheet">
-<!-- Shared theme -->
-<link rel="stylesheet" href="/static/style.css">
+        <!-- Bootstrap 5 -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        />
+        <!-- Bootstrap Icons -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        />
+        <!-- Google Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap"
+            rel="stylesheet"
+        />
+        <!-- Shared theme -->
+        <link rel="stylesheet" href="/static/style.css" />
 
-<style>
-/* ── Page shell ── */
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
+        <style>
+            /* ── Page shell ── */
+            html,
+            body {
+                height: 100%;
+                overflow: hidden;
+            }
 
-/* Navbar override height */
-.navbar { min-height: 52px; }
+            /* Navbar override height */
+            .navbar {
+                min-height: 52px;
+            }
 
-/* ── Two-column layout ── */
-#app-shell {
-  display: flex;
-  height: calc(100vh - 52px);
-  overflow: hidden;
-}
+            /* ── Two-column layout ── */
+            #app-shell {
+                display: flex;
+                height: calc(100vh - 52px);
+                overflow: hidden;
+            }
 
-/* ── Left sidebar: recording list ── */
-#sidebar {
-  width: 380px;
-  min-width: 380px;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #e5e7eb;
-  background: #fff;
-  overflow: hidden;
-}
+            /* ── Left sidebar: recording list ── */
+            #sidebar {
+                width: 380px;
+                min-width: 380px;
+                max-width: 380px;
+                display: flex;
+                flex-direction: column;
+                border-right: 1px solid #e5e7eb;
+                background: #fff;
+                overflow: hidden;
+            }
 
-#sidebar-header {
-  padding: .75rem 1rem .6rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
-  flex-shrink: 0;
-}
-#sidebar-header h6 {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  margin: 0 0 .6rem;
-  color: #212529;
-  letter-spacing: .02em;
-}
+            #sidebar-header {
+                padding: 0.75rem 1rem 0.6rem;
+                border-bottom: 1px solid #e5e7eb;
+                background: #fff;
+                flex-shrink: 0;
+            }
+            #sidebar-header h6 {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1rem;
+                font-weight: 700;
+                margin: 0 0 0.6rem;
+                color: #212529;
+                letter-spacing: 0.02em;
+            }
 
-/* Filter row */
-.filter-row {
-  display: flex;
-  gap: .4rem;
-  align-items: center;
-}
-.filter-row .form-select {
-  font-size: .8rem;
-  padding: .25rem .5rem;
-  height: 30px;
-  flex: 1;
-}
-.filter-row .btn {
-  height: 30px;
-  padding: 0 .6rem;
-  font-size: .8rem;
-}
+            /* Filter row */
+            .filter-row {
+                display: flex;
+                gap: 0.4rem;
+                align-items: center;
+            }
+            .filter-row .form-select {
+                font-size: 0.8rem;
+                padding: 0.25rem 0.5rem;
+                height: 30px;
+                flex: 1;
+            }
+            .filter-row .btn {
+                height: 30px;
+                padding: 0 0.6rem;
+                font-size: 0.8rem;
+            }
 
-/* List scroll area */
-#recordings-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: .5rem .75rem;
-}
+            /* List scroll area */
+            #recordings-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 0.5rem 0.75rem;
+            }
 
-/* Recording card */
-.rec-card {
-  border: 1px solid #e5e7eb;
-  border-radius: .625rem;
-  padding: .65rem .85rem;
-  margin-bottom: .5rem;
-  cursor: pointer;
-  transition: border-color .18s, box-shadow .18s, background .18s;
-  background: #fff;
-}
-.rec-card:hover {
-  border-color: var(--primary-light);
-  box-shadow: 0 2px 10px rgba(220,38,38,.1);
-  background: #fef2f2;
-}
-.rec-card.active {
-  border-color: var(--primary-color);
-  background: linear-gradient(135deg, rgba(220,38,38,.06), rgba(220,38,38,.02));
-  box-shadow: 0 2px 12px rgba(220,38,38,.18);
-}
+            /* Recording card */
+            .rec-card {
+                border: 1px solid #e5e7eb;
+                border-radius: 0.625rem;
+                padding: 0.65rem 0.85rem;
+                margin-bottom: 0.5rem;
+                cursor: pointer;
+                transition:
+                    border-color 0.18s,
+                    box-shadow 0.18s,
+                    background 0.18s;
+                background: #fff;
+            }
+            .rec-card:hover {
+                border-color: var(--primary-light);
+                box-shadow: 0 2px 10px rgba(220, 38, 38, 0.1);
+                background: #fef2f2;
+            }
+            .rec-card.active {
+                border-color: var(--primary-color);
+                background: linear-gradient(
+                    135deg,
+                    rgba(220, 38, 38, 0.06),
+                    rgba(220, 38, 38, 0.02)
+                );
+                box-shadow: 0 2px 12px rgba(220, 38, 38, 0.18);
+            }
 
-.rec-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: .5rem;
-  margin-bottom: .3rem;
-}
-.rec-session-id {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: .9rem;
-  font-weight: 700;
-  color: #1e293b;
-  word-break: break-all;
-  line-height: 1.2;
-  flex: 1;
-}
-.rec-play-btn {
-  flex-shrink: 0;
-  padding: .2rem .6rem;
-  font-size: .78rem;
-  font-weight: 600;
-  border-radius: .45rem;
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  transition: all .2s;
-  white-space: nowrap;
-}
-.rec-play-btn:hover {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(220,38,38,.35);
-}
+            .rec-card-top {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 0.5rem;
+                margin-bottom: 0.3rem;
+            }
+            .rec-session-id {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 0.9rem;
+                font-weight: 700;
+                color: #1e293b;
+                word-break: break-all;
+                line-height: 1.2;
+                flex: 1;
+            }
+            .rec-play-btn {
+                flex-shrink: 0;
+                padding: 0.2rem 0.6rem;
+                font-size: 0.78rem;
+                font-weight: 600;
+                border-radius: 0.45rem;
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-dark),
+                    var(--primary-color)
+                );
+                border: none;
+                color: #fff;
+                cursor: pointer;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+            .rec-play-btn:hover {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-color),
+                    var(--primary-light)
+                );
+                transform: translateY(-1px);
+                box-shadow: 0 3px 8px rgba(220, 38, 38, 0.35);
+            }
 
-.rec-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: .3rem;
-}
-.rec-time {
-  font-size: .72rem;
-  color: #6b7280;
-}
-.rec-teams {
-  font-size: .72rem;
-  color: #9ca3af;
-  margin-top: .15rem;
-}
+            .rec-meta {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 0.3rem;
+            }
+            .rec-time {
+                font-size: 0.72rem;
+                color: #6b7280;
+            }
+            .rec-teams {
+                font-size: 0.72rem;
+                color: #9ca3af;
+                margin-top: 0.15rem;
+            }
 
-/* ── Right: player area ── */
-#player-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #f8fafc;
-}
+            /* ── Right: player area ── */
+            #player-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: #f8fafc;
+            }
 
-/* Empty state */
-#empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  gap: 1rem;
-  padding: 2rem;
-}
-#empty-state .empty-icon {
-  font-size: 3.5rem;
-  color: #d1d5db;
-}
-#empty-state .empty-title {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #64748b;
-}
-#empty-state .empty-sub {
-  font-size: .9rem;
-  color: #94a3b8;
-}
+            /* Empty state */
+            #empty-state {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: #94a3b8;
+                gap: 1rem;
+                padding: 2rem;
+            }
+            #empty-state .empty-icon {
+                font-size: 3.5rem;
+                color: #d1d5db;
+            }
+            #empty-state .empty-title {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1.4rem;
+                font-weight: 700;
+                color: #64748b;
+            }
+            #empty-state .empty-sub {
+                font-size: 0.9rem;
+                color: #94a3b8;
+            }
 
-/* Player layout */
-#player {
-  display: none;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
+            /* Player layout */
+            #player {
+                display: none;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+            }
 
-/* Player info bar */
-#player-info-bar {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .6rem 1rem;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.player-session-id {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1e293b;
-}
-.player-time {
-  font-size: .8rem;
-  color: #6b7280;
-  margin-left: auto;
-}
-.replay-badge {
-  font-size: .68rem;
-  padding: .15rem .5rem;
-  border-radius: .35rem;
-  background: #f1f5f9;
-  color: #64748b;
-  font-weight: 700;
-  letter-spacing: .06em;
-}
+            /* Player info bar */
+            #player-info-bar {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                padding: 0.6rem 1rem;
+                background: #fff;
+                border-bottom: 1px solid #e5e7eb;
+                flex-shrink: 0;
+                flex-wrap: wrap;
+            }
+            .player-session-id {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1rem;
+                font-weight: 700;
+                color: #1e293b;
+            }
+            .player-time {
+                font-size: 0.8rem;
+                color: #6b7280;
+                margin-left: auto;
+            }
+            .replay-badge {
+                font-size: 0.68rem;
+                padding: 0.15rem 0.5rem;
+                border-radius: 0.35rem;
+                background: #f1f5f9;
+                color: #64748b;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+            }
 
-/* Main content: canvas + leaderboard */
-#player-main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
+            /* Main content: canvas + leaderboard */
+            #player-main {
+                display: flex;
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
+            }
 
-/* Canvas container */
-#minimap-container {
-  flex-shrink: 0;
-  background: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px solid #1f2937;
-  position: relative;
-}
-#minimap {
-  display: block;
-  width: 600px;
-  height: 380px;
-}
+            /* Canvas container */
+            #minimap-container {
+                flex-shrink: 0;
+                background: #111;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-right: 1px solid #1f2937;
+                position: relative;
+            }
+            #minimap {
+                display: block;
+                width: 600px;
+                height: 380px;
+            }
 
-/* Leaderboard */
-#leaderboard-panel {
-  flex: 1;
-  background: #fff;
-  overflow-y: auto;
-  padding: .75rem 1rem;
-  min-width: 200px;
-}
+            /* Leaderboard */
+            #leaderboard-panel {
+                flex: 1;
+                background: #fff;
+                overflow-y: auto;
+                padding: 0.75rem 1rem;
+                min-width: 200px;
+            }
 
-/* Override lb-table to use Bootstrap table feel */
-.lb-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .82rem;
-}
-.lb-table thead tr {
-  border-bottom: 2px solid #e5e7eb;
-}
-.lb-table th {
-  text-align: left;
-  font-weight: 600;
-  font-size: .75rem;
-  padding: .4rem .5rem;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: #6b7280;
-}
-.lb-table td {
-  padding: .45rem .5rem;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-.lb-table tbody tr:hover td { background: rgba(220,38,38,.03); }
-.lb-table tr.leader td { background: rgba(220,38,38,.05); }
-.lb-table tr.leader .lb-rank { color: var(--primary-color); font-weight: 700; }
-.lb-header {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: .85rem;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-bottom: .6rem;
-  padding-bottom: .4rem;
-  border-bottom: 2px solid #e5e7eb;
-}
-.final-header {
-  color: var(--success);
-  font-size: .95rem;
-  text-transform: none;
-  letter-spacing: 0;
-}
+            /* Override lb-table to use Bootstrap table feel */
+            .lb-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.82rem;
+            }
+            .lb-table thead tr {
+                border-bottom: 2px solid #e5e7eb;
+            }
+            .lb-table th {
+                text-align: left;
+                font-weight: 600;
+                font-size: 0.75rem;
+                padding: 0.4rem 0.5rem;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #6b7280;
+            }
+            .lb-table td {
+                padding: 0.45rem 0.5rem;
+                border-bottom: 1px solid #f1f5f9;
+                vertical-align: middle;
+            }
+            .lb-table tbody tr:hover td {
+                background: rgba(220, 38, 38, 0.03);
+            }
+            .lb-table tr.leader td {
+                background: rgba(220, 38, 38, 0.05);
+            }
+            .lb-table tr.leader .lb-rank {
+                color: var(--primary-color);
+                font-weight: 700;
+            }
+            .lb-header {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: #6b7280;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.6rem;
+                padding-bottom: 0.4rem;
+                border-bottom: 2px solid #e5e7eb;
+            }
+            .final-header {
+                color: var(--success);
+                font-size: 0.95rem;
+                text-transform: none;
+                letter-spacing: 0;
+            }
 
-/* rank medals */
-.lb-rank { color: #9ca3af; font-weight: 600; width: 28px; }
-.lb-name { font-weight: 500; }
-.lb-lap, .lb-best, .lb-speed, .lb-time {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: .8rem;
-  color: #6b7280;
-}
-.status-badge {
-  display: inline-block;
-  font-size: .68rem;
-  padding: .1rem .4rem;
-  border-radius: .25rem;
-  font-weight: 700;
-  margin-left: .25rem;
-  vertical-align: middle;
-}
-.status-dq       { background: #e5e7eb; color: #6b7280; }
-.status-stopped  { background: var(--warning); color: #1a1a1a; }
-.status-finished { background: var(--success); color: #fff; }
-.status-idle     { background: #f3f4f6; color: #9ca3af; }
+            /* rank medals */
+            .lb-rank {
+                color: #9ca3af;
+                font-weight: 600;
+                width: 28px;
+            }
+            .lb-name {
+                font-weight: 500;
+            }
+            .lb-lap,
+            .lb-best,
+            .lb-speed,
+            .lb-time {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 0.8rem;
+                color: #6b7280;
+            }
+            .status-badge {
+                display: inline-block;
+                font-size: 0.68rem;
+                padding: 0.1rem 0.4rem;
+                border-radius: 0.25rem;
+                font-weight: 700;
+                margin-left: 0.25rem;
+                vertical-align: middle;
+            }
+            .status-dq {
+                background: #e5e7eb;
+                color: #6b7280;
+            }
+            .status-stopped {
+                background: var(--warning);
+                color: #1a1a1a;
+            }
+            .status-finished {
+                background: var(--success);
+                color: #fff;
+            }
+            .status-idle {
+                background: #f3f4f6;
+                color: #9ca3af;
+            }
 
-/* Controls bar */
-#controls {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .55rem .9rem;
-  background: #fff;
-  border-top: 1px solid #e5e7eb;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
+            /* Controls bar */
+            #controls {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                padding: 0.55rem 0.9rem;
+                background: #fff;
+                border-top: 1px solid #e5e7eb;
+                flex-shrink: 0;
+                flex-wrap: wrap;
+            }
 
-#btn-rewind, #btn-play {
-  display: flex; align-items: center; justify-content: center;
-  border: none; cursor: pointer; flex-shrink: 0;
-  transition: all .18s;
-}
+            #btn-rewind,
+            #btn-play {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: none;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: all 0.18s;
+            }
 
-#btn-rewind {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: .85rem;
-  border: 1px solid #e2e8f0;
-}
-#btn-rewind:hover { background: #e2e8f0; color: #374151; }
+            #btn-rewind {
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                background: #f1f5f9;
+                color: #64748b;
+                font-size: 0.85rem;
+                border: 1px solid #e2e8f0;
+            }
+            #btn-rewind:hover {
+                background: #e2e8f0;
+                color: #374151;
+            }
 
-#btn-play {
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
-  color: #fff;
-  font-size: .9rem;
-  box-shadow: 0 2px 8px rgba(220,38,38,.3);
-}
-#btn-play:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(220,38,38,.4);
-}
-#btn-play:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; box-shadow: none; }
+            #btn-play {
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-dark),
+                    var(--primary-color)
+                );
+                color: #fff;
+                font-size: 0.9rem;
+                box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+            }
+            #btn-play:hover:not(:disabled) {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-color),
+                    var(--primary-light)
+                );
+                transform: scale(1.05);
+                box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+            }
+            #btn-play:disabled {
+                background: #e5e7eb;
+                color: #9ca3af;
+                cursor: not-allowed;
+                box-shadow: none;
+            }
 
-/* Timeline */
-#timeline {
-  flex: 1;
-  min-width: 100px;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: #e5e7eb;
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-#timeline::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  cursor: pointer;
-  transition: transform .1s;
-}
-#timeline::-webkit-slider-thumb:hover { transform: scale(1.3); }
-#timeline::-moz-range-thumb {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  border: none;
-}
+            /* Timeline */
+            #timeline {
+                flex: 1;
+                min-width: 100px;
+                height: 4px;
+                -webkit-appearance: none;
+                appearance: none;
+                background: #e5e7eb;
+                border-radius: 2px;
+                outline: none;
+                cursor: pointer;
+            }
+            #timeline::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: var(--primary-color);
+                cursor: pointer;
+                transition: transform 0.1s;
+            }
+            #timeline::-webkit-slider-thumb:hover {
+                transform: scale(1.3);
+            }
+            #timeline::-moz-range-thumb {
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: var(--primary-color);
+                border: none;
+            }
 
-#time-display {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: .88rem;
-  color: #6b7280;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+            #time-display {
+                font-family: "Rajdhani", sans-serif;
+                font-size: 0.88rem;
+                color: #6b7280;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
 
-.speed-btn {
-  padding: .2rem .55rem;
-  border-radius: .35rem;
-  background: #f1f5f9;
-  color: #6b7280;
-  font-size: .78rem;
-  font-weight: 600;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .15s;
-}
-.speed-btn:hover { background: #e5e7eb; color: #374151; }
-.speed-btn.active {
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
-  color: #fff;
-  border-color: transparent;
-  box-shadow: 0 2px 6px rgba(220,38,38,.3);
-}
+            .speed-btn {
+                padding: 0.2rem 0.55rem;
+                border-radius: 0.35rem;
+                background: #f1f5f9;
+                color: #6b7280;
+                font-size: 0.78rem;
+                font-weight: 600;
+                border: 1px solid #e2e8f0;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: all 0.15s;
+            }
+            .speed-btn:hover {
+                background: #e5e7eb;
+                color: #374151;
+            }
+            .speed-btn.active {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary-dark),
+                    var(--primary-color)
+                );
+                color: #fff;
+                border-color: transparent;
+                box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+            }
 
-#btn-final {
-  padding: .2rem .65rem;
-  border-radius: .35rem;
-  background: linear-gradient(135deg, #065f46, var(--success));
-  color: #fff;
-  font-size: .78rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .15s;
-}
-#btn-final:hover { opacity: .9; transform: translateY(-1px); }
+            #btn-final {
+                padding: 0.2rem 0.65rem;
+                border-radius: 0.35rem;
+                background: linear-gradient(135deg, #065f46, var(--success));
+                color: #fff;
+                font-size: 0.78rem;
+                font-weight: 600;
+                border: none;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: all 0.15s;
+            }
+            #btn-final:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
+            }
 
-/* Event log */
-#event-log {
-  padding: .35rem .9rem;
-  background: #fafafa;
-  border-top: 1px solid #e5e7eb;
-  font-size: .75rem;
-  color: #9ca3af;
-  white-space: nowrap;
-  overflow-x: auto;
-  flex-shrink: 0;
-  min-height: 26px;
-  line-height: 18px;
-  scrollbar-width: thin;
-}
-#event-log::-webkit-scrollbar { height: 3px; }
-#event-log::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-.ev-item { color: #374151; }
-.ev-item.ev-new { color: var(--primary-color); font-weight: 600; }
-.ev-sep { color: #d1d5db; }
+            /* Event log */
+            #event-log {
+                padding: 0.35rem 0.9rem;
+                background: #fafafa;
+                border-top: 1px solid #e5e7eb;
+                font-size: 0.75rem;
+                color: #9ca3af;
+                white-space: nowrap;
+                overflow-x: auto;
+                flex-shrink: 0;
+                min-height: 26px;
+                line-height: 18px;
+                scrollbar-width: thin;
+            }
+            #event-log::-webkit-scrollbar {
+                height: 3px;
+            }
+            #event-log::-webkit-scrollbar-thumb {
+                background: #d1d5db;
+                border-radius: 2px;
+            }
+            .ev-item {
+                color: #374151;
+            }
+            .ev-item.ev-new {
+                color: var(--primary-color);
+                font-weight: 600;
+            }
+            .ev-sep {
+                color: #d1d5db;
+            }
 
-/* Loading overlay */
-#loading-overlay {
-  position: fixed; inset: 0;
-  background: rgba(15,23,42,.75);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  flex-direction: column;
-  gap: .75rem;
-  backdrop-filter: blur(3px);
-}
-.loading-spinner {
-  width: 36px; height: 36px;
-  border: 3px solid rgba(255,255,255,.2);
-  border-top-color: var(--primary-color);
-  border-radius: 50%;
-  animation: spin .75s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-#load-progress { font-size: .8rem; color: rgba(255,255,255,.6); }
+            /* Loading overlay */
+            #loading-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.75);
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1050;
+                flex-direction: column;
+                gap: 0.75rem;
+                backdrop-filter: blur(3px);
+            }
+            .loading-spinner {
+                width: 36px;
+                height: 36px;
+                border: 3px solid rgba(255, 255, 255, 0.2);
+                border-top-color: var(--primary-color);
+                border-radius: 50%;
+                animation: spin 0.75s linear infinite;
+            }
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            #load-progress {
+                font-size: 0.8rem;
+                color: rgba(255, 255, 255, 0.6);
+            }
 
-/* Error banner inside player */
-.error-banner {
-  background: #fef2f2;
-  border-left: 4px solid var(--danger);
-  color: #991b1b;
-  padding: .6rem 1rem;
-  font-size: .85rem;
-  flex-shrink: 0;
-}
+            /* Error banner inside player */
+            .error-banner {
+                background: #fef2f2;
+                border-left: 4px solid var(--danger);
+                color: #991b1b;
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
+                flex-shrink: 0;
+            }
 
-/* Sidebar state messages */
-.list-loading, .list-empty, .list-error {
-  padding: 2.5rem 1rem;
-  text-align: center;
-  color: #9ca3af;
-  font-size: .85rem;
-}
-.list-error { color: var(--danger); }
+            /* Sidebar state messages */
+            .list-loading,
+            .list-empty,
+            .list-error {
+                padding: 2.5rem 1rem;
+                text-align: center;
+                color: #9ca3af;
+                font-size: 0.85rem;
+            }
+            .list-error {
+                color: var(--danger);
+            }
 
-/* Scrollbar for sidebar */
-#recordings-list::-webkit-scrollbar { width: 4px; }
-#recordings-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+            /* Scrollbar for sidebar */
+            #recordings-list::-webkit-scrollbar {
+                width: 4px;
+            }
+            #recordings-list::-webkit-scrollbar-thumb {
+                background: #d1d5db;
+                border-radius: 2px;
+            }
 
-/* Rank medal rows */
-.rec-rank-gold   { background: linear-gradient(90deg, rgba(251,191,36,.12), transparent) !important; }
-.rec-rank-silver { background: linear-gradient(90deg, rgba(156,163,175,.12), transparent) !important; }
-.rec-rank-bronze { background: linear-gradient(90deg, rgba(180,83,9,.12), transparent) !important; }
+            /* Rank medal rows */
+            .rec-rank-gold {
+                background: linear-gradient(
+                    90deg,
+                    rgba(251, 191, 36, 0.12),
+                    transparent
+                ) !important;
+            }
+            .rec-rank-silver {
+                background: linear-gradient(
+                    90deg,
+                    rgba(156, 163, 175, 0.12),
+                    transparent
+                ) !important;
+            }
+            .rec-rank-bronze {
+                background: linear-gradient(
+                    90deg,
+                    rgba(180, 83, 9, 0.12),
+                    transparent
+                ) !important;
+            }
 
-/* Canvas resize hint */
-#canvas-overlay-msg {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4b5563;
-  font-size: .85rem;
-  background: #111;
-  pointer-events: none;
-}
-</style>
-</head>
-<body>
+            /* Canvas resize hint */
+            #canvas-overlay-msg {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #4b5563;
+                font-size: 0.85rem;
+                background: #111;
+                pointer-events: none;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">
+                    <i class="bi bi-flag-fill me-1"></i> AI Racer
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="/"
+                        ><i class="bi bi-house me-1"></i>主页</a
+                    >
+                    <a class="nav-link active" href="/race/"
+                        ><i class="bi bi-play-circle me-1"></i>回放</a
+                    >
+                </div>
+            </div>
+        </nav>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/">
-      <i class="bi bi-flag-fill me-1"></i> AI Racer
-    </a>
-    <div class="navbar-nav ms-auto">
-      <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>主页</a>
-      <a class="nav-link" href="/live/"><i class="bi bi-tv me-1"></i>比赛实况</a>
-      <a class="nav-link active" href="/race/"><i class="bi bi-play-circle me-1"></i>回放</a>
-    </div>
-  </div>
-</nav>
+        <!-- Two-column shell -->
+        <div id="app-shell">
+            <!-- ── LEFT: Recording list sidebar ── -->
+            <div id="sidebar">
+                <div id="sidebar-header">
+                    <h6><i class="bi bi-collection-play me-1"></i>录像列表</h6>
+                    <div class="filter-row">
+                        <select
+                            id="filter-zone"
+                            class="form-select form-select-sm"
+                            title="按赛区筛选"
+                        >
+                            <option value="">全部赛区</option>
+                        </select>
+                        <select
+                            id="filter-type"
+                            class="form-select form-select-sm"
+                            title="按类型筛选"
+                        >
+                            <option value="">全部类型</option>
+                            <option value="placement">排位赛</option>
+                            <option value="group_stage">分组赛</option>
+                            <option value="semi">半决赛</option>
+                            <option value="final">决赛</option>
+                            <option value="test">测试</option>
+                        </select>
+                        <button
+                            class="btn btn-sm btn-outline-secondary"
+                            id="btn-refresh-list"
+                            title="刷新"
+                        >
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="recordings-list">
+                    <div class="list-loading">
+                        <div
+                            class="spinner-border spinner-border-sm text-secondary mb-2"
+                            role="status"
+                        ></div>
+                        <div>加载录像列表...</div>
+                    </div>
+                </div>
+            </div>
 
-<!-- Two-column shell -->
-<div id="app-shell">
+            <!-- ── RIGHT: Player area ── -->
+            <div id="player-area">
+                <!-- Empty state -->
+                <div id="empty-state">
+                    <div class="empty-icon">
+                        <i class="bi bi-collection-play"></i>
+                    </div>
+                    <div class="empty-title">选择一场比赛开始回放</div>
+                    <div class="empty-sub">
+                        从左侧列表中选择一场录像，点击
+                        <strong>播放</strong> 按钮
+                    </div>
+                </div>
 
-  <!-- ── LEFT: Recording list sidebar ── -->
-  <div id="sidebar">
-    <div id="sidebar-header">
-      <h6><i class="bi bi-collection-play me-1"></i>录像列表</h6>
-      <div class="filter-row">
-        <select id="filter-zone" class="form-select form-select-sm" title="按赛区筛选">
-          <option value="">全部赛区</option>
-        </select>
-        <select id="filter-type" class="form-select form-select-sm" title="按类型筛选">
-          <option value="">全部类型</option>
-          <option value="placement">排位赛</option>
-          <option value="group_stage">分组赛</option>
-          <option value="semi">半决赛</option>
-          <option value="final">决赛</option>
-          <option value="test">测试</option>
-        </select>
-        <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-list" title="刷新">
-          <i class="bi bi-arrow-clockwise"></i>
-        </button>
-      </div>
-    </div>
-    <div id="recordings-list">
-      <div class="list-loading">
-        <div class="spinner-border spinner-border-sm text-secondary mb-2" role="status"></div>
-        <div>加载录像列表...</div>
-      </div>
-    </div>
-  </div>
+                <!-- Player (hidden until session loaded) -->
+                <div id="player">
+                    <!-- Info bar -->
+                    <div id="player-info-bar">
+                        <span class="player-session-id" id="player-session-id"
+                            >—</span
+                        >
+                        <span id="player-type-badge"></span>
+                        <span class="replay-badge">REPLAY</span>
+                        <span class="player-time" id="player-time"></span>
+                    </div>
 
-  <!-- ── RIGHT: Player area ── -->
-  <div id="player-area">
+                    <!-- Canvas + Leaderboard -->
+                    <div id="player-main">
+                        <div id="minimap-container">
+                            <div id="canvas-overlay-msg">等待加载...</div>
+                            <canvas
+                                id="minimap"
+                                width="600"
+                                height="380"
+                                style="display: none"
+                            ></canvas>
+                        </div>
+                        <div id="leaderboard-panel">
+                            <div class="lb-header">排行榜</div>
+                            <div
+                                style="
+                                    color: #9ca3af;
+                                    padding: 1.5rem 0;
+                                    text-align: center;
+                                    font-size: 0.82rem;
+                                "
+                            >
+                                等待数据...
+                            </div>
+                        </div>
+                    </div>
 
-    <!-- Empty state -->
-    <div id="empty-state">
-      <div class="empty-icon"><i class="bi bi-collection-play"></i></div>
-      <div class="empty-title">选择一场比赛开始回放</div>
-      <div class="empty-sub">从左侧列表中选择一场录像，点击 <strong>播放</strong> 按钮</div>
-    </div>
+                    <!-- Controls -->
+                    <div id="controls">
+                        <button id="btn-rewind" title="回到开头">
+                            <i class="bi bi-skip-start-fill"></i>
+                        </button>
+                        <button id="btn-play" title="播放/暂停" disabled>
+                            <i class="bi bi-play-fill"></i>
+                        </button>
+                        <input
+                            type="range"
+                            id="timeline"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="0"
+                        />
+                        <span id="time-display">--:--.-- / --:--.--</span>
+                        <button class="speed-btn active" data-speed="1">
+                            1x
+                        </button>
+                        <button class="speed-btn" data-speed="2">2x</button>
+                        <button class="speed-btn" data-speed="4">4x</button>
+                    </div>
 
-    <!-- Player (hidden until session loaded) -->
-    <div id="player">
-
-      <!-- Info bar -->
-      <div id="player-info-bar">
-        <span class="player-session-id" id="player-session-id">—</span>
-        <span id="player-type-badge"></span>
-        <span class="replay-badge">REPLAY</span>
-        <span class="player-time" id="player-time"></span>
-      </div>
-
-      <!-- Canvas + Leaderboard -->
-      <div id="player-main">
-        <div id="minimap-container">
-          <div id="canvas-overlay-msg">等待加载...</div>
-          <canvas id="minimap" width="600" height="380" style="display:none"></canvas>
+                    <!-- Event log -->
+                    <div id="event-log">暂无事件</div>
+                </div>
+                <!-- /#player -->
+            </div>
+            <!-- /#player-area -->
         </div>
-        <div id="leaderboard-panel">
-          <div class="lb-header">排行榜</div>
-          <div style="color:#9ca3af;padding:1.5rem 0;text-align:center;font-size:.82rem">等待数据...</div>
-        </div>
-      </div>
+        <!-- /#app-shell -->
 
-      <!-- Controls -->
-      <div id="controls">
-        <button id="btn-rewind" title="回到开头"><i class="bi bi-skip-start-fill"></i></button>
-        <button id="btn-play" title="播放/暂停" disabled><i class="bi bi-play-fill"></i></button>
-        <input type="range" id="timeline" min="0" max="100" step="0.1" value="0">
-        <span id="time-display">--:--.-- / --:--.--</span>
-        <button class="speed-btn active" data-speed="1">1x</button>
-        <button class="speed-btn" data-speed="2">2x</button>
-        <button class="speed-btn" data-speed="4">4x</button>
-      </div>
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-      <!-- Event log -->
-      <div id="event-log">暂无事件</div>
+        <!-- Replay engine scripts (unchanged logic) -->
+        <script src="minimap.js"></script>
+        <script src="leaderboard.js"></script>
 
-    </div><!-- /#player -->
-  </div><!-- /#player-area -->
-</div><!-- /#app-shell -->
-
-<!-- Bootstrap JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Replay engine scripts (unchanged logic) -->
-<script src="minimap.js"></script>
-<script src="leaderboard.js"></script>
-
-<script>
-/* ============================================================
+        <script>
+            /* ============================================================
    replay-ui.js — inline, replaces replay.js
    Manages the two-column layout + calls minimap/leaderboard helpers
    ============================================================ */
 
-// ── State ──────────────────────────────────────────────────────
-let allRecordings = [];
-let frames = [], metadata = null, globalTeams = [];
-let playing = false, playSpeed = 1;
-let currentTime = 0, lastRafTime = null, rafId = null;
-let recentEvents = [];
-let activeSessionId = null;
+            // ── State ──────────────────────────────────────────────────────
+            let allRecordings = [];
+            let frames = [],
+                metadata = null,
+                globalTeams = [];
+            let playing = false,
+                playSpeed = 1;
+            let currentTime = 0,
+                lastRafTime = null,
+                rafId = null;
+            let recentEvents = [];
+            let activeSessionId = null;
 
-// ── Type labels ────────────────────────────────────────────────
-const TYPE_LABELS = {
-  placement:   '排位赛',
-  group_stage: '分组赛',
-  semi:       '半决赛',
-  final:      '决赛',
-  test:       '测试',
-};
+            // ── Type labels ────────────────────────────────────────────────
+            const TYPE_LABELS = {
+                placement: "排位赛",
+                group_stage: "分组赛",
+                semi: "半决赛",
+                final: "决赛",
+                test: "测试",
+            };
 
-const FINISH_LABELS = {
-  normal:  { label: '正常', cls: 'bg-success' },
-  timeout: { label: '超时', cls: 'bg-warning text-dark' },
-  aborted: { label: '中止', cls: 'bg-danger' },
-};
+            const FINISH_LABELS = {
+                normal: { label: "正常", cls: "bg-success" },
+                timeout: { label: "超时", cls: "bg-warning text-dark" },
+                aborted: { label: "中止", cls: "bg-danger" },
+            };
 
-// ── Init ───────────────────────────────────────────────────────
-window.addEventListener('load', async () => {
-  await loadRecordingsList();
-  setupFilters();
-  setupRefreshButton();
+            // ── Init ───────────────────────────────────────────────────────
+            window.addEventListener("load", async () => {
+                await loadRecordingsList();
+                setupFilters();
+                setupRefreshButton();
 
-  const params = new URLSearchParams(location.search);
-  const sessionId = params.get('session');
-  if (sessionId) {
-    await loadAndPlay(sessionId);
-  }
-});
+                const params = new URLSearchParams(location.search);
+                const sessionId = params.get("session");
+                if (sessionId) {
+                    await loadAndPlay(sessionId);
+                }
+            });
 
-// ── Load recordings list ───────────────────────────────────────
-async function loadRecordingsList() {
-  const listEl = document.getElementById('recordings-list');
-  listEl.innerHTML = `<div class="list-loading">
+            // ── Load recordings list ───────────────────────────────────────
+            async function loadRecordingsList() {
+                const listEl = document.getElementById("recordings-list");
+                listEl.innerHTML = `<div class="list-loading">
     <div class="spinner-border spinner-border-sm text-secondary mb-2" role="status"></div>
     <div>加载录像列表...</div>
   </div>`;
 
-  try {
-    const resp = await fetch('/api/recordings');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    allRecordings = await resp.json();
-  } catch (e) {
-    listEl.innerHTML = `<div class="list-error"><i class="bi bi-exclamation-triangle me-1"></i>加载失败: ${escHtml(e.message)}</div>`;
-    return;
-  }
+                try {
+                    const resp = await fetch("/api/recordings");
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    allRecordings = await resp.json();
+                } catch (e) {
+                    listEl.innerHTML = `<div class="list-error"><i class="bi bi-exclamation-triangle me-1"></i>加载失败: ${escHtml(e.message)}</div>`;
+                    return;
+                }
 
-  // Populate zone filter from data
-  populateZoneFilter(allRecordings);
+                // Populate zone filter from data
+                populateZoneFilter(allRecordings);
 
-  renderRecordingsList(allRecordings);
-}
+                renderRecordingsList(allRecordings);
+            }
 
-function populateZoneFilter(recordings) {
-  const zones = new Set();
-  recordings.forEach(r => {
-    if (r.zone_id) zones.add(r.zone_id);
-  });
-  const sel = document.getElementById('filter-zone');
-  // clear old options except the first
-  while (sel.options.length > 1) sel.remove(1);
-  zones.forEach(z => {
-    const opt = document.createElement('option');
-    opt.value = z;
-    opt.textContent = z;
-    sel.appendChild(opt);
-  });
-}
+            function populateZoneFilter(recordings) {
+                const zones = new Set();
+                recordings.forEach((r) => {
+                    if (r.zone_id) zones.add(r.zone_id);
+                });
+                const sel = document.getElementById("filter-zone");
+                // clear old options except the first
+                while (sel.options.length > 1) sel.remove(1);
+                zones.forEach((z) => {
+                    const opt = document.createElement("option");
+                    opt.value = z;
+                    opt.textContent = z;
+                    sel.appendChild(opt);
+                });
+            }
 
-function renderRecordingsList(recordings) {
-  const listEl = document.getElementById('recordings-list');
+            function renderRecordingsList(recordings) {
+                const listEl = document.getElementById("recordings-list");
 
-  if (!recordings.length) {
-    listEl.innerHTML = `<div class="list-empty"><i class="bi bi-inbox me-1"></i>暂无录像</div>`;
-    return;
-  }
+                if (!recordings.length) {
+                    listEl.innerHTML = `<div class="list-empty"><i class="bi bi-inbox me-1"></i>暂无录像</div>`;
+                    return;
+                }
 
-  listEl.innerHTML = recordings.map(r => buildRecCard(r)).join('');
+                listEl.innerHTML = recordings
+                    .map((r) => buildRecCard(r))
+                    .join("");
 
-  // bind click events
-  listEl.querySelectorAll('.rec-play-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const sid = btn.dataset.session;
-      setActiveCard(sid);
-      loadAndPlay(sid);
-    });
-  });
-  listEl.querySelectorAll('.rec-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const sid = card.dataset.session;
-      setActiveCard(sid);
-      loadAndPlay(sid);
-    });
-  });
+                // bind click events
+                listEl.querySelectorAll(".rec-play-btn").forEach((btn) => {
+                    btn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        const sid = btn.dataset.session;
+                        setActiveCard(sid);
+                        loadAndPlay(sid);
+                    });
+                });
+                listEl.querySelectorAll(".rec-card").forEach((card) => {
+                    card.addEventListener("click", () => {
+                        const sid = card.dataset.session;
+                        setActiveCard(sid);
+                        loadAndPlay(sid);
+                    });
+                });
 
-  // Mark active if already playing
-  if (activeSessionId) setActiveCard(activeSessionId);
-}
+                // Mark active if already playing
+                if (activeSessionId) setActiveCard(activeSessionId);
+            }
 
-function buildRecCard(r) {
-  const typeLabel = TYPE_LABELS[r.session_type] || r.session_type || '未知';
-  const typeCls   = `badge-session-${r.session_type || 'placement'}`;
+            function buildRecCard(r) {
+                const typeLabel =
+                    TYPE_LABELS[r.session_type] || r.session_type || "未知";
+                const typeCls = `badge-session-${r.session_type || "placement"}`;
 
-  const finish = r.finish_reason && FINISH_LABELS[r.finish_reason]
-    ? `<span class="badge ${FINISH_LABELS[r.finish_reason].cls}">${FINISH_LABELS[r.finish_reason].label}</span>`
-    : (r.finish_reason ? `<span class="badge bg-secondary">${escHtml(r.finish_reason)}</span>` : '');
+                const finish =
+                    r.finish_reason && FINISH_LABELS[r.finish_reason]
+                        ? `<span class="badge ${FINISH_LABELS[r.finish_reason].cls}">${FINISH_LABELS[r.finish_reason].label}</span>`
+                        : r.finish_reason
+                          ? `<span class="badge bg-secondary">${escHtml(r.finish_reason)}</span>`
+                          : "";
 
-  const timeStr = r.recorded_at
-    ? `<span class="rec-time"><i class="bi bi-clock me-1"></i>${formatDate(r.recorded_at)}</span>`
-    : '';
+                const timeStr = r.recorded_at
+                    ? `<span class="rec-time"><i class="bi bi-clock me-1"></i>${formatDate(r.recorded_at)}</span>`
+                    : "";
 
-  const shortId = r.session_id.length > 20
-    ? r.session_id.slice(0, 8) + '…' + r.session_id.slice(-6)
-    : r.session_id;
+                const shortId =
+                    r.session_id.length > 20
+                        ? r.session_id.slice(0, 8) +
+                          "…" +
+                          r.session_id.slice(-6)
+                        : r.session_id;
+                const displayName = r.name
+                    ? escHtml(r.name)
+                    : "<code>" + escHtml(shortId) + "</code>";
 
-  const teamsStr = r.teams && r.teams.length
-    ? `<div class="rec-teams"><i class="bi bi-people me-1"></i>${r.teams.slice(0, 5).map(escHtml).join(', ')}${r.teams.length > 5 ? ` +${r.teams.length - 5}` : ''}</div>`
-    : '';
+                const teamsStr =
+                    r.teams && r.teams.length
+                        ? `<div class="rec-teams"><i class="bi bi-people me-1"></i>${r.teams
+                              .slice(0, 5)
+                              .map(function (t) {
+                                  return escHtml(t.team_name || t.team_id || t);
+                              })
+                              .join(
+                                  ", ",
+                              )}${r.teams.length > 5 ? ` +${r.teams.length - 5}` : ""}</div>`
+                        : "";
 
-  return `<div class="rec-card" data-session="${escHtml(r.session_id)}" title="${escHtml(r.session_id)}">
+                return `<div class="rec-card" data-session="${escHtml(r.session_id)}" title="${escHtml(r.session_id)}">
     <div class="rec-card-top">
-      <div class="rec-session-id">${escHtml(shortId)}</div>
+      <div class="rec-session-id">${displayName}</div>
       <button class="rec-play-btn" data-session="${escHtml(r.session_id)}"><i class="bi bi-play-fill me-1"></i>播放</button>
     </div>
     <div class="rec-meta">
@@ -782,402 +994,502 @@ function buildRecCard(r) {
     </div>
     ${teamsStr}
   </div>`;
-}
+            }
 
-function setActiveCard(sessionId) {
-  activeSessionId = sessionId;
-  document.querySelectorAll('.rec-card').forEach(c => {
-    c.classList.toggle('active', c.dataset.session === sessionId);
-  });
-}
+            function setActiveCard(sessionId) {
+                activeSessionId = sessionId;
+                document.querySelectorAll(".rec-card").forEach((c) => {
+                    c.classList.toggle(
+                        "active",
+                        c.dataset.session === sessionId,
+                    );
+                });
+            }
 
-// ── Filters ────────────────────────────────────────────────────
-function setupFilters() {
-  document.getElementById('filter-zone').addEventListener('change', applyFilters);
-  document.getElementById('filter-type').addEventListener('change', applyFilters);
-}
+            // ── Filters ────────────────────────────────────────────────────
+            function setupFilters() {
+                document
+                    .getElementById("filter-zone")
+                    .addEventListener("change", applyFilters);
+                document
+                    .getElementById("filter-type")
+                    .addEventListener("change", applyFilters);
+            }
 
-function applyFilters() {
-  const zone = document.getElementById('filter-zone').value;
-  const type = document.getElementById('filter-type').value;
-  const filtered = allRecordings.filter(r => {
-    if (zone && r.zone_id !== zone) return false;
-    if (type && r.session_type !== type) return false;
-    return true;
-  });
-  renderRecordingsList(filtered);
-}
+            function applyFilters() {
+                const zone = document.getElementById("filter-zone").value;
+                const type = document.getElementById("filter-type").value;
+                const filtered = allRecordings.filter((r) => {
+                    if (zone && r.zone_id !== zone) return false;
+                    if (type && r.session_type !== type) return false;
+                    return true;
+                });
+                renderRecordingsList(filtered);
+            }
 
-function setupRefreshButton() {
-  document.getElementById('btn-refresh-list').addEventListener('click', async () => {
-    document.getElementById('filter-zone').value = '';
-    document.getElementById('filter-type').value = '';
-    await loadRecordingsList();
-  });
-}
+            function setupRefreshButton() {
+                document
+                    .getElementById("btn-refresh-list")
+                    .addEventListener("click", async () => {
+                        document.getElementById("filter-zone").value = "";
+                        document.getElementById("filter-type").value = "";
+                        await loadRecordingsList();
+                    });
+            }
 
-// ── Load & play a recording ────────────────────────────────────
-async function loadAndPlay(sessionId) {
-  // Update URL
-  const url = new URL(location.href);
-  url.searchParams.set('session', sessionId);
-  history.pushState({}, '', url);
+            // ── Load & play a recording ────────────────────────────────────
+            async function loadAndPlay(sessionId) {
+                // Update URL
+                const url = new URL(location.href);
+                url.searchParams.set("session", sessionId);
+                history.pushState({}, "", url);
 
-  // Show player, hide empty state
-  document.getElementById('empty-state').style.display = 'none';
-  document.getElementById('player').style.display = 'flex';
+                // Show player, hide empty state
+                document.getElementById("empty-state").style.display = "none";
+                document.getElementById("player").style.display = "flex";
 
-  // Stop any existing playback
-  stopPlayback();
-  frames = [];
-  recentEvents = [];
-  metadata = null;
+                // Stop any existing playback
+                stopPlayback();
+                frames = [];
+                recentEvents = [];
+                metadata = null;
 
-  // Reset UI
-  const canvas = document.getElementById('minimap');
-  canvas.style.display = 'none';
-  document.getElementById('canvas-overlay-msg').style.display = 'flex';
-  document.getElementById('btn-play').disabled = true;
-  document.getElementById('btn-play').innerHTML = '<i class="bi bi-play-fill"></i>';
-  document.getElementById('time-display').textContent = '--:--.-- / --:--.--';
-  document.getElementById('timeline').value = 0;
-  document.getElementById('event-log').textContent = '暂无事件';
-  document.getElementById('leaderboard-panel').innerHTML =
-    '<div class="lb-header">排行榜</div><div style="color:#9ca3af;padding:1.5rem 0;text-align:center;font-size:.82rem">加载中...</div>';
+                // Reset UI
+                const canvas = document.getElementById("minimap");
+                canvas.style.display = "none";
+                document.getElementById("canvas-overlay-msg").style.display =
+                    "flex";
+                document.getElementById("btn-play").disabled = true;
+                document.getElementById("btn-play").innerHTML =
+                    '<i class="bi bi-play-fill"></i>';
+                document.getElementById("time-display").textContent =
+                    "--:--.-- / --:--.--";
+                document.getElementById("timeline").value = 0;
+                document.getElementById("event-log").textContent = "暂无事件";
+                document.getElementById("leaderboard-panel").innerHTML =
+                    '<div class="lb-header">排行榜</div><div style="color:#9ca3af;padding:1.5rem 0;text-align:center;font-size:.82rem">加载中...</div>';
 
-  removePreviousErrors();
-  removeFinalBtn();
+                removePreviousErrors();
+                removeFinalBtn();
 
-  // ── 1. Fetch metadata ──
-  showLoading('加载场次信息...');
-  let meta;
-  try {
-    const resp = await fetch(`/api/recordings/${encodeURIComponent(sessionId)}/metadata`);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    meta = await resp.json();
-  } catch (e) {
-    hideLoading();
-    showPlayerError('无法加载录像: ' + e.message);
-    return;
-  }
+                // ── 1. Fetch metadata ──
+                showLoading("加载场次信息...");
+                let meta;
+                try {
+                    const resp = await fetch(
+                        `/api/recordings/${encodeURIComponent(sessionId)}/metadata`,
+                    );
+                    if (!resp.ok) throw new Error("HTTP " + resp.status);
+                    meta = await resp.json();
+                } catch (e) {
+                    hideLoading();
+                    showPlayerError("无法加载录像: " + e.message);
+                    return;
+                }
 
-  metadata = meta;
+                metadata = meta;
 
-  // Populate info bar
-  document.getElementById('player-session-id').textContent = sessionId;
-  const typeBadgeEl = document.getElementById('player-type-badge');
-  if (meta.session_type) {
-    const typeLabel = TYPE_LABELS[meta.session_type] || meta.session_type;
-    typeBadgeEl.innerHTML = `<span class="badge badge-session-${meta.session_type}">${escHtml(typeLabel)}</span>`;
-  } else {
-    typeBadgeEl.innerHTML = '';
-  }
-  const timeEl = document.getElementById('player-time');
-  const ts = meta.recorded_at || meta.finished_at;
-  timeEl.textContent = ts ? formatDate(ts) : '';
+                // Populate info bar — look up name from recordings list
+                var recMeta = allRecordings.find(function (r) {
+                    return r.session_id === sessionId;
+                });
+                document.getElementById("player-session-id").textContent =
+                    recMeta && recMeta.name ? escHtml(recMeta.name) : sessionId;
+                const typeBadgeEl =
+                    document.getElementById("player-type-badge");
+                if (meta.session_type) {
+                    const typeLabel =
+                        TYPE_LABELS[meta.session_type] || meta.session_type;
+                    typeBadgeEl.innerHTML = `<span class="badge badge-session-${meta.session_type}">${escHtml(typeLabel)}</span>`;
+                } else {
+                    typeBadgeEl.innerHTML = "";
+                }
+                const timeEl = document.getElementById("player-time");
+                const ts = meta.recorded_at || meta.finished_at;
+                timeEl.textContent = ts ? formatDate(ts) : "";
 
-  // Teams from metadata, try to merge with /api/teams
-  globalTeams = meta.teams || [];
-  try {
-    const tr = await fetch('/api/teams');
-    if (tr.ok) globalTeams = await tr.json();
-  } catch (_) { /* use metadata teams */ }
+                // Teams from metadata, try to merge with /api/teams
+                globalTeams = meta.teams || [];
+                try {
+                    const tr = await fetch("/api/teams");
+                    if (tr.ok) globalTeams = await tr.json();
+                } catch (_) {
+                    /* use metadata teams */
+                }
 
-  // ── 2. Show static final rankings immediately ──
-  if (meta.final_rankings && meta.final_rankings.length) {
-    showFinalRankings(document.getElementById('leaderboard-panel'), meta.final_rankings, globalTeams);
-  }
+                // ── 2. Show static final rankings immediately ──
+                if (meta.final_rankings && meta.final_rankings.length) {
+                    showFinalRankings(
+                        document.getElementById("leaderboard-panel"),
+                        meta.final_rankings,
+                        globalTeams,
+                    );
+                }
 
-  // ── 3. Try loading telemetry ──
-  updateLoadingMsg('加载遥测数据...');
-  let telemetryOk = false;
-  try {
-    const resp = await fetch(`/api/recordings/${encodeURIComponent(sessionId)}/telemetry`);
-    if (resp.ok) {
-      telemetryOk = true;
-      await streamTelemetry(resp);
-    }
-    // 404 means no telemetry file — that's fine, fall back to static view
-  } catch (e) {
-    // network error — also fall back
-    console.warn('Telemetry load failed, showing static result:', e);
-  }
+                // ── 3. Try loading telemetry ──
+                updateLoadingMsg("加载遥测数据...");
+                let telemetryOk = false;
+                try {
+                    const resp = await fetch(
+                        `/api/recordings/${encodeURIComponent(sessionId)}/telemetry`,
+                    );
+                    if (resp.ok) {
+                        telemetryOk = true;
+                        await streamTelemetry(resp);
+                    }
+                    // 404 means no telemetry file — that's fine, fall back to static view
+                } catch (e) {
+                    // network error — also fall back
+                    console.warn(
+                        "Telemetry load failed, showing static result:",
+                        e,
+                    );
+                }
 
-  hideLoading();
+                hideLoading();
 
-  if (telemetryOk && frames.length > 0) {
-    // Full replay mode
-    const duration = meta.duration_sim || frames[frames.length - 1].t || 0;
-    metadata.duration_sim = duration;
+                if (telemetryOk && frames.length > 0) {
+                    // Full replay mode
+                    const duration =
+                        meta.duration_sim || frames[frames.length - 1].t || 0;
+                    metadata.duration_sim = duration;
 
-    canvas.style.display = 'block';
-    document.getElementById('canvas-overlay-msg').style.display = 'none';
+                    canvas.style.display = "block";
+                    document.getElementById(
+                        "canvas-overlay-msg",
+                    ).style.display = "none";
 
-    drawTrackBackground(canvas);
-    renderFrame(0);
-    setupControls();
+                    drawTrackBackground(canvas);
+                    renderFrame(0);
+                    setupControls();
 
-    if (meta.final_rankings && meta.final_rankings.length) {
-      addFinalRankingsButton();
-    }
-  } else {
-    // Static result mode (no telemetry)
-    document.getElementById('canvas-overlay-msg').textContent = '暂无遥测数据，仅展示最终结果';
-    setupControlsDisabled();
-  }
-}
+                    if (meta.final_rankings && meta.final_rankings.length) {
+                        addFinalRankingsButton();
+                    }
+                } else {
+                    // Static result mode (no telemetry)
+                    document.getElementById("canvas-overlay-msg").textContent =
+                        "暂无遥测数据，仅展示最终结果";
+                    setupControlsDisabled();
+                }
+            }
 
-async function streamTelemetry(resp) {
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop();
-    for (const line of lines) {
-      if (line.trim()) {
-        try { frames.push(JSON.parse(line)); } catch (_) {}
-      }
-    }
-    updateLoadingMsg(`已加载 ${frames.length} 帧...`);
-  }
-  if (buf.trim()) {
-    try { frames.push(JSON.parse(buf)); } catch (_) {}
-  }
-}
+            async function streamTelemetry(resp) {
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = "";
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buf += decoder.decode(value, { stream: true });
+                    const lines = buf.split("\n");
+                    buf = lines.pop();
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            try {
+                                frames.push(JSON.parse(line));
+                            } catch (_) {}
+                        }
+                    }
+                    updateLoadingMsg(`已加载 ${frames.length} 帧...`);
+                }
+                if (buf.trim()) {
+                    try {
+                        frames.push(JSON.parse(buf));
+                    } catch (_) {}
+                }
+            }
 
-// ── Playback engine ────────────────────────────────────────────
-function renderFrame(idx) {
-  const frame = frames[idx];
-  if (!frame) return;
+            // ── Playback engine ────────────────────────────────────────────
+            function renderFrame(idx) {
+                const frame = frames[idx];
+                if (!frame) return;
 
-  const canvas = document.getElementById('minimap');
-  const ctx = canvas.getContext('2d');
-  drawTrackBackground(canvas);
-  drawCars(ctx, frame, canvas.width, canvas.height);
-  updateLeaderboard(document.getElementById('leaderboard-panel'), frame, globalTeams, metadata);
-  updateEventLog(frame);
+                const canvas = document.getElementById("minimap");
+                const ctx = canvas.getContext("2d");
+                drawTrackBackground(canvas);
+                drawCars(ctx, frame, canvas.width, canvas.height);
+                updateLeaderboard(
+                    document.getElementById("leaderboard-panel"),
+                    frame,
+                    globalTeams,
+                    metadata,
+                );
+                updateEventLog(frame);
 
-  const t = frame.t;
-  const dur = metadata.duration_sim || 0;
-  document.getElementById('time-display').textContent = fmtTime(t) + ' / ' + fmtTime(dur);
-  document.getElementById('timeline').value = t;
-}
+                const t = frame.t;
+                const dur = metadata.duration_sim || 0;
+                document.getElementById("time-display").textContent =
+                    fmtTime(t) + " / " + fmtTime(dur);
+                document.getElementById("timeline").value = t;
+            }
 
-function findFrameIndex(t) {
-  if (!frames.length) return 0;
-  let lo = 0, hi = frames.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (frames[mid].t <= t) lo = mid; else hi = mid - 1;
-  }
-  return lo;
-}
+            function findFrameIndex(t) {
+                if (!frames.length) return 0;
+                let lo = 0,
+                    hi = frames.length - 1;
+                while (lo < hi) {
+                    const mid = (lo + hi + 1) >> 1;
+                    if (frames[mid].t <= t) lo = mid;
+                    else hi = mid - 1;
+                }
+                return lo;
+            }
 
-function rafCallback(now) {
-  if (!playing) return;
-  if (lastRafTime !== null) {
-    const elapsed = (now - lastRafTime) / 1000;
-    currentTime = Math.min(currentTime + elapsed * playSpeed, metadata.duration_sim);
-  }
-  lastRafTime = now;
-  renderFrame(findFrameIndex(currentTime));
+            function rafCallback(now) {
+                if (!playing) return;
+                if (lastRafTime !== null) {
+                    const elapsed = (now - lastRafTime) / 1000;
+                    currentTime = Math.min(
+                        currentTime + elapsed * playSpeed,
+                        metadata.duration_sim,
+                    );
+                }
+                lastRafTime = now;
+                renderFrame(findFrameIndex(currentTime));
 
-  if (currentTime >= metadata.duration_sim) {
-    playing = false;
-    setPlayBtnState(false);
-    if (metadata.final_rankings && metadata.final_rankings.length) {
-      showFinalRankings(document.getElementById('leaderboard-panel'), metadata.final_rankings, globalTeams);
-    }
-    return;
-  }
-  rafId = requestAnimationFrame(rafCallback);
-}
+                if (currentTime >= metadata.duration_sim) {
+                    playing = false;
+                    setPlayBtnState(false);
+                    if (
+                        metadata.final_rankings &&
+                        metadata.final_rankings.length
+                    ) {
+                        showFinalRankings(
+                            document.getElementById("leaderboard-panel"),
+                            metadata.final_rankings,
+                            globalTeams,
+                        );
+                    }
+                    return;
+                }
+                rafId = requestAnimationFrame(rafCallback);
+            }
 
-function stopPlayback() {
-  playing = false;
-  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  lastRafTime = null;
-  currentTime = 0;
-}
+            function stopPlayback() {
+                playing = false;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+                lastRafTime = null;
+                currentTime = 0;
+            }
 
-function setPlayBtnState(isPlaying) {
-  const btn = document.getElementById('btn-play');
-  btn.innerHTML = isPlaying
-    ? '<i class="bi bi-pause-fill"></i>'
-    : '<i class="bi bi-play-fill"></i>';
-}
+            function setPlayBtnState(isPlaying) {
+                const btn = document.getElementById("btn-play");
+                btn.innerHTML = isPlaying
+                    ? '<i class="bi bi-pause-fill"></i>'
+                    : '<i class="bi bi-play-fill"></i>';
+            }
 
-function setupControls() {
-  const btnPlay = document.getElementById('btn-play');
-  btnPlay.disabled = false;
+            function setupControls() {
+                const btnPlay = document.getElementById("btn-play");
+                btnPlay.disabled = false;
 
-  btnPlay.onclick = () => {
-    if (playing) {
-      playing = false;
-      setPlayBtnState(false);
-      if (rafId) cancelAnimationFrame(rafId);
-    } else {
-      if (currentTime >= (metadata.duration_sim || 0)) {
-        currentTime = 0;
-        recentEvents = [];
-      }
-      playing = true;
-      lastRafTime = null;
-      setPlayBtnState(true);
-      rafId = requestAnimationFrame(rafCallback);
-    }
-  };
+                btnPlay.onclick = () => {
+                    if (playing) {
+                        playing = false;
+                        setPlayBtnState(false);
+                        if (rafId) cancelAnimationFrame(rafId);
+                    } else {
+                        if (currentTime >= (metadata.duration_sim || 0)) {
+                            currentTime = 0;
+                            recentEvents = [];
+                        }
+                        playing = true;
+                        lastRafTime = null;
+                        setPlayBtnState(true);
+                        rafId = requestAnimationFrame(rafCallback);
+                    }
+                };
 
-  document.getElementById('btn-rewind').onclick = () => {
-    stopPlayback();
-    setPlayBtnState(false);
-    recentEvents = [];
-    renderFrame(0);
-  };
+                document.getElementById("btn-rewind").onclick = () => {
+                    stopPlayback();
+                    setPlayBtnState(false);
+                    recentEvents = [];
+                    renderFrame(0);
+                };
 
-  document.getElementById('timeline').oninput = e => {
-    currentTime = parseFloat(e.target.value);
-    renderFrame(findFrameIndex(currentTime));
-  };
+                document.getElementById("timeline").oninput = (e) => {
+                    currentTime = parseFloat(e.target.value);
+                    renderFrame(findFrameIndex(currentTime));
+                };
 
-  document.querySelectorAll('.speed-btn').forEach(btn => {
-    btn.onclick = () => {
-      playSpeed = parseFloat(btn.dataset.speed);
-      document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    };
-  });
-}
+                document.querySelectorAll(".speed-btn").forEach((btn) => {
+                    btn.onclick = () => {
+                        playSpeed = parseFloat(btn.dataset.speed);
+                        document
+                            .querySelectorAll(".speed-btn")
+                            .forEach((b) => b.classList.remove("active"));
+                        btn.classList.add("active");
+                    };
+                });
+            }
 
-function setupControlsDisabled() {
-  document.getElementById('btn-play').disabled = true;
-  document.getElementById('timeline').disabled = true;
-}
+            function setupControlsDisabled() {
+                document.getElementById("btn-play").disabled = true;
+                document.getElementById("timeline").disabled = true;
+            }
 
-// ── Event log ─────────────────────────────────────────────────
-function updateEventLog(frame) {
-  if (frame.events && frame.events.length > 0) {
-    for (const ev of frame.events) {
-      let msg = '';
-      const t = fmtTimeMM(frame.t);
-      if (ev.type === 'lap_complete') {
-        msg = `[${t}] ${ev.team_id} 完成第${ev.lap_number}圈 ${parseFloat(ev.lap_time).toFixed(3)}s`;
-      } else if (ev.type === 'collision') {
-        msg = `[${t}] ${ev.team_id} 碰撞 (${ev.severity === 'major' ? '重' : '轻'})`;
-      } else if (ev.type === 'leader_finished') {
-        msg = `[${t}] ${ev.team_id} 率先完赛`;
-      } else if (ev.type === 'race_end') {
-        msg = `[${t}] 比赛结束`;
-      } else if (ev.type === 'powerup_pick') {
-        msg = `[${t}] ${ev.team_id} 获得加速包`;
-      } else if (ev.type === 'timeout') {
-        msg = `[${t}] ${ev.team_id} 超时警告`;
-      } else if (ev.type === 'car_finished') {
-        msg = `[${t}] ${ev.team_id} 完赛`;
-      }
-      if (msg) {
-        recentEvents.unshift(msg);
-        if (recentEvents.length > 10) recentEvents.pop();
-      }
-    }
-  }
-  const logEl = document.getElementById('event-log');
-  if (!recentEvents.length) {
-    logEl.textContent = '暂无事件';
-  } else {
-    logEl.innerHTML = recentEvents.map((ev, i) =>
-      `<span class="ev-item${i === 0 ? ' ev-new' : ''}">${escHtml(ev)}</span>`
-    ).join('<span class="ev-sep"> · </span>');
-  }
-}
+            // ── Event log ─────────────────────────────────────────────────
+            function getTeamName(tid) {
+                for (var i = 0; i < globalTeams.length; i++) {
+                    var t = globalTeams[i];
+                    if ((t.team_id || t.id) === tid)
+                        return t.team_name || t.name || tid;
+                }
+                return tid;
+            }
 
-// ── Final rankings button ──────────────────────────────────────
-function addFinalRankingsButton() {
-  if (document.getElementById('btn-final')) return;
-  const btn = document.createElement('button');
-  btn.id = 'btn-final';
-  btn.innerHTML = '<i class="bi bi-trophy me-1"></i>最终排名';
-  btn.onclick = () => {
-    showFinalRankings(document.getElementById('leaderboard-panel'), metadata.final_rankings, globalTeams);
-  };
-  document.getElementById('controls').appendChild(btn);
-}
+            function updateEventLog(frame) {
+                if (frame.events && frame.events.length > 0) {
+                    for (const ev of frame.events) {
+                        let msg = "";
+                        const t = fmtTimeMM(frame.t);
+                        if (ev.type === "lap_complete") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 完成第${ev.lap_number}圈 ${parseFloat(ev.lap_time).toFixed(3)}s`;
+                        } else if (ev.type === "collision") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 碰撞 (${ev.severity === "major" ? "重" : "轻"})`;
+                        } else if (ev.type === "leader_finished") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 率先完赛`;
+                        } else if (ev.type === "race_end") {
+                            msg = `[${t}] 比赛结束`;
+                        } else if (ev.type === "powerup_pick") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 获得加速包`;
+                        } else if (ev.type === "timeout") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 超时警告`;
+                        } else if (ev.type === "car_finished") {
+                            msg = `[${t}] ${getTeamName(ev.team_id)} 完赛`;
+                        }
+                        if (msg) {
+                            recentEvents.unshift(msg);
+                            if (recentEvents.length > 10) recentEvents.pop();
+                        }
+                    }
+                }
+                const logEl = document.getElementById("event-log");
+                if (!recentEvents.length) {
+                    logEl.textContent = "暂无事件";
+                } else {
+                    logEl.innerHTML = recentEvents
+                        .map(
+                            (ev, i) =>
+                                `<span class="ev-item${i === 0 ? " ev-new" : ""}">${escHtml(ev)}</span>`,
+                        )
+                        .join('<span class="ev-sep"> · </span>');
+                }
+            }
 
-function removeFinalBtn() {
-  const btn = document.getElementById('btn-final');
-  if (btn) btn.remove();
-}
+            // ── Final rankings button ──────────────────────────────────────
+            function addFinalRankingsButton() {
+                if (document.getElementById("btn-final")) return;
+                const btn = document.createElement("button");
+                btn.id = "btn-final";
+                btn.innerHTML = '<i class="bi bi-trophy me-1"></i>最终排名';
+                btn.onclick = () => {
+                    showFinalRankings(
+                        document.getElementById("leaderboard-panel"),
+                        metadata.final_rankings,
+                        globalTeams,
+                    );
+                };
+                document.getElementById("controls").appendChild(btn);
+            }
 
-// ── Utilities ─────────────────────────────────────────────────
-function fmtTime(t) {
-  if (t == null || isNaN(t)) return '--:--.--';
-  const m  = Math.floor(t / 60);
-  const s  = Math.floor(t % 60);
-  const cs = Math.floor((t % 1) * 100);
-  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + '.' + String(cs).padStart(2,'0');
-}
+            function removeFinalBtn() {
+                const btn = document.getElementById("btn-final");
+                if (btn) btn.remove();
+            }
 
-function fmtTimeMM(t) {
-  if (t == null) return '--:--';
-  return String(Math.floor(t / 60)).padStart(2,'0') + ':' + String(Math.floor(t % 60)).padStart(2,'0');
-}
+            // ── Utilities ─────────────────────────────────────────────────
+            function fmtTime(t) {
+                if (t == null || isNaN(t)) return "--:--.--";
+                const m = Math.floor(t / 60);
+                const s = Math.floor(t % 60);
+                const cs = Math.floor((t % 1) * 100);
+                return (
+                    String(m).padStart(2, "0") +
+                    ":" +
+                    String(s).padStart(2, "0") +
+                    "." +
+                    String(cs).padStart(2, "0")
+                );
+            }
 
-function formatDate(iso) {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  } catch (_) {
-    return iso.slice(0, 16).replace('T', ' ');
-  }
-}
+            function fmtTimeMM(t) {
+                if (t == null) return "--:--";
+                return (
+                    String(Math.floor(t / 60)).padStart(2, "0") +
+                    ":" +
+                    String(Math.floor(t % 60)).padStart(2, "0")
+                );
+            }
 
-function escHtml(s) {
-  if (s == null) return '';
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+            function formatDate(iso) {
+                if (!iso) return "";
+                try {
+                    const d = new Date(iso);
+                    return (
+                        d.toLocaleDateString("zh-CN") +
+                        " " +
+                        d.toLocaleTimeString("zh-CN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })
+                    );
+                } catch (_) {
+                    return iso.slice(0, 16).replace("T", " ");
+                }
+            }
 
-// ── Loading overlay ────────────────────────────────────────────
-function showLoading(msg) {
-  const existing = document.getElementById('loading-overlay');
-  if (existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', `
+            function escHtml(s) {
+                if (s == null) return "";
+                return String(s)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
+
+            // ── Loading overlay ────────────────────────────────────────────
+            function showLoading(msg) {
+                const existing = document.getElementById("loading-overlay");
+                if (existing) existing.remove();
+                document.body.insertAdjacentHTML(
+                    "beforeend",
+                    `
     <div id="loading-overlay">
       <div class="loading-spinner"></div>
       <div class="loading-msg">${escHtml(msg)}</div>
       <div id="load-progress"></div>
-    </div>`);
-}
+    </div>`,
+                );
+            }
 
-function updateLoadingMsg(msg) {
-  const el = document.getElementById('load-progress');
-  if (el) el.textContent = msg;
-}
+            function updateLoadingMsg(msg) {
+                const el = document.getElementById("load-progress");
+                if (el) el.textContent = msg;
+            }
 
-function hideLoading() {
-  const el = document.getElementById('loading-overlay');
-  if (el) el.remove();
-}
+            function hideLoading() {
+                const el = document.getElementById("loading-overlay");
+                if (el) el.remove();
+            }
 
-function showPlayerError(msg) {
-  removePreviousErrors();
-  const div = document.createElement('div');
-  div.className = 'error-banner';
-  div.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${escHtml(msg)}`;
-  document.getElementById('player').prepend(div);
-}
+            function showPlayerError(msg) {
+                removePreviousErrors();
+                const div = document.createElement("div");
+                div.className = "error-banner";
+                div.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>${escHtml(msg)}`;
+                document.getElementById("player").prepend(div);
+            }
 
-function removePreviousErrors() {
-  document.querySelectorAll('#player .error-banner').forEach(e => e.remove());
-}
-</script>
-</body>
+            function removePreviousErrors() {
+                document
+                    .querySelectorAll("#player .error-banner")
+                    .forEach((e) => e.remove());
+            }
+        </script>
+    </body>
 </html>

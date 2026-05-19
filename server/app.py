@@ -36,8 +36,9 @@ async def lifespan(app: FastAPI):
     hb_task = asyncio.create_task(_heartbeat_loop())
     live_task = asyncio.create_task(_sim_live_loop())
     test_task = asyncio.create_task(_serve_test_queue())
+    race_task = asyncio.create_task(_serve_race_event_queue())
     yield
-    for t in (hb_task, live_task, test_task):
+    for t in (hb_task, live_task, test_task, race_task):
         t.cancel()
         try:
             await t
@@ -88,6 +89,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 from server.blueprints.admin import router as admin_router
+from server.blueprints.races import router as races_router
 from server.blueprints.recording import router as recording_router
 from server.blueprints.submission import router as submission_router
 from server.blueprints.team import router as team_router
@@ -98,6 +100,7 @@ app.include_router(submission_router)  # 学生代码提交
 app.include_router(admin_router)  # 管理员
 app.include_router(recording_router)  # 录像
 app.include_router(team_router)  # 队伍
+app.include_router(races_router)  # 统一赛事
 app.include_router(ws_router)  # 管理员WebSocket
 
 # ---------------------------------------------------------------------------
@@ -130,10 +133,17 @@ async def _heartbeat_loop() -> None:
 
 
 async def _serve_test_queue() -> None:
-    """启动测试队列消费者 worker。"""
+    """启动测试队列消费者 worker（旧式 test_runs）。"""
     from server.services.test_worker import _test_worker_loop
 
     await _test_worker_loop()
+
+
+async def _serve_race_event_queue() -> None:
+    """启动统一 race 事件队列消费者 worker。"""
+    from server.services.test_worker import _race_event_worker_loop
+
+    await _race_event_worker_loop()
 
 
 async def _sim_live_loop() -> None:
@@ -165,7 +175,7 @@ async def _sim_live_loop() -> None:
                     # 区分"仿真引擎启动中"和"正常运行"两种状态：
                     # sim_time 为 None 说明 Webots 还没开始写 live.json（仿真引擎正在加载）
                     sim_time = info.get("sim_time")
-                    warmup = (sim_time is None)
+                    warmup = sim_time is None
                     await manager.broadcast(
                         {
                             **base,
@@ -174,7 +184,7 @@ async def _sim_live_loop() -> None:
                             "webots_pid": info.get("webots_pid"),
                             "sim_time": sim_time or 0,
                             "vehicles": vehicles,
-                            "warmup": warmup,   # 前端可据此显示"仿真引擎启动中..."
+                            "warmup": warmup,  # 前端可据此显示"仿真引擎启动中..."
                         }
                     )
             except Exception:

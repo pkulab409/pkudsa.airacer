@@ -313,9 +313,18 @@
                 border-color: #1e293b !important;
             }
             /* Vehicle status badges */
-            .badge-state-normal { background: #10b981; color: #fff; }
-            .badge-state-stopped { background: #f59e0b; color: #fff; }
-            .badge-state-disqualified { background: #ef4444; color: #fff; }
+            .badge-state-normal {
+                background: #10b981;
+                color: #fff;
+            }
+            .badge-state-stopped {
+                background: #f59e0b;
+                color: #fff;
+            }
+            .badge-state-disqualified {
+                background: #ef4444;
+                color: #fff;
+            }
 
             @media (max-width: 768px) {
                 .admin-sidebar {
@@ -591,6 +600,11 @@
                                     style="font-size: 0.875rem"
                                 ></span>
                             </h5>
+                            <div
+                                class="mb-2"
+                                style="font-size: 0.95rem; font-weight: 600"
+                                id="pending-name"
+                            ></div>
                             <div
                                 class="d-flex align-items-center gap-3 flex-wrap"
                             >
@@ -1207,8 +1221,9 @@
             var _ws = null;
             var _standingsTmr = null;
             var _overheadTmr = null;
-            var _currentSid = "";   // 原始完整 session ID，用于摄像头 API
-            var _prevState = "";    // 上一次比赛状态，用于检测比赛结束
+            var _currentSid = ""; // 原始完整 session ID，用于摄像头 API
+            var _prevState = ""; // 上一次比赛状态，用于检测比赛结束
+            var _teamNameMap = {}; // team_id → team_name
 
             /* ================================================================
    AUTH HELPER
@@ -1493,7 +1508,28 @@
                 // Update per-zone lock button
                 var zoneState = z ? z.state : null;
                 _updateZoneLockButton(zoneState);
+                loadTeamNameMap();
                 loadPendingSession();
+            }
+
+            async function loadTeamNameMap() {
+                if (!currentZone) return;
+                _teamNameMap = {};
+                try {
+                    var r = await api(
+                        "GET",
+                        "/api/teams?zone_id=" + encodeURIComponent(currentZone),
+                    );
+                    var data = r.ok ? await r.json() : [];
+                    var list = data.teams || data || [];
+                    list.forEach(function (t) {
+                        _teamNameMap[t.id] = t.name || t.id;
+                    });
+                } catch (e) {}
+            }
+
+            function teamDisplay(tid) {
+                return _teamNameMap[tid] || tid;
             }
 
             /* ================================================================
@@ -1608,6 +1644,14 @@
                             "pending-teams",
                             s.team_count != null ? s.team_count : "--",
                         );
+                        // 可读名称
+                        var nameEl = document.getElementById("pending-name");
+                        if (s.name) {
+                            nameEl.textContent = s.name;
+                            nameEl.style.display = "block";
+                        } else {
+                            nameEl.style.display = "none";
+                        }
 
                         // Show team list if available
                         var listCol = document.getElementById(
@@ -1617,7 +1661,9 @@
                             document.getElementById("pending-teams-list");
                         if (s.team_ids && s.team_ids.length) {
                             listCol.style.display = "block";
-                            listEl.textContent = s.team_ids.join(", ");
+                            listEl.textContent = s.team_ids
+                                .map(teamDisplay)
+                                .join(", ");
                         } else {
                             listCol.style.display = "none";
                         }
@@ -1626,23 +1672,32 @@
                         var progressEl =
                             document.getElementById("pending-progress");
                         progressEl.textContent = "";
-                        try {
-                            var br = await api(
-                                "GET",
-                                "/api/admin/zones/" + currentZone + "/bracket",
-                            );
-                            var bracket = br.ok ? await br.json() : null;
-                            if (bracket && bracket.sessions_per_stage) {
-                                var total = bracket.sessions_per_stage[s.type];
-                                // Extract session number from session ID (format: {zone}_{stage}_{N})
-                                var parts = s.id ? s.id.split("_") : [];
-                                var n = parseInt(parts[parts.length - 1], 10);
-                                if (total && !isNaN(n)) {
-                                    progressEl.textContent =
-                                        "第 " + n + "/" + total + " 场";
+                        if (s.name) {
+                            // 已有可读名称，不再额外显示进度
+                        } else {
+                            try {
+                                var br = await api(
+                                    "GET",
+                                    "/api/admin/zones/" +
+                                        currentZone +
+                                        "/bracket",
+                                );
+                                var bracket = br.ok ? await br.json() : null;
+                                if (bracket && bracket.sessions_per_stage) {
+                                    var total =
+                                        bracket.sessions_per_stage[s.type];
+                                    var parts = s.id ? s.id.split("_") : [];
+                                    var n = parseInt(
+                                        parts[parts.length - 2],
+                                        10,
+                                    );
+                                    if (total && !isNaN(n)) {
+                                        progressEl.textContent =
+                                            "第 " + n + "/" + total + " 场";
+                                    }
                                 }
-                            }
-                        } catch (e) {}
+                            } catch (e) {}
+                        }
                     } else {
                         card.style.display = "none";
                     }
@@ -1655,7 +1710,7 @@
             /* ── Session queue ── */
             function getSessionNum(sid) {
                 var parts = sid ? sid.split("_") : [];
-                var n = parseInt(parts[parts.length - 1], 10);
+                var n = parseInt(parts[parts.length - 2], 10);
                 return isNaN(n) ? "?" : n;
             }
 
@@ -1720,7 +1775,7 @@
                             var sname = STAGE_NAMES[s.type] || s.type;
                             var num = getSessionNum(s.id);
                             var teams = s.team_ids
-                                ? s.team_ids.join(", ")
+                                ? s.team_ids.map(teamDisplay).join(", ")
                                 : "--";
                             var meta =
                                 (PHASE_LABELS[s.phase] || s.phase) +
@@ -1729,14 +1784,15 @@
                                 "圈  ·  " +
                                 s.team_count +
                                 "车";
+                            var displayName = s.name
+                                ? esc(s.name)
+                                : sname + " " + num;
                             return (
                                 '<div class="session-row phase-' +
                                 s.phase +
                                 '">' +
                                 '<div class="session-row-num">' +
-                                sname +
-                                " " +
-                                num +
+                                esc(displayName) +
                                 "</div>" +
                                 '<div class="session-row-teams" title="' +
                                 esc(teams) +
@@ -1780,7 +1836,8 @@
                 }
 
                 // ── Race-end detection ──
-                var isRaceEnd = msg.state === "recording_ready" ||
+                var isRaceEnd =
+                    msg.state === "recording_ready" ||
                     (msg.state || "").endsWith("_FINISHED") ||
                     (msg.state || "").endsWith("_DONE") ||
                     msg.state === "closed";
@@ -1808,7 +1865,9 @@
                 } else {
                     setText(
                         "live-sim-time",
-                        msg.sim_time != null ? msg.sim_time.toFixed(1) + "s" : "--",
+                        msg.sim_time != null
+                            ? msg.sim_time.toFixed(1) + "s"
+                            : "--",
                     );
                 }
                 var stage = msg.session_type || msg.current_stage;
@@ -1862,7 +1921,9 @@
                             esc(tid) +
                             "</td>" +
                             "<td>" +
-                            (v.checkpoints_passed != null ? v.checkpoints_passed : "--") +
+                            (v.checkpoints_passed != null
+                                ? v.checkpoints_passed
+                                : "--") +
                             "</td>" +
                             "<td>" +
                             (v.speed != null ? v.speed.toFixed(1) : "--") +
@@ -1889,12 +1950,14 @@
             }
 
             async function pollOverhead() {
-                if (!currentZone || !_currentSid || _currentSid === "--") return;
+                if (!currentZone || !_currentSid || _currentSid === "--")
+                    return;
                 var img = document.getElementById("live-overhead-img");
                 if (!img) return;
                 try {
                     var r = await fetch(
-                        "/api/admin/live-frame/" + encodeURIComponent(_currentSid),
+                        "/api/admin/live-frame/" +
+                            encodeURIComponent(_currentSid),
                         { headers: authHdr(), cache: "no-store" },
                     );
                     if (!r.ok) return;
@@ -1950,7 +2013,7 @@
                                 medal +
                                 "</td>" +
                                 "<td>" +
-                                esc(row.team_id || "--") +
+                                esc(teamDisplay(row.team_id) || "--") +
                                 "</td>" +
                                 "<td>" +
                                 (row.total_score != null
@@ -2308,11 +2371,16 @@
                                   encodeURIComponent(rec.session_id) +
                                   '" target="_blank" class="btn btn-sm btn-outline-danger">播放</a>'
                                 : "--";
+                            var displayName = rec.name
+                                ? esc(rec.name)
+                                : "<code>" +
+                                  esc(rec.session_id || "--") +
+                                  "</code>";
                             return (
                                 "<tr>" +
-                                '<td class="ps-3"><code>' +
-                                esc(rec.session_id || "--") +
-                                "</code></td>" +
+                                '<td class="ps-3">' +
+                                displayName +
+                                "</td>" +
                                 "<td>" +
                                 typeBadge +
                                 "</td>" +
