@@ -1,4 +1,4 @@
-# Sim Node 包文档：仿真节点核心模块
+# Sim Node 包文档
 
 此文档介绍 `simnode/` 包的功能、使用方式和接口。
 
@@ -6,207 +6,157 @@
 
 ## 1. 环境配置
 
-- **Python 版本**：3.10+（需运行在 Linux 上）
-- **依赖**：
-  - `fastapi`, `uvicorn`：HTTP/WebSocket 服务
-  - `httpx`：Backend 与 Sim Node 之间的 HTTP 请求
-  - `pyyaml`：配置文件解析
-  - Webots 安装包（Linux，`/usr/bin/webots`）
+- **Python 版本**：3.10+
+- **依赖**：`fastapi`, `uvicorn`, `httpx`, `pyyaml`, `numpy`, `opencv-python-headless`
+- **外部依赖**：Webots（Linux 上通常为 `/usr/bin/webots`）
 
-配置文件位于 `simnode/config/config.yaml`，需在部署前修改路径：
+配置文件：`simnode/config/config.yaml`（从 `.example` 复制），关键项：
 
 ```yaml
-SIMNODE_HOST:         "0.0.0.0:8001"
-RECORDINGS_DIR:       "/data/airacer/recordings"
+SIMNODE_HOST:         "0.0.0.0:5000"
+RECORDINGS_DIR:       "./recordings"
 WEBOTS_BINARY:        "/usr/bin/webots"
-WEBOTS_WORLD:         "/opt/airacer/simnode/webots/worlds/track_complex.wbt"
+WEBOTS_WORLD:         "./simnode/webots/worlds/track_complex.wbt"
 RACE_TIMEOUT_SECONDS: 600
+MAX_CONCURRENT_RACES: 4
 ```
 
 启动方式：
 
 ```bash
-cd /opt/airacer
-uvicorn simnode.server:app --host 0.0.0.0 --port 8001
+uvicorn simnode.server:app --host 0.0.0.0 --port 5000
 ```
 
 ---
 
-## 2. `race_manager.py` 模块
+## 2. `race_manager.py`
 
-对应 Avalon 的 `battle_manager.py`，采用**单例模式**管理所有比赛。
+**单例模式**管理所有比赛生命周期。
 
-### 2.1 核心类：`RaceManager`
+### `RaceManager`
 
-| 方法 | 参数 | 返回值 | 描述 |
-|------|------|--------|------|
-| `start_race(race_id, session_type, total_laps, cars, ws_push_callback)` | 比赛参数，可选 WS 推流回调 | `race_id` | 创建 RaceRunner 并启动线程 |
-| `cancel_race(race_id)` | `race_id` | `bool` | 终止 Webots 进程 |
-| `get_race_status(race_id)` | `race_id` | 状态字符串 | 查询比赛状态 |
-| `get_race_result(race_id)` | `race_id` | 结果字典或 `None` | 查询已完成比赛结果 |
-| `get_all_races()` | 无 | `[(race_id, status)]` | 列出所有比赛 |
+| 方法 | 说明 |
+|------|------|
+| `start_race(race_id, session_type, total_laps, cars, ws_push_callback)` | 创建并启动比赛线程 |
+| `cancel_race(race_id) -> bool` | 优雅停止（STOP 文件 + 等待），超时强制 kill |
+| `get_race_status(race_id) -> Optional[str]` | 查询状态 |
+| `get_race_result(race_id) -> Optional[dict]` | 查询结果（仅 completed） |
+| `get_all_races() -> List[(race_id, status)]` | 列出所有比赛 |
+| `get_webots_pid(race_id) -> Optional[int]` | 获取 Webots 进程 PID |
 
-与 `BattleManager` 的对应：
-
-```
-BattleManager.create_battle()     → RaceManager.start_race()
-BattleManager.cancel_battle()     → RaceManager.cancel_race()
-BattleManager.get_battle_status() → RaceManager.get_race_status()
-BattleManager.get_battle_result() → RaceManager.get_race_result()
-BattleManager.get_all_battles()   → RaceManager.get_all_races()
-BattleManager.get_snapshots_queue() → [由 WebSocket 推流代替]
-```
-
-### 2.2 创建比赛线程的具体流程（`start_race()`）
-
-1. 创建 `TelemetryObserver`（对应 Avalon 中创建 `Observer`）
-2. 创建 `RaceRunner`（对应 Avalon 中创建 `AvalonReferee`）
-3. 定义线程执行函数，启动 `threading.Thread`
-4. 将 `_RaceRecord` 存入 `_races` 字典，返回 `race_id`
+**并发控制**：默认最大 4 场同时运行（`MAX_CONCURRENT_RACES`），超出时返回 HTTP 409。
 
 ---
 
-## 3. `race_runner.py` 模块
+## 3. `race_runner.py`
 
-对应 Avalon 的 `referee.py`（`AvalonReferee`），负责驱动完整的仿真流程。
+每场比赛一个独立 `RaceRunner` 实例，在线程中执行完整生命周期。
 
-### 3.1 核心类：`RaceRunner`
+### 执行流程
 
-```python
-class RaceRunner:
-    def __init__(self, race_id, session_type, total_laps, cars, observer)
-    def run_race(self) -> Dict[str, Any]
-    def force_stop(self) -> None
-    def _decode_car_codes(self) -> List[Dict]   # 对应 Avalon _load_codes()
-    def _write_race_config(self, car_configs) -> str
-    def _launch_webots(self, config_path) -> None
-    def _wait_for_webots(self) -> int
-    def _read_result(self, exit_code) -> Dict
-    def _abort(self, reason) -> None             # 对应 Avalon suspend_game()
-```
+1. `_decode_car_codes()`：Base64 解码学生代码，写入临时目录
+2. `_write_race_config()`：生成 `race_config.json`（含车辆配置、圈数、录制路径）
+3. `_launch_webots()`：启动 Webots 子进程，传入 `RACE_CONFIG_PATH` 环境变量
+   - headless 模式：`--batch --no-sandbox`
+   - 非 headless：`--minimize`
+4. `_wait_for_webots()`：阻塞等待进程结束（最长 10 分钟）
+5. `_read_result()`：读取 `metadata.json`
 
-#### 3.1.1 学生代码加载流程
+### 关于 headless 与摄像头
 
-与 Avalon `_load_codes()` + `load_player_codes()` 的对应：
+- `--batch` 模式会禁用 GPU 渲染，导致 `Camera.saveImage()` 输出全黑帧（俯视摄像头失效）
+- 若需要实时俯视画面（`/frame` 端点），请在配置文件中设置 `WEBOTS_HEADLESS: false`，此时使用 `--minimize` 启动，保留 GPU 渲染能力
+- 生产环境 Linux 服务器若无显示器，可保持 `--batch`，但 `/frame` 将不可用
 
-| Avalon | AiRacer | 说明 |
-|--------|---------|------|
-| `exec(code_content, module.__dict__)` | Base64 解码 → 写入 tmp 文件 | 代码在独立子进程中执行 |
-| `Player()` 实例化 | `sandbox_runner.py` 子进程启动 | 在 CarController 内执行 |
-| `safe_execute()` 包装调用 | `sandbox_runner.py` stdin/stdout 协议 | 每帧通信 |
+### 优雅停止
 
-#### 3.1.2 仿真流程
-
-1. 解码各队代码，写入临时目录（`_decode_car_codes`）
-2. 生成 `race_config.json`（`_write_race_config`）
-3. 启动 Webots 子进程，传入 `RACE_CONFIG_PATH` 环境变量（`_launch_webots`）
-4. 等待 Webots 进程结束（`_wait_for_webots`，最长 10 分钟）
-5. 读取 Supervisor 写入的 `metadata.json`（`_read_result`）
-6. 通过 `TelemetryObserver` 发送 `race_ended` 事件
-
-#### 3.1.3 异常终止（对应 Avalon `suspend_game()`）
-
-```python
-_abort(reason: str)
-→ observer.make_snapshot("race_error", {"error_type": ..., "message": reason})
-→ force_stop()   # SIGKILL Webots 进程
-```
+`graceful_stop()`：写入 `STOP` 文件，等待 Webots 读取后退出（最长 15 秒）；超时则 `force_stop()`（SIGKILL）。
 
 ---
 
-## 4. `telemetry_observer.py` 模块
+## 4. `telemetry_observer.py`
 
-对应 Avalon 的 `observer.py`，记录比赛快照并推流至 Backend。
+记录比赛快照并推流。
 
-### 4.1 核心类：`TelemetryObserver`
+### `TelemetryObserver`
 
-#### 4.1.1 方法
+- `make_snapshot(event_type, event_data)`：记录事件并触发 `ws_push_callback`
+- `pop_snapshots()`：获取并清空缓冲区
+- `get_snapshots()`：获取不清空
+- `confirm_telemetry_file()`：确认文件存在且非空
 
-- **`make_snapshot(event_type: str, event_data: Any) -> None`**
-
-  记录一次仿真事件。**与 Avalon `Observer.make_snapshot()` 同名同意**。
-  额外功能：将快照推送至 Backend WebSocket 连接。
-
-- **`pop_snapshots() -> List[Dict]`**
-
-  获取并清空快照队列（对应 Avalon `pop_snapshots()`）。
-
-- **`confirm_telemetry_file() -> bool`**
-
-  确认 `telemetry.jsonl` 存在且非空（对应 Avalon `snapshots_to_json()`）。
-
-#### 4.1.2 存储格式
-
-与 Avalon `archive_game_{id}.json` 的区别：
-- 改用 NDJSON 格式（每行一条快照），支持流式读取
-- 文件路径：`recordings/{race_id}/telemetry.jsonl`
+存储路径：`recordings/{race_id}/simnode_events.jsonl`
 
 ---
 
-## 5. `car_sandbox.py` 模块
+## 5. `car_sandbox.py`
 
-对应 Avalon 的 `restrictor.py`，限制学生代码的执行环境。
+学生代码执行环境限制。
 
-### 5.1 提供的功能
+### 功能
 
-- **`RESTRICTED_BUILTINS`**：受限 `__builtins__` 字典（同 Avalon 同名常量）
-- **`_restricted_importer()`**：白名单导入器（同 Avalon）
-- **`SandboxImportHook`**：`sys.meta_path` 拦截器（Avalon 无此类，新增）
-- **`apply_resource_limits()`**：Linux `resource.setrlimit`（Avalon 无，新增）
+- **`RESTRICTED_BUILTINS`**：受限 `__builtins__` 字典（移除 `open`, `eval`, `exec`, `globals`, `locals`, `compile`）
+- **`SandboxImportHook`**：`sys.meta_path` 拦截器，禁止 `os`, `sys`, `socket`, `threading` 等模块
+- **`apply_resource_limits()`**：Linux 下限制内存 512 MB、CPU 30 秒
 
-### 5.2 白名单对比
+### 白名单
 
-| Avalon `restrictor.py` | AiRacer `car_sandbox.py` |
-|------------------------|--------------------------|
-| `random, re, collections, math, json` | `numpy, cv2, math, collections, heapq, functools, itertools` |
+允许：`numpy`, `cv2`, `math`, `collections`, `heapq`, `functools`, `itertools`, `typing`, `__future__`, `pathlib`, `dataclasses`, `re`
 
-### 5.3 使用方式
-
-`car_sandbox.py` 被 `simnode/webots/controllers/car/sandbox_runner.py` 使用：
-
-```python
-# sandbox_runner.py 启动时（子进程）：
-from car_sandbox import SandboxImportHook, RESTRICTED_BUILTINS, apply_resource_limits
-
-apply_resource_limits()               # Linux 资源限制
-sys.meta_path.insert(0, SandboxImportHook())  # 安装导入拦截
-
-# 加载学生代码时替换 __builtins__：
-module.__dict__["__builtins__"] = RESTRICTED_BUILTINS
-```
+禁止（包括但不限于）：`os`, `sys`, `socket`, `subprocess`, `multiprocessing`, `threading`, `time`, `datetime`, `io`, `builtins`, `ctypes`, `shutil`, `tempfile`, `glob`, `fnmatch`, `winreg`, `nt`, `_winapi`, `requests`, `urllib`, `http`, `ftplib`, `smtplib`, `signal`, `gc`, `inspect`, `importlib`, `pickle`
 
 ---
 
-## 6. `server.py` 模块
+## 6. `server.py`
 
-Sim Node HTTP/WebSocket 接口层，暴露 `/race/*` 端点。
+SimNode HTTP/WebSocket 服务层。
 
-详细接口说明见 `READMEs/README_simnode_interface.md`。
+### REST 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/race/create` | 创建比赛 |
+| `POST` | `/race/{id}/cancel` | 取消比赛 |
+| `GET`  | `/race/{id}/status` | 查询状态 |
+| `GET`  | `/race/{id}/result` | 查询结果 |
+| `GET`  | `/race/{id}/live` | 实时遥测（内存缓存） |
+| `GET`  | `/race/{id}/frame` | 俯视摄像头帧（内存缓存） |
+| `POST` | `/race/{id}/push` | Supervisor 直推遥测 |
+| `GET`  | `/races` | 列出所有比赛 |
+| `GET`  | `/health` | 健康检查 |
+
+### WebSocket
+
+`WS /race/{race_id}/stream`：实时事件推流。
+
+### 后台缓存线程
+
+`_cache_updater_loop`：每 50 ms 读取磁盘 `live.json` + `live_view.jpg`，更新内存缓存，供 `/live` 和 `/frame` 热路径使用。
 
 ---
 
 ## 7. Webots 控制器
 
-### 7.1 Supervisor（对应 Avalon `AvalonReferee` 的游戏逻辑部分）
+### Supervisor（`simnode/webots/controllers/supervisor/supervisor.py`）
 
-文件：`simnode/webots/controllers/supervisor/supervisor.py`
+- 每仿真步（64 ms）更新所有车辆位置、速度、朝向
+- 检查点序列检测（CP0 ~ CP8），CP0 兼作起点与终点
+- 碰撞检测：pairwise 距离 < 0.5 m；相对速度 >= 3 m/s 为 major
+- 违规判定：3 次 major -> `disqualified`；60 秒未过检查点 -> `disqualified`
+- 结束逻辑：
+  - 首车完赛后 60 秒宽限期（非排位赛）
+  - 所有车辆完赛/违规/超时后结束
+  - 全局超时 600 秒
+- 每步写入 `telemetry.jsonl`；每 2 步保存 `live_view.jpg` 和 `live.json`
 
-- 每仿真步读取各车位置，调用 `TelemetryObserver.make_snapshot("TelemetryFrame", data)`
-- 计圈判定（4 检查点序列），触发 `"LapComplete"` 事件
-- 碰撞检测，触发 `"Collision"` 事件并施加停车惩罚
-- 竞速赛制结束逻辑：领先者完赛 → 60 秒宽限 → `"RaceEnd"`
-- 仿真结束后写入 `recordings/{race_id}/metadata.json`
+### Car Controller（`simnode/webots/controllers/car/car_controller.py`）
 
-### 7.2 CarController（对应 Avalon `safe_execute()` 包装层）
-
-文件：`simnode/webots/controllers/car/car_controller.py`
-
-- 每仿真步读取左右摄像头图像
-- 将图像序列化，通过 stdin 传给 `sandbox_runner.py` 子进程
-- 接收返回的 `{"steering": float, "speed": float}` JSON 行
-- 超时（20ms）时沿用上一帧指令（对应 Avalon 超时默认行为）
-- 连续 3 次超时：触发 `"TimeoutWarn"` 事件
+- 每步读取 `left_camera` / `right_camera` 图像
+- 通过 `RACE_CONFIG_PATH` 加载对应车辆的 `team_controller.py`
+- **In-process 调用**：直接执行学生 `control(left_img, right_img, timestamp)`，零延迟
+- 学生代码缺失或异常时，车辆**静止不动**（速度=0，转向=0）
+- 通过 `customData` 接收 Supervisor 指令：`disqualify` / `stop`
 
 ---
 
-**最后更新**：2026-04-28
+**最后更新**：2026-05-20

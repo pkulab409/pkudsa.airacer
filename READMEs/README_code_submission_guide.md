@@ -4,21 +4,18 @@
 
 学生需要提交一个包含 `control()` 函数的 Python 脚本（`team_controller.py`）。
 
-与 Avalon 的区别：Avalon 要求实现一个 `Player` **类**（13 个方法），AiRacer 简化为**一个函数**，但设计思路完全相同。
-
 ```python
 import numpy as np
 
 def control(
-    left_img:  np.ndarray,   # 左目摄像头图像，shape=(480,640,3), dtype=uint8, BGR 通道
-    right_img: np.ndarray,   # 右目摄像头图像，shape=(480,640,3), dtype=uint8, BGR 通道
+    left_img:  np.ndarray,   # 左摄像头图像，shape=(480, 640, 3), dtype=uint8, BGR
+    right_img: np.ndarray,   # 右摄像头图像，shape=(480, 640, 3), dtype=uint8, BGR
     timestamp: float         # 当前仿真时间（秒），只读
 ) -> tuple[float, float]:
     """
     返回值：
         steering: float, [-1.0, 1.0]，负值左转，正值右转
-        speed:    float, [0.0, 1.0]，0.0 停止，1.0 最大速度
-    执行时限：20ms / 次（对应 Avalon 的方法调用超时限制）
+        speed:    float, [0.0, 1.0]，0.0 停止，1.0 最大速度比例
     """
     steering = 0.0
     speed    = 0.5
@@ -27,69 +24,73 @@ def control(
 
 ### 参数说明
 
-| 参数 | 类型 | Avalon 类比 | 说明 |
-|------|------|-------------|------|
-| `left_img` | `np.ndarray` (480×640×3, uint8, BGR) | `pass_role_sight()` 传入的视野 | 左前摄像头图像 |
-| `right_img` | `np.ndarray` (480×640×3, uint8, BGR) | — | 右前摄像头图像 |
-| `timestamp` | `float`，单位秒 | `pass_position_data()` 中的时间 | 仿真已过时间 |
-| 返回 `steering` | `float`，`[-1.0, 1.0]` | `walk()` 返回方向 | 方向盘转角 |
-| 返回 `speed` | `float`，`[0.0, 1.0]` | 动作力度 | 油门比例 |
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `left_img` | `np.ndarray` (480x640x3, uint8, BGR) | 左前摄像头图像 |
+| `right_img` | `np.ndarray` (480x640x3, uint8, BGR) | 右前摄像头图像 |
+| `timestamp` | `float`，单位秒 | 仿真已过时间 |
+| 返回 `steering` | `float`，`[-1.0, 1.0]` | 方向盘转角比例 |
+| 返回 `speed` | `float`，`[0.0, 1.0]` | 油门比例 |
 
 ---
 
-## 2. 最小可运行模板（对应 Avalon `basic_player.py`）
+## 2. 最小可运行模板
 
 ```python
-# team_controller.py — 官方模板：直行
+# team_controller.py - 官方模板：直行
 
 def control(left_img, right_img, timestamp):
     """全速前进，不转向"""
     return 0.0, 1.0
 ```
 
-完整版本见 `sdk/team_controller.py`。
+完整示例见 `sdk/team_controller.py` 与 `sdk/example_controller.py`。
 
 ---
 
-## 3. 可用库（对应 Avalon `restrictor.py` 白名单）
+## 3. 可用库（白名单）
 
 | 允许导入 | 说明 |
 |----------|------|
-| `numpy` | 图像处理必备 |
+| `numpy` / `np` | 图像处理必备 |
 | `cv2` | OpenCV 视觉处理 |
 | `math` | 数学运算 |
-| `collections` | 数据结构（deque 等） |
+| `collections` | 数据结构 |
 | `heapq` | 优先队列 |
 | `functools` | 函数工具 |
 | `itertools` | 迭代工具 |
+| `typing` | 类型注解 |
+| `__future__` | 语法 future 声明 |
+| `pathlib` | 路径操作（只读用途） |
+| `dataclasses` | 数据类装饰器 |
+| `re` | 正则表达式 |
 
-禁止导入：`os`, `sys`, `socket`, `subprocess`, `threading`, `time`, `requests` 及所有系统/网络模块。
+**禁止导入**（包括但不限于）：`os`, `sys`, `socket`, `subprocess`, `multiprocessing`, `threading`, `time`, `datetime`, `io`, `builtins`, `ctypes`, `shutil`, `tempfile`, `glob`, `fnmatch`, `winreg`, `nt`, `_winapi`, `requests`, `urllib`, `http`, `ftplib`, `smtplib`, `signal`, `gc`, `inspect`, `importlib`, `pickle`。
 
-禁止使用：`open`, `eval`, `exec`, `globals`, `locals`。
+**禁止使用的内置函数**：`open`, `eval`, `exec`, `globals`, `locals`, `compile`。
 
 ---
 
-## 4. 执行限制（对应 Avalon 方法调用超时）
+## 4. 执行限制
 
 | 限制项 | 值 | 说明 |
 |--------|-----|------|
-| 单步执行时限 | 20ms | 超时沿用上一帧指令 |
-| 连续超时次数 | 3 次 | 该圈计圈无效 |
-| 内存限制（Linux） | 512 MB | `resource.setrlimit` 强制 |
-| CPU 时间上限（Linux） | 30s/race | 防止无限循环导致占用 |
+| 内存限制（Linux） | 512 MB | `resource.setrlimit(RLIMIT_AS)` |
+| CPU 时间上限（Linux） | 30 s | `resource.setrlimit(RLIMIT_CPU)` |
+
+> **注意**：当前版本尚未对学生 `control()` 函数的单步执行时间做硬性截断。若代码死循环或耗时过长，会直接阻塞仿真步进。请确保 `control()` 能在毫秒级返回。
 
 ---
 
-## 5. 本地验证（对应 Avalon 代码合规检查）
+## 5. 本地验证
 
-在提交前，可使用提供的本地验证工具检查代码是否通过平台校验：
+提交前可使用本地验证工具检查代码合规性：
 
 ```bash
-python sdk/validate_controller.py --code-path my_controller.py
+python sdk/validate_controller.py --code-path my_controller.py --rules-path sdk/rules.yaml
 ```
 
 验证内容：
-
 1. Python 语法合法（`py_compile`）
 2. `control` 函数是否存在且可调用
 3. 禁止 import 的 AST 静态扫描
@@ -99,40 +100,62 @@ python sdk/validate_controller.py --code-path my_controller.py
 
 ## 6. 提交方式
 
-通过学生提交页（`/submit/`）上传 `team_controller.py`。
+通过学生提交页（`/submit/`）上传 `team_controller.py`，或调用 API：
 
-**提交流程（与 Avalon 代码管理完全类似）：**
+```bash
+POST /api/submit
+Body: {
+  "team_id": "A01",
+  "password": "...",
+  "code": "<base64 编码的 .py 文件>",
+  "slot_name": "main"   // 可选：main / dev / backup
+}
+```
+
+**提交流程**：
 
 ```
 上传 team_controller.py
-    │
-    ▼
-即时检查（Backend，< 2 秒）
-    ├── 通过：写入数据库，加入测试队列
-    └── 失败：返回详细错误，不入队
-    │
-    ▼
-测试队列（对应 Avalon BattleManager 队列）
-    └── 单车测试（占用 Sim Node 约 5~10 分钟）
-    │
-    ▼
+    |
+    v
+即时校验（Backend，<< 2 秒）
+    |-- 通过：写入文件系统 + 数据库
+    |-- 失败：返回详细错误，不入库
+    |
+    v
+手动申请测试（/api/test-request 或前端点击"申请测试"）
+    |
+    v
+测试队列（内存 FIFO，Worker 消费）
+    |-- 单车测试（SimNode 运行约 5~10 分钟）
+    |
+    v
 测试报告（仅本队可见）
-    ├── 是否完成 2 圈
-    ├── 最快单圈时间
-    ├── 碰撞次数（轻微/严重）
-    ├── 超时警告次数
-    └── 测试结束原因
+    |-- 完成圈数
+    |-- 最快单圈时间
+    |-- 碰撞次数（轻微/严重）
+    |-- 结束原因
 ```
 
 ---
 
-## 7. 提交锁定
+## 7. 三槽位与激活机制
 
-- 助教执行锁定指令后，平台立即停止接受新提交
-- 不可逆，请在截止前确认提交
-- 锁定后，各队使用截止前最后一次通过检查的版本
-- 无有效提交的队伍使用官方模板（直行，`return 0.0, 1.0`）
+- **main**：主力版本，默认参赛槽位
+- **dev**：开发版本，用于迭代测试
+- **backup**：备用版本
+
+上传新版本到某槽位后，该槽位旧版本自动失效。需手动点击**"设为参赛"**（调用 `/api/activate`）将某个槽位标记为 `is_race_active=1`，该版本才会被用于正式比赛。
 
 ---
 
-**最后更新**：2026-04-28
+## 8. 提交锁定
+
+- 赛区处于 `REGISTRATION` 状态时允许上传代码
+- 管理员可执行**"锁定提交"**将赛区转入 `IDLE`，此后拒绝所有新提交（HTTP 403）
+- 锁定后，各队使用最后一次成功上传的版本参赛
+- 无有效提交的队伍：小车将**静止不动**（速度=0，转向=0），不会使用任何默认策略
+
+---
+
+**最后更新**：2026-05-20
