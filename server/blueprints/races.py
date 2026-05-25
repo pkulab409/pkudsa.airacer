@@ -24,6 +24,7 @@ from server.database.action import (
     create_race as db_create_race,
 )
 from server.database.action import (
+    db_count_active_races_by_initiator,
     db_get_team_secure,
     db_get_teams_with_code,
     list_races_by_participant,
@@ -121,22 +122,36 @@ async def create_race(body: CreateRaceRequest):
     if not zone_id:
         raise HTTPException(status_code=400, detail="Team has no zone assigned")
 
-    # 3. 拼 participant_ids = 发起者 + 对手（去重）
-    all_teams = list(dict.fromkeys([body.team_id] + body.opponents))
-    if len(all_teams) < 2:
+    # 3. 检查该队伍是否已有正在进行的测试赛事（防恶意并发）
+    with get_db(DB_PATH) as conn:
+        active_count = db_count_active_races_by_initiator(conn, body.team_id)
+    if active_count > 0:
         raise HTTPException(
-            status_code=400,
-            detail="需要至少 2 支队伍（自己和至少一个对手）才能发起测试赛事",
+            status_code=429,
+            detail="该队伍已有正在进行的测试赛事，请等待完成后重试",
         )
 
-    # 4. 验所有参与者都有已上传的代码
+    # 4. 拼 participant_ids = 发起者 + 对手（去重）
+    all_teams = list(dict.fromkeys([body.team_id] + body.opponents))
+    if len(all_teams) < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="需要至少 1 支队伍才能发起测试赛事",
+        )
+    if len(all_teams) > 6:
+        raise HTTPException(
+            status_code=400,
+            detail="最多支持 6 支队伍参赛",
+        )
+
+    # 5. 验所有参与者都有已上传的代码
     with get_db(DB_PATH) as conn:
         try:
             db_get_teams_with_code(conn, all_teams)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-    # 5. 写入 DB + 入队
+    # 6. 写入 DB + 入队
     race_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
