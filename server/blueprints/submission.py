@@ -1,5 +1,5 @@
 """
-Team submission and test-status endpoints.
+Tea submission and test-status endpoints.
 
 POST /api/submit                  — upload base64-encoded Python driver (slot_name optional)
 POST /api/activate                — switch which slot is the race-active one

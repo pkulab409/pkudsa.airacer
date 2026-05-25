@@ -700,7 +700,7 @@
 
             function onTeamToggle(cb) {
                 var selected = getSelectedTeams();
-                var max = 4;
+                var max = 6;
 
                 if (cb.checked && selected.length > max) {
                     cb.checked = false;
@@ -728,13 +728,15 @@
                 var btn = document.getElementById("btn-create");
                 var hint = document.getElementById("create-hint");
 
-                if (selected.length < 2) {
+                if (selected.length < 1) {
                     btn.disabled = true;
-                    hint.textContent =
-                        "至少需要 2 支队伍（自己和至少 1 个对手）";
+                    hint.textContent = "请至少选择自己（单人测试）";
                 } else {
                     btn.disabled = false;
-                    hint.textContent = selected.length + " 支队伍已选择";
+                    hint.textContent =
+                        selected.length +
+                        " 支队伍已选择" +
+                        (selected.length === 1 ? "（单人测试）" : "");
                 }
             }
 
@@ -751,8 +753,8 @@
                 }
 
                 var selected = getSelectedTeams();
-                if (selected.length < 2) {
-                    toast("至少需要 2 支队伍", "warning");
+                if (selected.length < 1) {
+                    toast("请至少选择自己", "warning");
                     return;
                 }
 
@@ -1042,6 +1044,20 @@
             // ══════════════════════════════ INIT ════════════════════════
             (async function init() {
                 await loadZones();
+
+                // 支持从提交页携带登录信息跳转过来
+                var params = new URLSearchParams(location.search);
+                var zoneId = params.get("zoneId");
+                var teamId = params.get("teamId");
+                var password = params.get("password");
+                if (zoneId && teamId && password) {
+                    document.getElementById("input-zone").value = zoneId;
+                    document.getElementById("input-team").value = teamId;
+                    document.getElementById("input-password").value = password;
+                    await handleLogin();
+                    // 清理 URL 参数，避免刷新后重复提交
+                    history.replaceState(null, "", "/testrace/");
+                }
             })();
         </script>
     </body>

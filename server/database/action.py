@@ -778,3 +778,13 @@ def list_races_by_participant(conn, team_id: str, limit: int = 20) -> List[Dict]
         (f"%{team_id}%", limit),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def db_count_active_races_by_initiator(conn, team_id: str) -> int:
+    """统计某队伍当前处于 waiting/running 状态的 race 数量（作为发起者）。"""
+    row = conn.execute(
+        """SELECT COUNT(*) AS cnt FROM races
+           WHERE initiator = ? AND status IN ('waiting', 'running')""",
+        (team_id,),
+    ).fetchone()
+    return row["cnt"] if row else 0

@@ -1154,6 +1154,10 @@
                         meta.duration_sim || frames[frames.length - 1].t || 0;
                     metadata.duration_sim = duration;
 
+                    // 设置进度条范围，与实际时长匹配
+                    document.getElementById("timeline").max = duration;
+                    document.getElementById("timeline").step = 0.064;
+
                     canvas.style.display = "block";
                     document.getElementById(
                         "canvas-overlay-msg",
