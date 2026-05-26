@@ -15,6 +15,12 @@ python sdk/run_local.py \
     --car-slot car_2 \
     --world complex
 
+# 多车并发用法（--car 可重复，格式 controller_path:slot:team）
+python sdk/run_local.py \
+    --world basic \
+    --car sdk/example_controller.py:car_1:red \
+    --car sdk/my_controller.py:car_2:blue
+
 # 查看所有可用赛道和车型
 python sdk/run_local.py --list-worlds
 
@@ -76,6 +82,53 @@ def _run_validator(code_path: pathlib.Path, rules_path: Optional[pathlib.Path]) 
     return subprocess.call(cmd)
 
 
+def _validate_cars(
+    cars: list[dict],
+    rules_path: Optional[pathlib.Path],
+) -> int:
+    """对车辆列表中每辆车依次调用校验器，任一失败立即返回非零退出码。
+
+    Returns:
+        0  — 全部通过
+        2  — 某辆车校验失败（与原单车校验退出码一致）
+    """
+    for i, car in enumerate(cars):
+        code_path = pathlib.Path(car["controller_path"])
+        car_id = car.get("car_id", f"car_{i}")
+        print(f"[run_local] 校验车辆 {car_id} ({code_path.name}) ...")
+        rc = _run_validator(code_path, rules_path)
+        if rc != 0:
+            print(
+                f"[run_local][error] 车辆 {car_id} ({code_path}) 校验失败（退出码 {rc}）。",
+                file=sys.stderr,
+            )
+            return 2
+    return 0
+
+
+def _make_config_multi(
+    cars: list[dict],
+    world_key: str,
+    out_path: pathlib.Path,
+) -> int:
+    """调用 make_local_config.py 生成多车 race_config.json。
+
+    cars 中每项须包含 car_id / slot / team / controller_path。
+    """
+    cmd = [
+        sys.executable, str(SDK_DIR / "make_local_config.py"),
+        "--world", world_key,
+        "--out", str(out_path),
+        "--force",
+    ]
+    for car in cars:
+        # 格式：car_id:slot:team:controller_path（make_local_config 的 --car 格式扩展）
+        spec = f"{car['car_id']}:{car['slot']}:{car['team']}:{car['controller_path']}"
+        cmd += ["--car-multi", spec]
+    print(f"[run_local] 生成多车配置: {' '.join(cmd)}")
+    return subprocess.call(cmd)
+
+
 def _make_config(
     code_path: pathlib.Path,
     team_id: str,
@@ -83,7 +136,7 @@ def _make_config(
     out_path: pathlib.Path,
     car_model: Optional[str] = None,
 ) -> int:
-    """调用 make_local_config.py 生成 race_config.json。"""
+    """调用 make_local_config.py 生成 race_config.json（单车兼容接口）。"""
     cmd = [
         sys.executable, str(SDK_DIR / "make_local_config.py"),
         "--code-path", str(code_path),
@@ -226,12 +279,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     # --list-worlds 不需要 --code-path，因此 required 在 main() 里手动校验
     p.add_argument("--code-path",
-                   help="team_controller.py 的路径（--list-worlds 时可省略）")
+                   help="team_controller.py 的路径（--list-worlds 时可省略；"
+                        "与 --car 互斥，两者只选其一）")
     p.add_argument("--team-id", default="local_team",
-                   help="队伍 ID（默认 local_team）")
+                   help="队伍 ID（默认 local_team；仅 --code-path 单车模式生效）")
     p.add_argument("--car-slot", default="car_1",
                    help="赛道中的车位名（car_1 / car_2 / …；用 --list-worlds "
-                        "查看每个赛道的车位与对应车型）")
+                        "查看每个赛道的车位与对应车型；仅 --code-path 单车模式生效）")
+    p.add_argument(
+        "--car",
+        action="append",
+        default=[],
+        metavar="PATH:SLOT:TEAM",
+        help="多车模式：添加一辆车，格式 controller_path:slot:team（可重复指定，"
+             "每次指定一辆）。与 --code-path 互斥。",
+    )
     p.add_argument("--world", default=DEFAULT_WORLD_KEY,
                    help=f"赛道：短名（{'/'.join(WORLDS)}）、"
                         f".wbt 文件名、或完整路径。默认 {DEFAULT_WORLD_KEY}。")
@@ -272,14 +334,69 @@ def main() -> int:
         print(format_catalog())
         return 0
 
-    if not args.code_path:
-        print("[run_local][error] 必须通过 --code-path 指定控制器文件 "
-              "（或改用 --list-worlds 查看赛道目录）", file=sys.stderr)
+    # --- 互斥检查：--code-path 与 --car 不能同时使用 ---
+    if args.code_path and args.car:
+        print("[run_local][error] --code-path 与 --car 不能同时使用，请选择其中一种模式。",
+              file=sys.stderr)
         return 1
 
-    code_path = pathlib.Path(args.code_path).expanduser().resolve()
-    if not code_path.is_file():
-        print(f"[run_local][error] 代码文件不存在: {code_path}", file=sys.stderr)
+    # --- 解析车辆列表（统一成内部格式） ---
+    # 内部格式：list of {car_id, slot, team, controller_path}
+    if args.car:
+        # 多车模式：解析 --car PATH:SLOT:TEAM
+        cars: list[dict] = []
+        seen_slots: set[str] = set()
+        for i, spec in enumerate(args.car):
+            parts = spec.split(":", 2)
+            if len(parts) != 3:
+                print(
+                    f"[run_local][error] --car 格式错误: {spec!r}。"
+                    "期望格式：controller_path:slot:team",
+                    file=sys.stderr,
+                )
+                return 1
+            ctrl_path_str, slot, team = (s.strip() for s in parts)
+            if not all([ctrl_path_str, slot, team]):
+                print(
+                    f"[run_local][error] --car 参数中 controller_path/slot/team 不能为空: {spec!r}",
+                    file=sys.stderr,
+                )
+                return 1
+            if slot in seen_slots:
+                print(
+                    f"[run_local][error] slot 冲突：{slot!r} 被多辆车使用。"
+                    "每辆车必须分配唯一车位。",
+                    file=sys.stderr,
+                )
+                return 1
+            seen_slots.add(slot)
+            ctrl_path = pathlib.Path(ctrl_path_str).expanduser().resolve()
+            if not ctrl_path.is_file():
+                print(f"[run_local][error] 控制器文件不存在: {ctrl_path}", file=sys.stderr)
+                return 1
+            cars.append({
+                "car_id": f"car_{i}",
+                "slot": slot,
+                "team": team,
+                "controller_path": str(ctrl_path),
+            })
+        multi_car_mode = True
+    elif args.code_path:
+        # 单车兼容模式：--code-path 包装为长度为 1 的车辆列表
+        code_path = pathlib.Path(args.code_path).expanduser().resolve()
+        if not code_path.is_file():
+            print(f"[run_local][error] 代码文件不存在: {code_path}", file=sys.stderr)
+            return 1
+        cars = [{
+            "car_id": "car_0",
+            "slot": args.car_slot,
+            "team": args.team_id,
+            "controller_path": str(code_path),
+        }]
+        multi_car_mode = False
+    else:
+        print("[run_local][error] 必须通过 --code-path（单车）或 --car（多车）指定控制器文件 "
+              "（或改用 --list-worlds 查看赛道目录）", file=sys.stderr)
         return 1
 
     # --- 解析 --world：短名 / 文件名 / 路径 ---
@@ -293,20 +410,27 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
-    # --- 校验 --car-slot 是否存在于该赛道 ---
+    # --- 校验 slot 是否存在于该赛道（仅对已登记赛道做校验；自定义路径跳过） ---
     car_model_name: Optional[str] = None
-    if world_entry.cars:  # 只对已登记赛道做校验；自定义路径跳过
-        if args.car_slot not in world_entry.cars:
+    if not multi_car_mode and world_entry.cars:
+        single_slot = cars[0]["slot"]
+        if single_slot not in world_entry.cars:
             print(
-                f"[run_local][error] 车位 {args.car_slot!r} 不在赛道 "
+                f"[run_local][error] 车位 {single_slot!r} 不在赛道 "
                 f"{world_entry.key!r} 中。可用车位：{', '.join(world_entry.slots)}",
                 file=sys.stderr,
             )
             return 1
-        car = world_entry.cars[args.car_slot]
-        car_model_name = car.proto
+        car_entry = world_entry.cars[single_slot]
+        car_model_name = car_entry.proto
         print(f"[run_local] 赛道: {world_entry.title}")
-        print(f"[run_local] 车位: {args.car_slot} -> {car.label()}")
+        print(f"[run_local] 车位: {single_slot} -> {car_entry.label()}")
+    elif multi_car_mode:
+        print(f"[run_local] 赛道: {world_entry.title}")
+        print(f"[run_local] 多车模式：{len(cars)} 辆车")
+        for car in cars:
+            print(f"[run_local]   {car['car_id']}: slot={car['slot']}  "
+                  f"team={car['team']}  code={car['controller_path']}")
 
     rules_path: Optional[pathlib.Path] = None
     if args.rules:
@@ -314,9 +438,9 @@ def main() -> int:
     elif (SDK_DIR / "rules.yaml").is_file():
         rules_path = SDK_DIR / "rules.yaml"
 
-    # --- Step 1: 校验 ---
+    # --- Step 1: 校验（对每辆车依次校验） ---
     if not args.skip_validate:
-        rc = _run_validator(code_path, rules_path)
+        rc = _validate_cars(cars, rules_path)
         if rc != 0:
             print("[run_local] 校验未通过，终止。", file=sys.stderr)
             return 2
@@ -327,8 +451,19 @@ def main() -> int:
 
     # --- Step 2: 生成 race_config.json ---
     config_path = pathlib.Path(args.config_out).expanduser().resolve()
-    rc = _make_config(code_path, args.team_id, args.car_slot, config_path,
-                      car_model=car_model_name)
+    # 确保 .local/ 目录存在
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if multi_car_mode:
+        rc = _make_config_multi(cars, world_entry.key, config_path)
+    else:
+        rc = _make_config(
+            pathlib.Path(cars[0]["controller_path"]),
+            cars[0]["team"],
+            cars[0]["slot"],
+            config_path,
+            car_model=car_model_name,
+        )
     if rc != 0:
         print("[run_local] 生成 race_config 失败。", file=sys.stderr)
         return 1
