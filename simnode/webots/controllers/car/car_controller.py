@@ -37,7 +37,7 @@ STRAIGHT_DEADBAND = 0.02
 OFFSET_SMOOTHING = 0.7
 STEER_SMOOTHING = 0.6
 MIN_CONFIDENCE = 0.15
-MOTOR_MAX = 0.95           # hard clamp to prevent Webots "too big requested position" warning
+MOTOR_MAX = 0.80           # hard clamp to prevent Webots "too big requested position" warning
 
 
 @dataclass
@@ -462,7 +462,7 @@ def run() -> None:
                 raw_steering, raw_speed = 0.0, 0.0
             steer_angle = clamp(raw_steering * MOTOR_MAX, -MOTOR_MAX, MOTOR_MAX)
             if use_driver:
-                driver.setCruisingSpeed(raw_speed * MAX_SPEED)
+                driver.setCruisingSpeed(clamp(raw_speed, 0.0, 1.0) * MAX_SPEED)
                 driver.setSteeringAngle(steer_angle)
             else:
                 if fl_steer is not None:
