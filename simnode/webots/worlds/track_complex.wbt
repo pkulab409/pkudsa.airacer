@@ -1,4 +1,4 @@
-#VRML_SIM R2025a utf8
+﻿#VRML_SIM R2025a utf8
 
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/CurvedRoadSegment.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/Road.proto"
@@ -604,7 +604,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -621,7 +621,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -638,7 +638,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -656,7 +656,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -674,7 +674,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -692,7 +692,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -710,7 +710,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -728,7 +728,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }
@@ -746,7 +746,7 @@ Solid {
     Shape {
       appearance PBRAppearance {
         baseColor 0 0.8 1
-        transparency 0.6
+        transparency 1
         roughness 0.3
         metalness 0
       }

@@ -60,16 +60,6 @@ cars = []
 for cc in cars_config:
     node = robot.getFromDef(cc['car_slot'])
     code_path = cc.get('code_path', '')
-
-    # Calculate start-line offset: distance from spawn point to CP0 (56, -29)
-    start_offset_time = 0.0
-    if node is not None:
-        trans_field = node.getField('translation')
-        if trans_field is not None:
-            spawn_pos = trans_field.getSFVec3f()
-            dist_to_start = math.sqrt((spawn_pos[0] - 56.0) ** 2 + (spawn_pos[1] - (-29.0)) ** 2)
-            start_offset_time = dist_to_start / 22.0  # compensate at ~22 m/s
-
     cars.append({
         "team_id":             cc['team_id'],
         "car_slot":            cc['car_slot'],
@@ -94,7 +84,6 @@ for cc in cars_config:
         "finish_time":         None,       # sim time when car completed total_laps
         "laps_data":           [],         # list of lap times (float)
         "last_cp_time":        0.0,        # sim time when last checkpoint was passed (for 60s idle rule)
-        "start_offset_time":   start_offset_time,  # compensation for starting grid position
     })
 
 # ---------------------------------------------------------------------------
@@ -259,14 +248,8 @@ def check_car_collisions(cars, sim_time, events):
 # ---------------------------------------------------------------------------
 
 def compute_final_rankings(cars):
-    # Sort finished cars by adjusted finish time (compensated for starting grid position)
-    def adjusted_finish(c):
-        if c['finish_time'] is None:
-            return float('inf')
-        return c['finish_time'] - c.get('start_offset_time', 0.0)
-
     finished   = sorted([c for c in cars if c['finish_time'] is not None],
-                        key=adjusted_finish)
+                        key=lambda c: c['finish_time'])
     unfinished = sorted([c for c in cars if c['finish_time'] is None],
                         key=lambda c: (-c['lap'], -c['lap_progress']))
     ranked = finished + unfinished
@@ -277,7 +260,7 @@ def compute_final_rankings(cars):
             "team_name":  c['team_name'],
             "laps":       c['lap'],
             "best_lap":   round(c['best_lap_time'], 3) if c['best_lap_time'] is not None else None,
-            "total_time": round(adjusted_finish(c), 3) if c['finish_time'] is not None else None,
+            "total_time": round(c['finish_time'], 3) if c['finish_time'] is not None else None,
             "status":     c['status'],
             "collision_major_count": c['collision_major_count'],
         }
