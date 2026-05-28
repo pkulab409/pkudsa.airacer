@@ -96,6 +96,21 @@ from server.utils.simnode_client import (
     start_race as simnode_start_race,
 )
 
+import time
+
+# ---------------------------------------------------------------------------
+# Admin impersonate token (in-memory, 5-min TTL)
+# ---------------------------------------------------------------------------
+
+_impersonate_tokens: dict[str, dict] = {}  # token → {team_id, expires_at}
+
+def _cleanup_expired_tokens():
+    now = time.time()
+    expired = [k for k, v in _impersonate_tokens.items() if v["expires_at"] < now]
+    for k in expired:
+        del _impersonate_tokens[k]
+
+
 router = APIRouter(prefix="/api/admin")
 _security = HTTPBasic()
 
@@ -348,6 +363,7 @@ async def list_zones(_auth=Depends(require_admin)):
                 "created_at": r["created_at"],
                 "team_count": r["team_count"],
                 "state": sm.state.value,
+                "registration_open": bool(r.get("registration_open", 1)),
                 "running_session": _zone_running_session.get(r["id"]),
             }
         )
@@ -827,6 +843,33 @@ async def _handle_aborted(session_id: str, session_type: str, zone_id: str = "de
 
 
 # ---------------------------------------------------------------------------
+# Per-zone registration open/close (独立于 code submission)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/zones/{zone_id}/close-registration")
+async def close_zone_registration(zone_id: str, _auth=Depends(require_admin)):
+    """关闭指定赛区的队伍注册（不影响已注册队伍上传代码）。"""
+    from server.database.action import db_set_zone_registration
+
+    with get_db(DB_PATH) as conn:
+        if not db_set_zone_registration(conn, zone_id, False):
+            raise HTTPException(status_code=404, detail=f"赛区未找到: {zone_id}")
+    return {"status": "registration_closed", "zone_id": zone_id}
+
+
+@router.post("/zones/{zone_id}/open-registration")
+async def open_zone_registration(zone_id: str, _auth=Depends(require_admin)):
+    """打开指定赛区的队伍注册。"""
+    from server.database.action import db_set_zone_registration
+
+    with get_db(DB_PATH) as conn:
+        if not db_set_zone_registration(conn, zone_id, True):
+            raise HTTPException(status_code=404, detail=f"赛区未找到: {zone_id}")
+    return {"status": "registration_opened", "zone_id": zone_id}
+
+
+# ---------------------------------------------------------------------------
 # Per-zone submission lock/unlock
 # ---------------------------------------------------------------------------
 
@@ -1021,3 +1064,69 @@ async def get_live_frame(session_id: str, _auth=Depends(require_admin)):
         raise
     except Exception:
         raise HTTPException(status_code=503, detail="Simnode unreachable")
+
+
+# ---------------------------------------------------------------------------
+# Admin view team code — view any team's submitted controller code
+# ---------------------------------------------------------------------------
+
+
+@router.get("/team-code/{team_id}")
+async def view_team_code(team_id: str, _auth=Depends(require_admin)):
+    """获取指定队伍所有槽位的提交代码内容。"""
+    from server.database.action import db_get_all_slots_code
+
+    with get_db(DB_PATH) as conn:
+        slots = db_get_all_slots_code(conn, team_id)
+
+    result = []
+    for slot in slots:
+        code = ""
+        code_path = slot.get("code_path")
+        if code_path and pathlib.Path(code_path).exists():
+            code = pathlib.Path(code_path).read_text(encoding="utf-8")
+        result.append({
+            "slot_name": slot["slot_name"],
+            "submitted_at": slot["submitted_at"],
+            "is_race_active": bool(slot["is_race_active"]),
+            "code": code,
+        })
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"队伍 {team_id} 尚无提交代码")
+
+    return {"team_id": team_id, "slots": result}
+
+
+# ---------------------------------------------------------------------------
+# Admin impersonate team — view any team's submission dashboard
+# ---------------------------------------------------------------------------
+
+
+@router.post("/impersonate/{team_id}")
+async def impersonate_team(team_id: str, _auth=Depends(require_admin)):
+    """生成一个临时 token，管理员可用此 token 以队伍身份登录提交界面。"""
+    from server.database.action import db_get_team_secure
+
+    with get_db(DB_PATH) as conn:
+        team = db_get_team_secure(conn, team_id)
+
+    if team is None:
+        raise HTTPException(status_code=404, detail=f"队伍不存在: {team_id}")
+
+    _cleanup_expired_tokens()
+    token = secrets.token_urlsafe(32)
+    _impersonate_tokens[token] = {
+        "team_id": team_id,
+        "team_name": team["name"],
+        "zone_id": team["zone_id"],
+        "expires_at": time.time() + 300,  # 5 minutes
+    }
+
+    return {
+        "token": token,
+        "team_id": team_id,
+        "team_name": team["name"],
+        "zone_id": team["zone_id"],
+    }
+

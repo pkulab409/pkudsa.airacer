@@ -15,9 +15,29 @@ from typing import Dict, List, Optional
 # ---------------------------------------------------------------------------
 
 
+def db_set_zone_registration(conn, zone_id: str, open: bool) -> bool:
+    """Toggle registation_open for a zone. Returns True if the zone existed."""
+    cur = conn.execute(
+        "UPDATE zones SET registration_open = ? WHERE id = ?",
+        (1 if open else 0, zone_id),
+    )
+    return cur.rowcount > 0
+
+
+def db_is_registration_open(conn, zone_id: str) -> bool:
+    """Check if registration is currently open for a zone. Default True."""
+    row = conn.execute(
+        "SELECT registration_open FROM zones WHERE id = ?", (zone_id,)
+    ).fetchone()
+    if row is None:
+        return True  # zone doesn't exist yet, assume open
+    return bool(row[0])
+
+
 def db_list_zones(conn) -> List[Dict]:
     rows = conn.execute("""
         SELECT z.id, z.name, z.description, z.total_laps, z.created_at,
+               z.registration_open,
                COUNT(t.id) AS team_count
         FROM zones z
         LEFT JOIN teams t ON t.zone_id = z.id
@@ -797,3 +817,22 @@ def db_count_active_races_by_initiator(conn, team_id: str) -> int:
         (team_id,),
     ).fetchone()
     return row["cnt"] if row else 0
+
+
+def db_get_all_slots_code(conn, team_id: str) -> List[Dict]:
+    """Return all active submissions for a team with their code_paths."""
+    rows = conn.execute(
+        """SELECT slot_name, code_path, submitted_at, is_race_active
+           FROM submissions
+           WHERE team_id = ? AND is_active = 1
+           ORDER BY slot_name, submitted_at DESC""",
+        (team_id,),
+    ).fetchall()
+    # Only keep the latest per slot
+    seen = set()
+    result = []
+    for r in rows:
+        if r["slot_name"] not in seen:
+            seen.add(r["slot_name"])
+            result.append(dict(r))
+    return result

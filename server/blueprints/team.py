@@ -13,13 +13,14 @@ from server.database.action import (
     db_get_teams_by_zone,
     db_get_zone_detailed,
     db_get_zone_standings,
+    db_is_registration_open,
     db_list_zones,
     db_resource_exists,
     list_teams as db_list_all_teams,
 )
 from server.database.models import get_db
 from server.race.bracket import compute_bracket
-from server.race.state_machine import get_zone_sm
+from server.race.state_machine import get_zone_sm, RaceState
 
 router = APIRouter(prefix="/api")
 
@@ -146,6 +147,13 @@ async def register_team(body: RegisterRequest):
 
         if db_resource_exists(conn, "teams", body.team_id):
             raise HTTPException(status_code=409, detail=f"队伍ID已被占用: {body.team_id}")
+
+        # Check if zone registration is open (independent of code submission state)
+        if not db_is_registration_open(conn, body.zone_id):
+            raise HTTPException(
+                status_code=403,
+                detail=f"赛区 '{body.zone_id}' 队伍注册已关闭",
+            )
 
         create_team(conn, body.team_id, body.team_name, password_hash, body.zone_id)
 

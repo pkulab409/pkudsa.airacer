@@ -1712,6 +1712,38 @@
             // ══════════════════════════════════════════════════
 
             (async function init() {
+                // ── 强伪装认证 ──
+                const urlParams = new URLSearchParams(window.location.search);
+                const impToken = urlParams.get("impersonate_token");
+                if (impToken) {
+                    try {
+                        const r = await fetch("/api/impersonate-login", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ token: impToken }),
+                        });
+                        if (r.ok) {
+                            const data = await r.json();
+                            S.teamId = data.team_id;
+                            S.password = data.bearer_token; // 使用 bearer token 代替密码
+                            S.zoneId = data.zone_id;
+                            S.zoneName = data.zone_id;
+                            // 不写 localStorage，不影响管理员自己的提交页面
+                            await loadZones();
+                            enterMainPanel();
+                            return;
+                        } else {
+                            const data = await r.json();
+                            console.warn("Impersonation failed:", data.detail || data.message);
+                            alert("模拟登录失败: " + (data.detail || data.message || "token 无效或已过期"));
+                            // Clean URL
+                            window.history.replaceState({}, document.title, "/submit/");
+                        }
+                    } catch (e) {
+                        console.warn("Impersonation error:", e);
+                    }
+                }
+
                 await loadZones();
 
                 const saved = localStorage.getItem("airacer_session");

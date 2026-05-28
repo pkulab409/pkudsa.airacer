@@ -12,8 +12,10 @@ import base64
 import datetime
 import os
 import pathlib
+import secrets
 import tempfile
 import threading
+import time
 from typing import Optional
 
 import bcrypt as _bcrypt
@@ -101,11 +103,18 @@ def queue_position(submission_id: str) -> Optional[int]:
 
 _basic_security = HTTPBasic()
 
+# Impersonation bearer token store (same memory as admin.py but shared via module-level)
+_impersonation_sessions: dict[str, dict] = {}  # bearer_token → {team_id, expires_at}
+
 
 def _require_team_auth(
     team_id: str,
     credentials: HTTPBasicCredentials = Depends(_basic_security),
 ) -> str:
+    # Also accept Bearer token via Authorization header
+    from fastapi import Request
+
+    # Check for Basic Auth first
     if credentials.username != team_id:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -115,10 +124,75 @@ def _require_team_auth(
     if row is None:
         raise HTTPException(status_code=401, detail="Team not found")
 
-    if not _verify_password(credentials.password, row["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    # Accept either the real password or a valid impersonation bearer token
+    if _verify_password(credentials.password, row["password_hash"]):
+        return team_id
 
-    return team_id
+    # Fallback: check if the "password" field is actually a bearer token
+    if _validate_impersonation_bearer(credentials.password, team_id):
+        return team_id
+
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+def _validate_impersonation_bearer(token: str, team_id: str) -> bool:
+    now = time.time()
+    # Cleanup expired tokens
+    expired = [
+        k for k, v in _impersonation_sessions.items() if v["expires_at"] < now
+    ]
+    for k in expired:
+        del _impersonation_sessions[k]
+
+    entry = _impersonation_sessions.get(token)
+    if entry and entry["team_id"] == team_id:
+        return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Impersonation login (public — called by submit page with admin token)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/impersonate-login")
+async def impersonate_login_public(body: dict):
+    """用管理员生成的 impersonate token 换取一个临时 bearer token。
+    前端用此 bearer token 替代密码进行 Basic Auth 的 password 字段。"""
+    import time as _time
+
+    admin_token = body.get("token", "")
+    if not admin_token:
+        raise HTTPException(status_code=400, detail="Missing token")
+
+    # Validate against admin's impersonate tokens
+    from server.blueprints.admin import _impersonate_tokens, _cleanup_expired_tokens
+    _cleanup_expired_tokens()
+    entry = _impersonate_tokens.pop(admin_token, None)
+    if entry is None:
+        raise HTTPException(status_code=401, detail="Token 无效或已过期")
+
+    team_id = entry["team_id"]
+
+    # Verify team exists
+    with get_db(DB_PATH) as conn:
+        team = db_get_team_secure(conn, team_id)
+    if team is None:
+        raise HTTPException(status_code=404, detail="队伍不存在")
+
+    # Generate a session bearer token (valid for 30 minutes)
+    bearer = secrets.token_urlsafe(32)
+    _impersonation_sessions[bearer] = {
+        "team_id": team_id,
+        "expires_at": _time.time() + 1800,
+    }
+
+    return {
+        "team_id": team_id,
+        "team_name": team["name"],
+        "zone_id": team["zone_id"],
+        "bearer_token": bearer,
+    }
 
 
 # ---------------------------------------------------------------------------

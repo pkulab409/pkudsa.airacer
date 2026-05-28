@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS zones (
     description TEXT NOT NULL DEFAULT '',
     total_laps  INTEGER NOT NULL DEFAULT 3,
     state       TEXT NOT NULL DEFAULT 'REGISTRATION',
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
+    registration_open INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS teams (
@@ -106,6 +107,7 @@ _MIGRATIONS = [
     "ALTER TABLE test_runs   ADD COLUMN world_key        TEXT NOT NULL DEFAULT 'complex'",
     "ALTER TABLE races      ADD COLUMN name             TEXT",
     "ALTER TABLE race_sessions ADD COLUMN name          TEXT",
+    "ALTER TABLE zones       ADD COLUMN registration_open INTEGER NOT NULL DEFAULT 1",
 ]
 
 

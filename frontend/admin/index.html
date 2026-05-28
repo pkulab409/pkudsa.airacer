@@ -900,6 +900,7 @@
                                                 <th>注册时间</th>
                                                 <th>激活槽位</th>
                                                 <th>版本</th>
+                                                <th style="width:100px;">操作</th>
                                             </tr>
                                         </thead>
                                         <tbody id="teams-tbody">
@@ -1064,6 +1065,19 @@
                         </div>
 
                         <!-- Danger zone -->
+                        <!-- Registration control (all zones) -->
+                        <div class="ctrl-card mb-4" style="border: 2px solid #f59e0b;">
+                            <div class="fw-bold mb-2" style="font-size:1rem;color:#92400e;">队伍注册管理（全部赛区）</div>
+                            <p class="text-muted mb-3" style="font-size:.875rem;">
+                                关闭/打开所有赛区的队伍注册。关闭后新队伍无法注册，但不影响已有队伍提交代码。
+                            </p>
+                            <div class="d-flex gap-2">
+                                <button id="btn-close-all-reg" class="btn btn-warning" onclick="doToggleAllRegistration(false)">关闭所有赛区注册</button>
+                                <button id="btn-open-all-reg" class="btn btn-outline-warning" onclick="doToggleAllRegistration(true)">打开所有赛区注册</button>
+                            </div>
+                        </div>
+
+                        <!-- Danger zone -->
                         <div class="danger-zone">
                             <div class="danger-zone-title">
                                 提交管理（全部赛区）
@@ -1072,8 +1086,8 @@
                                 class="text-muted mb-3"
                                 style="font-size: 0.875rem"
                             >
-                                批量操作所有赛区的提交开关。<br />
-                                锁定后队伍将无法上传或切换代码，赛区状态从报名阶段转入待命。<br />
+                                批量操作所有赛区的代码提交开关。<br />
+                                锁定后队伍将无法上传或切换代码。不影响队伍注册。<br />
                                 <span class="text-danger"
                                     >生产环境锁定后不应再次解锁。</span
                                 >
@@ -1256,6 +1270,22 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                         <button type="button" class="btn btn-danger" onclick="doChangePassword()">确认修改</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 查看代码 Modal -->
+        <div class="modal fade" id="codeViewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: #fff;">
+                        <h5 class="modal-title"><i class="bi bi-code-slash me-2"></i><span id="code-modal-team-name">队伍代码</span></h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ul class="nav nav-tabs mb-3" id="code-modal-tabs" role="tablist"></ul>
+                        <div class="tab-content" id="code-modal-panels"></div>
                     </div>
                 </div>
             </div>
@@ -2105,7 +2135,7 @@
                     var tbody = document.getElementById("teams-tbody");
                     if (!d.length) {
                         tbody.innerHTML =
-                            '<tr><td colspan="5" class="text-center py-4 text-muted">暂无队伍</td></tr>';
+                            '<tr><td colspan="6" class="text-center py-4 text-muted">暂无队伍</td></tr>';
                         return;
                     }
                     tbody.innerHTML = d
@@ -2130,12 +2160,81 @@
                                 "<td><code>" +
                                 esc(t.active_version || "--") +
                                 "</code></td>" +
+                                '<td><a href="#" class="btn btn-sm btn-outline-primary" onclick="impersonateTeam(\'' +
+                                esc(t.id) +
+                                "');return false\">查看界面</a> " +
+                                '<a href="#" class="btn btn-sm btn-outline-secondary" onclick="viewTeamCode(\'' +
+                                esc(t.id) +
+                                "');return false\">查看代码</a></td>" +
                                 "</tr>"
                             );
                         })
                         .join("");
                 } catch (e) {
                     console.warn("teams", e);
+                }
+            }
+
+            async function impersonateTeam(teamId) {
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/impersonate/" + encodeURIComponent(teamId),
+                    );
+                    var d = await r.json();
+                    if (!r.ok) {
+                        toast(d.detail || "生成令牌失败", "danger");
+                        return;
+                    }
+                    // Open submit page in new tab with impersonation token
+                    window.open(
+                        "/submit/?impersonate_token=" +
+                            encodeURIComponent(d.token),
+                        "_blank",
+                    );
+                    toast("已在新建标签页打开队伍 " + teamId + " 的界面", "success");
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            async function viewTeamCode(teamId) {
+                try {
+                    var r = await api(
+                        "GET",
+                        "/api/admin/team-code/" + encodeURIComponent(teamId),
+                    );
+                    var d = await r.json();
+                    if (!r.ok) {
+                        toast(d.detail || "获取代码失败", "danger");
+                        return;
+                    }
+                    var tabsHtml = "";
+                    var panelsHtml = "";
+                    d.slots.forEach(function (s, i) {
+                        var active = i === 0 ? " active" : "";
+                        var show = i === 0 ? " show active" : "";
+                        var isRace = s.is_race_active ? " (参赛)" : "";
+                        tabsHtml +=
+                            '<button class="nav-link' + active + '" id="code-tab-' + i +
+                            '" data-bs-toggle="tab" data-bs-target="#code-panel-' + i +
+                            '" type="button" role="tab">' +
+                            esc(s.slot_name) + isRace + '</button>';
+                        panelsHtml +=
+                            '<div class="tab-pane fade' + show + '" id="code-panel-' + i +
+                            '" role="tabpanel"><pre class="bg-dark text-light p-3 rounded" style="max-height:500px;overflow:auto;font-size:.8rem;line-height:1.5;">' +
+                            esc(s.code || "(无代码)") + '</pre></div>';
+                    });
+                    document.getElementById("code-modal-team-name").textContent =
+                        teamId + " 的提交代码";
+                    document.getElementById("code-modal-tabs").innerHTML = tabsHtml;
+                    document.getElementById("code-modal-panels").innerHTML = panelsHtml;
+                    var modal = new bootstrap.Modal(
+                        document.getElementById("codeViewModal"),
+                    );
+                    modal.show();
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
                 }
             }
 
@@ -2255,6 +2354,26 @@
                 } catch (e) {
                     toast("请求失败: " + e.message, "danger");
                 }
+            }
+
+            // ── Global registration open/close (all zones at once) ──
+            async function doToggleAllRegistration(open) {
+                var action = open ? "open-registration" : "close-registration";
+                var label = open ? "打开" : "关闭";
+                var msg = "确认" + label + "所有赛区的队伍注册？";
+                if (!confirm(msg)) return;
+                var zones = [];
+                var failed = 0;
+                for (var i = 0; i < _zones.length; i++) {
+                    var zid = _zones[i].zone_id;
+                    try {
+                        var r = await api("POST", "/api/admin/zones/" + zid + "/" + action);
+                        if (r.ok) zones.push(zid);
+                        else failed++;
+                    } catch (e) { failed++; }
+                }
+                toast("已" + label + " " + zones.length + " 个赛区注册" + (failed ? "（" + failed + "个失败）" : ""), "success");
+                await loadZones();
             }
 
             // ── Global lock/unlock (danger zone, all zones at once) ──
