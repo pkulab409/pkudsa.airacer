@@ -2,13 +2,30 @@
 Usage:
     # 单车模式
     python sdk/make_local_config.py --code-path PATH [--team-id ID] [--car-slot NAME] [--out FILE]
-    # 多车模式（可重复使用 --car 参数）
+    # 多车模式（可重复使用 --car 参数，格式 car_slot:team_id:code_path）
     python sdk/make_local_config.py \
-        --car car_0:team_a:/path/to/team_a_controller.py \
-        --car car_1:team_b:/path/to/team_b_controller.py \
-        --out sdk/local_race_config.json
+        --car car_1:team_a:/path/to/team_a_controller.py \
+        --car car_2:team_b:/path/to/team_b_controller.py \
+        --out sdk/.local/race_config.json
+    # run_local.py 内部多车模式（--car-multi，格式 car_id:slot:team:controller_path）
+    python sdk/make_local_config.py \
+        --world basic \
+        --car-multi car_0:car_1:red:/abs/path/a.py \
+        --car-multi car_1:car_2:blue:/abs/path/b.py \
+        --out sdk/.local/race_config.json --force
     # 追加到已有配置
     python sdk/make_local_config.py --code-path PATH --team-id new_team --append
+
+输出 JSON 顶层结构（新格式）：
+    {
+      "world": "<world_name>",
+      "cars": [
+        { "car_id": "car_0", "slot": "car_1", "team": "red", "controller_path": "/abs/path/a.py" },
+        ...
+      ]
+    }
+兼容旧格式：单车调用时 cars[] 长度为 1，同时保留 car_slot/team_id/code_path 字段供老版
+supervisor.py 读取。
 The produced JSON contains a `cars` list that `car_controller.py` reads.
 Edit the produced file to set absolute paths if necessary.
 """
@@ -18,7 +35,11 @@ import json
 import pathlib
 import sys
 from typing import Any
-DEFAULT_OUT = "sdk/local_race_config.json"
+DEFAULT_OUT = "sdk/.local/race_config.json"
+
+SDK_DIR = pathlib.Path(__file__).resolve().parent
+
+
 def validate_code_path(code_path: str) -> pathlib.Path:
     """Validate that the controller script exists and is a .py file."""
     p = pathlib.Path(code_path).expanduser()
@@ -35,6 +56,9 @@ def parse_car_spec(spec: str) -> dict[str, str]:
     支持两种格式（以冒号分隔）：
       * ``car_slot:team_id:code_path``                —— 3 段，无车型注释
       * ``car_slot:team_id:code_path:car_model``      —— 4 段，最后一段是车型（仅注释用）
+
+    返回字典同时包含新格式字段（car_id/slot/team/controller_path）和老格式字段
+    （car_slot/team_id/code_path）以保证向下兼容。
     """
     parts = spec.split(":", 3)
     if len(parts) not in (3, 4):
@@ -55,14 +79,54 @@ def parse_car_spec(spec: str) -> dict[str, str]:
         )
     resolved = validate_code_path(code_path)
     entry: dict[str, str] = {
+        # 新格式字段
+        "car_id": car_slot,          # --car 模式下 car_id 默认等同于 car_slot
+        "slot": car_slot,
+        "team": team_id,
+        "controller_path": str(resolved),
+        # 老格式兼容字段
         "car_slot": car_slot,
         "team_id": team_id,
-        "team_name": team_id,      # supervisor 需要 team_name；本地无独立显示名时沿用 team_id
+        "team_name": team_id,        # supervisor 需要 team_name；本地无独立显示名时沿用 team_id
         "code_path": str(resolved),
     }
     if car_model:
         entry["car_model"] = car_model
     return entry
+
+
+def parse_car_multi_spec(spec: str) -> dict[str, str]:
+    """Parse a --car-multi argument（由 run_local.py 内部调用）。
+
+    格式：``car_id:slot:team:controller_path``（4 段，均必填）
+    返回字典同时包含新格式字段和老格式字段以保证向下兼容。
+    """
+    # controller_path 本身可能含冒号（Windows 盘符），因此最多分 4 段
+    parts = spec.split(":", 3)
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError(
+            f"Invalid --car-multi spec: {spec!r}. "
+            "Expected 'car_id:slot:team:controller_path'"
+        )
+    car_id, slot, team, code_path = (s.strip() for s in parts)
+    if not all([car_id, slot, team, code_path]):
+        raise argparse.ArgumentTypeError(
+            f"Invalid --car-multi spec: {spec!r}. "
+            "car_id / slot / team / controller_path 均必须非空。"
+        )
+    resolved = validate_code_path(code_path)
+    return {
+        # 新格式字段
+        "car_id": car_id,
+        "slot": slot,
+        "team": team,
+        "controller_path": str(resolved),
+        # 老格式兼容字段
+        "car_slot": slot,
+        "team_id": team,
+        "team_name": team,
+        "code_path": str(resolved),
+    }
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate a race_config JSON for local Webots runs.",
@@ -101,7 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Telemetry recording output directory "
                              "(supervisor writes telemetry.jsonl + live_view.jpg "
                              "inside it; default: <repo_root>/.local/recordings/)")
-    # 多车模式
+    # 赛道名（写入 race_config.json 顶层）
+    parser.add_argument(
+        "--world",
+        default="",
+        help="World/track short name to embed in race_config.json (e.g. basic / complex).",
+    )
+    # 多车模式（旧格式：car_slot:team_id:code_path）
     parser.add_argument(
         "--car",
         action="append",
@@ -109,6 +179,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SLOT:TEAM:PATH",
         help="Add a car entry (can be specified multiple times). "
         "Format: 'car_slot:team_id:code_path'",
+    )
+    # 多车模式（新格式：car_id:slot:team:controller_path，由 run_local.py 内部使用）
+    parser.add_argument(
+        "--car-multi",
+        action="append",
+        default=[],
+        metavar="CAR_ID:SLOT:TEAM:PATH",
+        help="Add a car entry in new multi-car format (used internally by run_local.py). "
+        "Format: 'car_id:slot:team:controller_path'",
     )
     # 输出控制
     parser.add_argument("--out", default=DEFAULT_OUT, help=f"Output JSON path (default: {DEFAULT_OUT})")
@@ -127,16 +206,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     return parser
 def collect_cars(args: argparse.Namespace) -> list[dict[str, str]]:
-    """Collect car entries from CLI arguments."""
+    """Collect car entries from CLI arguments.
+
+    处理优先级（从高到低）：
+      1. --car-multi（新格式，run_local.py 内部调用）
+      2. --car（旧格式，用户直接调用 make_local_config.py）
+      3. --code-path（单车兼容模式）
+
+    若同时传入 --car-multi 和 --car，两者均会被收集（分别解析后合并）。
+    未显式指定 car_id 时自动生成（car_0, car_1, ...）。
+    """
     cars: list[dict[str, str]] = []
-    # 多车模式
+
+    # 新格式多车（--car-multi）
+    for spec in args.car_multi:
+        cars.append(parse_car_multi_spec(spec))
+
+    # 旧格式多车（--car）
     for spec in args.car:
         cars.append(parse_car_spec(spec))
-    # 单车模式
+
+    # 单车兼容模式（--code-path）
     if args.code_path:
         resolved = validate_code_path(args.code_path)
         team_name = args.team_name if args.team_name else args.team_id
         entry: dict[str, str] = {
+            # 新格式字段（car_id 在单车模式下默认为 car_slot）
+            "car_id": args.car_slot,
+            "slot": args.car_slot,
+            "team": args.team_id,
+            "controller_path": str(resolved),
+            # 老格式兼容字段
             "car_slot": args.car_slot,
             "team_id": args.team_id,
             "team_name": team_name,
@@ -145,15 +245,29 @@ def collect_cars(args: argparse.Namespace) -> list[dict[str, str]]:
         if args.car_model:
             entry["car_model"] = args.car_model
         cars.append(entry)
+
     if not cars:
         raise ValueError(
             "No car configuration provided. Use --code-path or --car to specify at least one car."
         )
-    # 检查 car_slot 重复
-    slots = [c["car_slot"] for c in cars]
+
+    # 对未显式设置 car_id 的条目（不应出现，但防御性处理）自动补全
+    for i, car in enumerate(cars):
+        if not car.get("car_id"):
+            car["car_id"] = f"car_{i}"
+
+    # 检查 car_id 唯一性
+    ids = [c["car_id"] for c in cars]
+    dup_ids = {v for v in ids if ids.count(v) > 1}
+    if dup_ids:
+        raise ValueError(f"Duplicate car_id values detected: {sorted(dup_ids)}")
+
+    # 检查 slot 重复
+    slots = [c.get("slot") or c.get("car_slot", "") for c in cars]
     duplicates = {s for s in slots if slots.count(s) > 1}
     if duplicates:
-        raise ValueError(f"Duplicate car_slot values detected: {sorted(duplicates)}")
+        raise ValueError(f"Duplicate slot values detected: {sorted(duplicates)}")
+
     return cars
 def _default_recording_path() -> str:
     """Default telemetry recording directory.
@@ -232,6 +346,10 @@ def main() -> int:
             cfg.setdefault(k, v)
     else:
         cfg = {**session_meta, "cars": new_cars}
+    # 将 world 写入顶层（若调用方未传入则为空字符串，不强制要求）
+    world_val = getattr(args, "world", "") or ""
+    if world_val:
+        cfg["world"] = world_val
     rendered = json.dumps(cfg, indent=2, ensure_ascii=False)
     if args.dry_run:
         print(rendered)
@@ -253,10 +371,16 @@ def main() -> int:
     print(f"[ok] Wrote {len(cfg['cars'])} car(s) to: {outp.resolve()}")
     print(f"     race_id={cfg.get('race_id')}  session_type={cfg.get('session_type')}"
           f"  total_laps={cfg.get('total_laps')}")
+    if cfg.get("world"):
+        print(f"     world={cfg['world']}")
     for car in cfg["cars"]:
         extra = f"  car_model={car['car_model']}" if car.get("car_model") else ""
-        print(f"     - {car['car_slot']}  team={car['team_id']}"
-              f"  code={car['code_path']}{extra}")
+        car_id = car.get("car_id") or car.get("car_slot", "?")
+        slot = car.get("slot") or car.get("car_slot", "?")
+        team = car.get("team") or car.get("team_id", "?")
+        code = car.get("controller_path") or car.get("code_path", "?")
+        print(f"     - car_id={car_id}  slot={slot}  team={team}"
+              f"  code={code}{extra}")
     return 0
 if __name__ == "__main__":
     sys.exit(main())

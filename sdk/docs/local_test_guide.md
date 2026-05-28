@@ -17,7 +17,8 @@
 6. [编写你的控制器](#6-编写你的控制器)
 7. [提交前校验](#7-提交前校验)
 8. [常见问题 FAQ](#8-常见问题-faq)
-9. [反馈渠道](#9-反馈渠道)
+9. [多车并发本地测试](#9-多车并发本地测试)
+10. [反馈渠道](#10-反馈渠道)
 
 ---
 
@@ -526,10 +527,162 @@ python sdk/run_local.py --code-path sdk/my_controller.py `
 
 ---
 
-## 9. 反馈渠道
+## 9. 多车并发本地测试
+
+> 本章适用于希望在本地一次性启动多辆车参与同一场仿真的用户。单车用法不受影响，详见 §5。
+
+### 9.1 多车并发用法
+
+`run_local.py` 支持通过重复 `--car` 参数同时接入多辆车。
+
+**`--car` 参数语法**
+
+```
+--car controller_path:slot:team
+```
+
+| 字段 | 说明 |
+|---|---|
+| `controller_path` | 控制器脚本的路径（相对或绝对均可，最终会转为绝对路径） |
+| `slot` | 赛道中的车位名，如 `car_1` / `car_2` / … （必须在赛道中存在） |
+| `team` | 队伍标识字符串，用于区分各车归属 |
+
+**多车示例命令**
+
+```powershell
+python sdk/run_local.py `
+  --world basic `
+  --car sdk/example_controller.py:car_1:red `
+  --car sdk/my_controller.py:car_2:blue
+```
+
+`--car` 可重复任意次，每次指定一辆车。所有车辆校验通过后，脚本**一次性启动 Webots**。
+
+> 💡 `--car` 与 `--code-path` 互斥，不可同时使用。
+
+### 9.2 向下兼容
+
+原 `--code-path` 单车用法**完全不变**：
+
+```powershell
+# 单车用法（与之前完全一致）
+python sdk/run_local.py --code-path sdk/my_controller.py
+```
+
+内部逻辑：`--code-path` 会被自动包装为 `cars[]` 长度为 1 的列表，`car_id` 默认等于 `--car-slot`（默认 `car_1`）。生成的 `race_config.json` 结构与多车模式完全一致，只是 `cars[]` 只有一条记录。
+
+所有老版工具（`make_local_config.py --code-path`、`--car` 旧格式）继续有效。
+
+### 9.3 race_config.json 结构说明
+
+多车模式下生成的 `sdk/.local/race_config.json` 顶层结构如下：
+
+```json
+{
+  "world": "basic",
+  "race_id": "local_race",
+  "session_type": "practice",
+  "total_laps": 1,
+  "recording_path": "/absolute/path/to/recordings",
+  "cars": [
+    {
+      "car_id": "car_0",
+      "slot": "car_1",
+      "team": "red",
+      "controller_path": "/absolute/path/to/example_controller.py",
+      "car_slot": "car_1",
+      "team_id": "red",
+      "team_name": "red",
+      "code_path": "/absolute/path/to/example_controller.py"
+    },
+    {
+      "car_id": "car_1",
+      "slot": "car_2",
+      "team": "blue",
+      "controller_path": "/absolute/path/to/my_controller.py",
+      "car_slot": "car_2",
+      "team_id": "blue",
+      "team_name": "blue",
+      "code_path": "/absolute/path/to/my_controller.py"
+    }
+  ]
+}
+```
+
+**各字段含义**
+
+| 字段 | 说明 |
+|---|---|
+| `world` | 赛道短名（由 `--world` 指定，如 `basic` / `complex`） |
+| `cars[]` | 车辆配置数组，每项描述一辆车 |
+| `car_id` | 车辆唯一标识（多车模式下自动生成为 `car_0` / `car_1` / …） |
+| `slot` | 赛道中的车位名（与 `car_slot` 相同，新格式字段名） |
+| `team` | 队伍标识（与 `team_id` 相同，新格式字段名） |
+| `controller_path` | 控制器脚本绝对路径（新格式字段名） |
+| `car_slot` / `team_id` / `code_path` | 老格式兼容字段，值与新字段相同，保证老版 supervisor.py 可读 |
+
+> 💡 `sandbox_runner.py` 通过环境变量 `CAR_ID` + `RACE_CONFIG_PATH` 在 `cars[]` 中定位自身配置条目，取出 `controller_path` 加载控制器代码。
+
+### 9.4 多车场景常见错误与排查
+
+#### slot 冲突
+
+**症状**：两辆车分配了相同车位，`run_local.py` 报错并中止。
+
+```
+[run_local][error] slot 冲突：'car_1' 被多辆车使用。每辆车必须分配唯一车位。
+```
+
+**解决方法**：修改其中一辆车的 `slot`，确保每辆车的车位名唯一，例如改为：
+
+```powershell
+--car sdk/a.py:car_1:red --car sdk/b.py:car_2:blue
+```
+
+#### car_id 未匹配
+
+**症状**：`sandbox_runner.py` 报 `CAR_ID` 未匹配，Webots 控制台出现以下红色错误：
+
+```
+[Sandbox][error] CAR_ID='car_3' 在 race_config.json 的 cars[] 中未找到匹配条目。可用 car_id: ['car_0', 'car_1']
+```
+
+**可能原因**：
+- `CAR_ID` 环境变量被手动设置为错误的值；
+- `race_config.json` 与当前 `CAR_ID` 不同步（重新生成配置后未重启 Webots）。
+
+**解决方法**：重新运行 `run_local.py` 让其自动设置正确的 `RACE_CONFIG_PATH` 和 `CAR_ID`，不要手动修改这两个环境变量。
+
+#### 某车校验失败导致全局中止
+
+**症状**：多车批量校验时，某辆车校验失败，流程提前终止：
+
+```
+[run_local] 校验车辆 car_1 (my_controller.py) ...
+[run_local][error] 车辆 car_1 (…/my_controller.py) 校验失败（退出码 1）。
+[run_local] 校验未通过，终止。
+```
+
+**定位方法**：
+- 错误信息中会明确打印失败的 `car_id` 和控制器路径；
+- 单独运行 `python sdk/validate_controller.py --code-path <该控制器路径>` 查看详细错误码（E004 / E006 / E008 等）；
+- 参考 §7.4 错误码速查表修复对应问题后重新运行。
+
+#### 多 sandbox_runner 并发时的日志过滤
+
+同一 Webots 实例启动时会为每辆车分别创建 `sandbox_runner.py` 子进程，日志会混在 Webots 控制台中。建议：
+
+- 每条 `[Sandbox]` 日志前都标注了 `CAR_ID`（因为 `sandbox_runner.py` 以 `CAR_ID` 作为前缀打印），可按 `CAR_ID` 关键字过滤；
+- 也可在控制台过滤框输入进程 PID（Webots 会在每行前显示 PID）或 `car_id=car_0` 等字符串；
+- 如需更精细的日志，可在控制器脚本中用 `print(f"[{os.getenv('CAR_ID', 'unknown')}] ...")` 加前缀（注意 `os` 在沙箱内不可用，但 `sandbox_runner.py` 本身不在沙箱限制内，可在 `car_controller.py` 层加日志）。
+
+---
+
+## 10. 反馈渠道
 
 - Bug / 功能需求：在项目仓库提 issue
 - 紧急问题：🚧 _占位_ —— 由 TA 在群公告里提供官方渠道
+
 
 ---
 

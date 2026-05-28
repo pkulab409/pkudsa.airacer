@@ -16,8 +16,17 @@ Exit codes:
   0 — clean shutdown (stdin closed)
   1 — student code failed to load (non-import error)
   2 — student code triggered a blocked import (ImportError from hook)
+
+多车并发说明：
+  当 race_config.json 中包含多辆车（cars[] 数组）时，每辆车的 sandbox_runner
+  进程通过环境变量 CAR_ID 确定自身对应的配置条目：
+    - RACE_CONFIG_PATH：race_config.json 的绝对路径
+    - CAR_ID：该进程对应的 car_id（如 car_0、car_1）
+  CAR_ID 未设置或无法在 cars[] 中找到时，进程以非零码退出并输出明确错误信息。
+  多实例并发时各 runner 为独立进程，互不干扰。
 """
 
+import os
 import sys
 import argparse
 import struct
@@ -30,9 +39,90 @@ import importlib.util
 # ---------------------------------------------------------------------------
 
 parser = argparse.ArgumentParser(description="AI Racer sandbox runner")
-parser.add_argument('--team-id',   required=True,  help="Team identifier")
-parser.add_argument('--code-path', required=True,  help="Absolute path to team_controller.py")
+parser.add_argument('--team-id',   required=False, default=None, help="Team identifier")
+parser.add_argument('--code-path', required=False, default=None,
+                    help="Absolute path to team_controller.py "
+                         "(可选：未指定时从 RACE_CONFIG_PATH + CAR_ID 自动解析)")
 args = parser.parse_args()
+
+# ---------------------------------------------------------------------------
+# 若 --code-path 未指定，则从 RACE_CONFIG_PATH + CAR_ID 环境变量解析
+# ---------------------------------------------------------------------------
+
+_resolved_code_path: str = args.code_path or ""
+_resolved_team_id: str = args.team_id or ""
+
+if not _resolved_code_path:
+    _race_config_path = os.environ.get("RACE_CONFIG_PATH", "")
+    _car_id = os.environ.get("CAR_ID", "")
+
+    if not _race_config_path:
+        print(
+            "[Sandbox][error] --code-path 未指定且环境变量 RACE_CONFIG_PATH 未设置。"
+            "请通过 --code-path 或 RACE_CONFIG_PATH + CAR_ID 提供控制器路径。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if not _car_id:
+        print(
+            "[Sandbox][error] --code-path 未指定且环境变量 CAR_ID 未设置。"
+            "多车模式下必须通过 CAR_ID 指定当前进程对应的车辆标识。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        with open(_race_config_path, encoding="utf-8") as _f:
+            _race_cfg = json.load(_f)
+    except FileNotFoundError:
+        print(
+            f"[Sandbox][error] RACE_CONFIG_PATH 指向的文件不存在: {_race_config_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except json.JSONDecodeError as _e:
+        print(
+            f"[Sandbox][error] RACE_CONFIG_PATH 文件不是合法 JSON: {_race_config_path} ({_e})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    _cars = _race_cfg.get("cars", [])
+    _matched = None
+    for _car in _cars:
+        if _car.get("car_id") == _car_id:
+            _matched = _car
+            break
+
+    if _matched is None:
+        _available = [c.get("car_id", "?") for c in _cars]
+        print(
+            f"[Sandbox][error] CAR_ID={_car_id!r} 在 race_config.json 的 cars[] 中未找到匹配条目。"
+            f"可用 car_id: {_available}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # 优先使用新格式字段 controller_path，兼容旧格式字段 code_path
+    _resolved_code_path = _matched.get("controller_path") or _matched.get("code_path", "")
+    if not _resolved_code_path:
+        print(
+            f"[Sandbox][error] cars[] 中 car_id={_car_id!r} 的条目缺少 "
+            "controller_path / code_path 字段。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # 若 team_id 也未从命令行传入，尝试从配置中读取
+    if not _resolved_team_id:
+        _resolved_team_id = (
+            _matched.get("team") or _matched.get("team_id", "unknown")
+        )
+
+# 统一变量名，后续代码不再区分来源
+args.code_path = _resolved_code_path
+args.team_id = _resolved_team_id
 
 # ---------------------------------------------------------------------------
 # Import numpy BEFORE the hook (sandbox_runner itself needs it)
