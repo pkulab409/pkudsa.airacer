@@ -2326,8 +2326,11 @@
                         })
                         .join("");
                     if (currentZone === zid) {
-                        setCtrlBadge(z.state);
-                        highlightStage(z.current_stage);
+                        var _cfgZone = _zones.find(function (x) { return x.zone_id === zid; });
+                        if (_cfgZone) {
+                            setCtrlBadge(_cfgZone.state);
+                            highlightStage(_cfgZone.current_stage);
+                        }
                     }
                 } catch (e) {
                     teamsDiv.innerHTML =
