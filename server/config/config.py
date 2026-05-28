@@ -48,6 +48,14 @@ class Config:
             return _DEFAULTS[key]
         return default
 
+    @staticmethod
+    def set_admin_password(new_password: str) -> None:
+        """Update admin password in memory and persist to config.yaml."""
+        _config['ADMIN_PASSWORD'] = new_password
+        yaml_path = pathlib.Path(__file__).parent / "config.yaml"
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(_config, f, allow_unicode=True)
+
 
 # ---------------------------------------------------------------------------
 # 便捷常量（向后兼容旧的 config.py 导入方式）

@@ -15,7 +15,7 @@ _DEFAULTS = {
     "RECORDINGS_DIR":         str(_BASE_DIR.parent / "recordings"),
     "WEBOTS_BINARY":          "/usr/bin/webots",
     "WEBOTS_WORLD":           str(_BASE_DIR / "webots" / "worlds" / "track_complex.wbt"),
-    "RACE_TIMEOUT_SECONDS":   600,
+    "RACE_TIMEOUT_SECONDS":   1000,
     "LOG_LEVEL":              "INFO",
 }
 

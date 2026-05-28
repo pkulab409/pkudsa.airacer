@@ -146,6 +146,12 @@ class TestRequest(BaseModel):
     world: str = "complex"  # "basic" | "complex"
 
 
+class ChangeTeamPasswordRequest(BaseModel):
+    team_id: str
+    old_password: str
+    new_password: str
+
+
 # ---------------------------------------------------------------------------
 # Shared: validate and save code bytes
 # ---------------------------------------------------------------------------
@@ -424,3 +430,36 @@ async def get_test_status(
             }
 
     return {"team_id": team_id, "slots": slots_data}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/change-team-password — team self-service password change
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/change-team-password")
+async def change_team_password(body: ChangeTeamPasswordRequest):
+    """队伍自行修改登录密码。需提供旧密码验证和新密码。"""
+    if not body.old_password or not body.new_password:
+        raise HTTPException(status_code=400, detail="旧密码和新密码均为必填项")
+
+    if len(body.new_password) < 4:
+        raise HTTPException(status_code=400, detail="新密码长度至少为4位")
+
+    from server.database.action import db_update_team_password
+
+    with get_db(DB_PATH) as conn:
+        team_row = db_get_team_secure(conn, body.team_id)
+
+    if team_row is None:
+        raise HTTPException(status_code=401, detail="队伍不存在")
+
+    if not _verify_password(body.old_password, team_row["password_hash"]):
+        raise HTTPException(status_code=403, detail="旧密码错误")
+
+    new_hash = _hash_password(body.new_password)
+
+    with get_db(DB_PATH) as conn:
+        db_update_team_password(conn, body.team_id, new_hash)
+
+    return {"status": "ok", "message": "密码修改成功"}

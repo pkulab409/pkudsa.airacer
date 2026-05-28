@@ -137,6 +137,11 @@ class ZoneSetSessionBody(BaseModel):
     name: Optional[str] = None  # 可读名称
 
 
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -966,6 +971,33 @@ async def close_event(_auth=Depends(require_admin)):
         raise HTTPException(status_code=409, detail=str(exc))
     await _broadcast("idle", zone_id="default")
     return {"state": sm.state}
+
+
+# ---------------------------------------------------------------------------
+# Change password
+# ---------------------------------------------------------------------------
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordBody, _auth=Depends(require_admin)):
+    """修改管理员密码。需要提供旧密码验证和新密码。"""
+    from server.config.config import Config
+
+    if not body.old_password or not body.new_password:
+        raise HTTPException(status_code=400, detail="旧密码和新密码均为必填项")
+
+    if not secrets.compare_digest(body.old_password.encode(), ADMIN_PASSWORD.encode()):
+        raise HTTPException(status_code=403, detail="旧密码错误")
+
+    if len(body.new_password) < 4:
+        raise HTTPException(status_code=400, detail="新密码长度至少为4位")
+
+    try:
+        Config.set_admin_password(body.new_password)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"密码写入配置文件失败: {e}")
+
+    return {"status": "ok", "message": "密码修改成功，请使用新密码重新登录"}
 
 
 # ---------------------------------------------------------------------------

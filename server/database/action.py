@@ -359,6 +359,15 @@ def db_get_team_secure(conn, team_id: str) -> Optional[Dict]:
     return dict(row) if row else None
 
 
+def db_update_team_password(conn, team_id: str, new_password_hash: str) -> bool:
+    """更新队伍密码哈希。返回 True 表示更新成功，False 表示队伍不存在。"""
+    cur = conn.execute(
+        "UPDATE teams SET password_hash = ? WHERE id = ?",
+        (new_password_hash, team_id),
+    )
+    return cur.rowcount > 0
+
+
 def list_teams(conn) -> List[Dict]:
     rows = conn.execute("SELECT id, name, zone_id FROM teams ORDER BY name").fetchall()
     return [dict(r) for r in rows]

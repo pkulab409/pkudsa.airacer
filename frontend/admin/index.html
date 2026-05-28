@@ -516,6 +516,17 @@
                             admin
                         </div>
                         <button
+                            class="btn btn-sm w-100 mb-2"
+                            style="
+                                background: rgba(255, 255, 255, 0.08);
+                                color: #94a3b8;
+                                border: 1px solid rgba(255, 255, 255, 0.1);
+                            "
+                            onclick="showChangePasswordModal()"
+                        >
+                            <i class="bi bi-key me-1"></i>修改密码
+                        </button>
+                        <button
                             class="btn btn-sm w-100"
                             style="
                                 background: rgba(255, 255, 255, 0.08);
@@ -1208,6 +1219,47 @@
 
         <!-- Toast container -->
         <div class="toast-container"></div>
+
+        <!-- ════════════════════════════════════════════════════════════════
+     修改密码 Modal
+     ════════════════════════════════════════════════════════════════ -->
+        <div
+            class="modal fade"
+            id="changePasswordModal"
+            tabindex="-1"
+            aria-labelledby="changePasswordModalLabel"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff;">
+                        <h5 class="modal-title" id="changePasswordModalLabel">
+                            <i class="bi bi-key me-2"></i>修改管理员密码
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="cp-old-pwd" class="form-label">旧密码</label>
+                            <input type="password" id="cp-old-pwd" class="form-control" placeholder="请输入旧密码" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="cp-new-pwd" class="form-label">新密码</label>
+                            <input type="password" id="cp-new-pwd" class="form-control" placeholder="请输入新密码（至少4位）" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="cp-confirm-pwd" class="form-label">确认新密码</label>
+                            <input type="password" id="cp-confirm-pwd" class="form-control" placeholder="请再次输入新密码" onkeydown="if(event.key==='Enter')doChangePassword()" />
+                        </div>
+                        <div id="cp-error" class="text-danger" style="font-size: 0.85rem; display: none;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" onclick="doChangePassword()">确认修改</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
         <script>
@@ -2273,6 +2325,10 @@
                             );
                         })
                         .join("");
+                    if (currentZone === zid) {
+                        setCtrlBadge(z.state);
+                        highlightStage(z.current_stage);
+                    }
                 } catch (e) {
                     teamsDiv.innerHTML =
                         '<div class="text-danger" style="font-size:.85rem;">加载队伍失败</div>';
@@ -2461,6 +2517,74 @@
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;")
                     .replace(/"/g, "&quot;");
+            }
+
+            /* ================================================================
+   CHANGE PASSWORD
+================================================================ */
+            function showChangePasswordModal() {
+                document.getElementById("cp-old-pwd").value = "";
+                document.getElementById("cp-new-pwd").value = "";
+                document.getElementById("cp-confirm-pwd").value = "";
+                document.getElementById("cp-error").style.display = "none";
+                var modal = new bootstrap.Modal(
+                    document.getElementById("changePasswordModal"),
+                );
+                modal.show();
+            }
+
+            async function doChangePassword() {
+                var oldPwd = document.getElementById("cp-old-pwd").value;
+                var newPwd = document.getElementById("cp-new-pwd").value;
+                var confirmPwd = document.getElementById("cp-confirm-pwd").value;
+                var errEl = document.getElementById("cp-error");
+
+                errEl.style.display = "none";
+                errEl.textContent = "";
+
+                if (!oldPwd) {
+                    errEl.textContent = "请输入旧密码";
+                    errEl.style.display = "block";
+                    return;
+                }
+                if (!newPwd) {
+                    errEl.textContent = "请输入新密码";
+                    errEl.style.display = "block";
+                    return;
+                }
+                if (newPwd.length < 4) {
+                    errEl.textContent = "新密码长度至少为4位";
+                    errEl.style.display = "block";
+                    return;
+                }
+                if (newPwd !== confirmPwd) {
+                    errEl.textContent = "两次输入的新密码不一致";
+                    errEl.style.display = "block";
+                    return;
+                }
+
+                try {
+                    var r = await api("POST", "/api/admin/change-password", {
+                        old_password: oldPwd,
+                        new_password: newPwd,
+                    });
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast(d.message || "密码修改成功", "success");
+                        var modal = bootstrap.Modal.getInstance(
+                            document.getElementById("changePasswordModal"),
+                        );
+                        if (modal) modal.hide();
+                        localStorage.setItem("adminPwd", newPwd);
+                        adminPwd = newPwd;
+                    } else {
+                        errEl.textContent = d.detail || d.message || "修改失败";
+                        errEl.style.display = "block";
+                    }
+                } catch (e) {
+                    errEl.textContent = "请求失败: " + e.message;
+                    errEl.style.display = "block";
+                }
             }
 
             /* ================================================================
