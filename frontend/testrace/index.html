@@ -308,9 +308,9 @@
                                     id="input-laps"
                                     type="number"
                                     class="form-control"
-                                    value="3"
+                                    value="2"
                                     min="1"
-                                    max="10"
+                                    max="2"
                                 />
                             </div>
                             <div class="col-md-3 d-flex align-items-end">
@@ -318,7 +318,7 @@
                                     class="text-muted"
                                     style="font-size: 0.78rem"
                                 >
-                                    1 ~ 10 圈
+                                    1 ~ 2 圈
                                 </div>
                             </div>
                         </div>
@@ -618,7 +618,7 @@
                     .getElementById("login-screen")
                     .classList.remove("d-none");
                 document.getElementById("input-password").value = "";
-                document.getElementById("input-laps").value = 3;
+                document.getElementById("input-laps").value = 2;
             }
 
             // ── Team loading ───────────────────────────────────────────
@@ -747,8 +747,8 @@
                 var laps = parseInt(
                     document.getElementById("input-laps").value,
                 );
-                if (isNaN(laps) || laps < 1 || laps > 10) {
-                    toast("圈数必须在 1 ~ 10 之间", "warning");
+                if (isNaN(laps) || laps < 1 || laps > 2) {
+                    toast("圈数必须在 1 ~ 2 之间", "warning");
                     return;
                 }
 
