@@ -37,7 +37,7 @@ from server.database.models import get_db
 router = APIRouter()
 
 TEST_RACE_LAPS_MIN = 1
-TEST_RACE_LAPS_MAX = 10
+TEST_RACE_LAPS_MAX = 2
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -48,7 +48,7 @@ class CreateRaceRequest(BaseModel):
     team_id: str
     password: str
     world: str = "complex"  # "basic" | "complex"
-    total_laps: int = 3
+    total_laps: int = 2
     opponents: list[str] = []  # 对手 team_id 列表（不含发起者）
     name: Optional[str] = None  # 自定义名称/备注
 
