@@ -11,6 +11,7 @@ import datetime
 import json
 import logging
 import pathlib
+import time as _time
 
 from server.config.config import DB_PATH
 from server.database.action import (
@@ -42,11 +43,12 @@ _DEFAULT_CODE_PATH = (
 # 背压重试：simnode 并发槽满时等待而不要立刻失败
 # ---------------------------------------------------------------------------
 
-# SimNode 的 MAX_CONCURRENT_RACES 默认 4，一场测试约 60~90 秒，
-# 最坏情况 4 场都刚启动 ≈ 6 分钟。给 10 分钟足够覆盖。
-_RETRY_BACKOFF_START = 2.0  # 首次重试前等待 2 秒
-_RETRY_BACKOFF_MAX = 60.0  # 单次最长等待 60 秒
-_RETRY_TOTAL_TIMEOUT = 600.0  # 总计最多等 10 分钟
+_RETRY_BACKOFF_START = 2.0
+_RETRY_BACKOFF_MAX = 60.0
+_RETRY_TOTAL_TIMEOUT = 600.0
+
+# 单场比赛最大轮询时间（超过则标记超时），防止 worker 异常导致 DB 永久 running
+_POLL_TOTAL_TIMEOUT = 900.0  # 15 分钟
 
 
 async def _start_race_with_retry(
@@ -57,11 +59,6 @@ async def _start_race_with_retry(
     world: str = "complex",
     slot_name: str = "",
 ) -> None:
-    """
-    调用 simnode_start_race，如果 simnode 并发槽满（HTTP 409）则等待重试。
-
-    只重试 "并发满"（409）场景；网络不可达等致命错误立即抛出。
-    """
     waited = 0.0
     delay = _RETRY_BACKOFF_START
 
@@ -70,10 +67,9 @@ async def _start_race_with_retry(
             await asyncio.to_thread(
                 simnode_start_race, race_id, session_type, total_laps, cars, world
             )
-            return  # 成功
+            return
         except RuntimeError as exc:
             msg = str(exc)
-            # 409 = SimNode 并发槽满
             if "409" in msg or "并发" in msg:
                 if waited >= _RETRY_TOTAL_TIMEOUT:
                     raise RuntimeError(
@@ -89,13 +85,15 @@ async def _start_race_with_retry(
                 waited += delay
                 delay = min(delay * 2, _RETRY_BACKOFF_MAX)
                 continue
-            # 其他 RuntimeError（网络不通等）不重试
             raise
 
 
 async def _test_worker_loop() -> None:
     """主循环：每 2 秒取队列头部任务，全部发射给 simnode，由其背压排队。"""
     from server.blueprints.submission import dequeue_test
+
+    # 启动时恢复 stuck test_runs
+    await _recover_stuck_test_runs()
 
     running: set[asyncio.Task] = set()
 
@@ -119,6 +117,19 @@ async def _test_worker_loop() -> None:
 
 async def _run_single_test(task: dict) -> None:
     """执行单个测试：读代码 → 调 Sim Node → 轮询结果 → 写库。"""
+    submission_id = task["submission_id"]
+    test_run_id = task["test_run_id"]
+    team_id = task["team_id"]
+
+    # 用最外层 try/except 确保任何未预期异常都会更新 DB 状态
+    try:
+        await _run_single_test_impl(task)
+    except Exception as e:
+        logger.exception(f"测试赛未预期异常 (test_run_id={test_run_id}): {e}")
+        _mark_error(test_run_id, f"unexpected_error: {e}")
+
+
+async def _run_single_test_impl(task: dict) -> None:
     submission_id = task["submission_id"]
     test_run_id = task["test_run_id"]
     team_id = task["team_id"]
@@ -176,10 +187,17 @@ async def _run_single_test(task: dict) -> None:
 
     logger.info(f"测试赛已启动: {race_id}")
 
-    # 5. 轮询等待完成
+    # 5. 轮询等待完成（带总超时保护）
     none_strikes = 0
+    poll_start = _time.monotonic()
     while True:
         await asyncio.sleep(5)
+
+        # 总超时检查：防止 worker 异常导致 DB 永久 "running"
+        if _time.monotonic() - poll_start > _POLL_TOTAL_TIMEOUT:
+            _mark_error(test_run_id, "poll_timeout")
+            return
+
         status = await asyncio.to_thread(simnode_get_status, race_id)
 
         if status is None:
@@ -215,14 +233,75 @@ def _mark_error(test_run_id: int, reason: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 启动恢复：扫描所有 status='running' 的记录，与 simnode 同步
+# ---------------------------------------------------------------------------
+
+
+async def _recover_stuck_test_runs() -> None:
+    """Backend 启动时：将 DB 中状态为 running 的 test_runs 与 simnode 同步。"""
+    try:
+        with get_db(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT tr.id, tr.submission_id, s.team_id "
+                "FROM test_runs tr "
+                "JOIN submissions s ON tr.submission_id = s.id "
+                "WHERE tr.status = 'running'"
+            ).fetchall()
+    except Exception as e:
+        logger.warning(f"恢复 stuck test_runs 查询失败: {e}")
+        return
+
+    if not rows:
+        return
+
+    logger.info(f"发现 {len(rows)} 条 running 状态的 test_run，正在恢复...")
+    for row in rows:
+        test_run_id = row["id"]
+        # 直接标记为 error（simnode 侧的 race 已随进程生命周期结束）
+        # 更健壮的方案是尝试查询 simnode，但 simnode 重启后内存记录丢失
+        _mark_error(test_run_id, "recovered_after_restart")
+        logger.info(f"test_run {test_run_id} 已恢复为 error (recovered_after_restart)")
+
+
+async def _recover_stuck_races() -> None:
+    """Backend 启动时：将 DB 中状态为 running 的 races 与 simnode 同步。"""
+    try:
+        with get_db(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT id FROM races WHERE status = 'running'"
+            ).fetchall()
+    except Exception as e:
+        logger.warning(f"恢复 stuck races 查询失败: {e}")
+        return
+
+    if not rows:
+        return
+
+    from server.database.action import update_race as db_update_race
+
+    logger.info(f"发现 {len(rows)} 条 running 状态的 race，正在恢复...")
+    for row in rows:
+        race_id = row["id"]
+        try:
+            with get_db(DB_PATH) as conn:
+                db_update_race(
+                    conn, race_id, status="error",
+                    finish_reason="recovered_after_restart",
+                )
+            logger.info(f"race {race_id} 已恢复为 error (recovered_after_restart)")
+        except Exception as e:
+            logger.warning(f"恢复 race {race_id} 失败: {e}")
+
+
+# ---------------------------------------------------------------------------
 # 统一 race 类型测试赛事 Worker
-# 说明：独立于旧式 test_runs 队列，消费 races 表中 type='test' 的记录。
 # ---------------------------------------------------------------------------
 
 
 async def _race_event_worker_loop() -> None:
     """主循环：每 2 秒取 race 队列头部，全部发射给 simnode。"""
-    from server.blueprints.races import _dequeue_race
+    # 启动时恢复 stuck races
+    await _recover_stuck_races()
 
     running = set()
 
@@ -244,6 +323,15 @@ async def _race_event_worker_loop() -> None:
 
 
 async def _run_single_race_event(race_id: str) -> None:
+    """执行单个 race 事件（外层兜底异常处理）。"""
+    try:
+        await _run_single_race_event_impl(race_id)
+    except Exception as e:
+        logger.exception(f"race 事件未预期异常 (race_id={race_id}): {e}")
+        _mark_race_error(race_id, f"unexpected_error: {e}")
+
+
+async def _run_single_race_event_impl(race_id: str) -> None:
     from server.database.action import get_race as db_get_race
     from server.database.action import update_race as db_update_race
 
@@ -265,13 +353,12 @@ async def _run_single_race_event(race_id: str) -> None:
     with get_db(DB_PATH) as conn:
         teams_data = db_get_teams_with_code(conn, participant_ids)
 
-    # 3. 构建 cars 列表（沿用模拟节点 slot 命名 car_1 ~ car_N）
+    # 3. 构建 cars 列表
     code_cache: dict[str, str] = {}
     cars = []
     for idx, team in enumerate(teams_data):
         cp = team.get("code_path")
         if not cp:
-            # 未上传代码 → 用 SDK 默认模板
             code_path = _DEFAULT_CODE_PATH
             if not code_path.exists():
                 _mark_race_error(race_id, f"default_code_missing")
@@ -319,10 +406,17 @@ async def _run_single_race_event(race_id: str) -> None:
 
     logger.info(f"测试赛事已启动: {sim_race_id} (race_id={race_id})")
 
-    # 6. 轮询等待完成
+    # 6. 轮询等待完成（带总超时保护）
     none_strikes = 0
+    poll_start = _time.monotonic()
     while True:
         await asyncio.sleep(5)
+
+        # 总超时检查
+        if _time.monotonic() - poll_start > _POLL_TOTAL_TIMEOUT:
+            _mark_race_error(race_id, "poll_timeout")
+            return
+
         status = await asyncio.to_thread(simnode_get_status, sim_race_id)
 
         if status is None:

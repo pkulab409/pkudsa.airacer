@@ -462,7 +462,7 @@ def run() -> None:
                 raw_steering, raw_speed = 0.0, 0.0
             steer_angle = clamp(raw_steering * MOTOR_MAX, -MOTOR_MAX, MOTOR_MAX)
             if use_driver:
-                driver.setCruisingSpeed(clamp(raw_speed, 0.0, 1.0) * MAX_SPEED)
+                driver.setCruisingSpeed(clamp(raw_speed, -1.0, 1.0) * MAX_SPEED)
                 driver.setSteeringAngle(steer_angle)
             else:
                 if fl_steer is not None:
@@ -470,7 +470,7 @@ def run() -> None:
                 if fr_steer is not None:
                     fr_steer.setPosition(steer_angle)
                 if left_motor is not None and right_motor is not None:
-                    base = 8000.0 * clamp(raw_speed, 0.0, 1.0)
+                    base = 8000.0 * clamp(raw_speed, -1.0, 1.0)
                     diff = raw_steering * 4000.0
                     left_motor.setVelocity(base + diff)
                     right_motor.setVelocity(base - diff)
