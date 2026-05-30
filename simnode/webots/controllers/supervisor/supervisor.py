@@ -47,7 +47,6 @@ CHECKPOINTS = [
     {"id": 8, "cx": -18.0, "cy": 40.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": 0.2},
 ]
 
-
 def in_checkpoint(x, y, cp):
     return abs(x - cp['cx']) < cp['half_w'] and abs(y - cp['cy']) < cp['half_h']
 
@@ -102,6 +101,29 @@ def send_cmd_to_car(car, cmd_dict):
 
 def clear_cmd(car):
     send_cmd_to_car(car, {"cmd": "none"})
+
+def disqualify_car(car, reason, sim_time):
+    """统一退赛处理：设状态、发IPC、冻结坐标后从场景中移除小车"""
+    car['status'] = 'disqualified'
+    send_cmd_to_car(car, {"cmd": "disqualify"})
+    # 冻结最后的位置/朝向/速度，后续录像帧继续使用这些值
+    node = car.get('node')
+    if node is not None:
+        pos = node.getPosition()
+        car['x'], car['y'] = pos[0], pos[1]
+        ori = node.getOrientation()
+        car['heading'] = math.atan2(-ori[3], ori[0])
+        vel = node.getVelocity()
+        car['speed'] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
+        node.remove()
+    events_entry = {
+        "type": "disqualified",
+        "team_id": car['team_id'],
+        "reason": reason,
+        "sim_time": round(sim_time, 3),
+    }
+    print(f"[DQ] {car['team_id']} disqualified: {reason} (sim_time={sim_time:.1f})")
+    return events_entry
 
 # ---------------------------------------------------------------------------
 # Checkpoint logic
@@ -227,14 +249,7 @@ def check_car_collisions(cars, sim_time, events):
                             continue
                         car['collision_major_count'] += 1
                         if car['collision_major_count'] >= 3:
-                            car['status'] = 'disqualified'
-                            send_cmd_to_car(car, {"cmd": "disqualify"})
-                            events.append({
-                                "type": "disqualified",
-                                "team_id": car['team_id'],
-                                "reason": "major_collision_threshold",
-                                "sim_time": round(sim_time, 3),
-                            })
+                            events.append(disqualify_car(car, "major_collision_threshold", sim_time))
                         else:
                             car['status'] = 'stopped'
                             car['stop_end_time'] = sim_time + 2.0
@@ -443,6 +458,9 @@ try:
             node = car.get('node')
             if node is None:
                 continue
+            # 退赛小车节点已删除，坐标已冻结，跳过
+            if car['status'] == 'disqualified':
+                continue
             pos = node.getPosition()
             car['x'], car['y'] = pos[0], pos[1]          # x/y ground plane in ENU
 
@@ -494,14 +512,7 @@ try:
         for car in cars:
             if car['status'] in ('normal',) and car['finish_time'] is None and car['lap_started']:
                 if sim_time - car['last_cp_time'] >= STUCK_TIMEOUT:
-                    car['status'] = 'disqualified'
-                    send_cmd_to_car(car, {"cmd": "disqualify"})
-                    events_this_frame.append({
-                        "type": "disqualified",
-                        "team_id": car['team_id'],
-                        "reason": "checkpoint_timeout",
-                        "sim_time": round(sim_time, 3),
-                    })
+                    events_this_frame.append(disqualify_car(car, "checkpoint_timeout", sim_time))
                     print(f"[DQ] {car['team_id']} disqualified: 60s without checkpoint (last_cp={car['last_cp_time']:.1f}, now={sim_time:.1f})")
 
         # --- Collision detection ---

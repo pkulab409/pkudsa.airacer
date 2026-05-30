@@ -393,6 +393,36 @@ def list_teams(conn) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def db_delete_team(conn, team_id: str) -> bool:
+    """删除队伍及其所有关联数据（submissions, test_runs, race_points）。"""
+    row = conn.execute("SELECT id FROM teams WHERE id=?", (team_id,)).fetchone()
+    if row is None:
+        return False
+
+    # Delete test_runs linked to this team's submissions
+    sub_ids = [
+        r[0]
+        for r in conn.execute(
+            "SELECT id FROM submissions WHERE team_id=?", (team_id,)
+        ).fetchall()
+    ]
+    if sub_ids:
+        placeholders = ",".join("?" for _ in sub_ids)
+        conn.execute(
+            f"DELETE FROM test_runs WHERE submission_id IN ({placeholders})", sub_ids
+        )
+
+    # Delete submissions
+    conn.execute("DELETE FROM submissions WHERE team_id=?", (team_id,))
+
+    # Delete race_points
+    conn.execute("DELETE FROM race_points WHERE team_id=?", (team_id,))
+
+    # Delete the team itself
+    conn.execute("DELETE FROM teams WHERE id=?", (team_id,))
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Submissions
 # ---------------------------------------------------------------------------

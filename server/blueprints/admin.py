@@ -45,6 +45,7 @@ from server.config.config import (
 from server.database.action import (
     db_create_zone,
     db_delete_zone,
+    db_delete_team,
     db_ensure_default_zone,
     db_get_placement_rankings,
     db_get_running_session,
@@ -1130,3 +1131,16 @@ async def impersonate_team(team_id: str, _auth=Depends(require_admin)):
         "zone_id": team["zone_id"],
     }
 
+
+# ---------------------------------------------------------------------------
+# Admin delete team — remove a team and all its associated data
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/teams/{team_id}")
+async def delete_team(team_id: str, _auth=Depends(require_admin)):
+    """删除队伍及其所有关联数据（提交记录、测试记录、积分等）。"""
+    with get_db(DB_PATH) as conn:
+        if not db_delete_team(conn, team_id):
+            raise HTTPException(status_code=404, detail=f"队伍不存在: {team_id}")
+    return {"status": "deleted", "team_id": team_id}

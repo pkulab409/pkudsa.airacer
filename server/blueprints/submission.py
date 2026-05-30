@@ -361,7 +361,7 @@ async def activate_slot(body: ActivateRequest):
         team_row = db_get_team_secure(conn, body.team_id)
         if team_row is None:
             raise HTTPException(status_code=401, detail="Team not found")
-        if not _verify_password(body.password, team_row["password_hash"]):
+        if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
             raise HTTPException(status_code=401, detail="Invalid password")
 
         success = db_activate_submission_slot(conn, body.team_id, slot)
@@ -404,7 +404,7 @@ async def request_test(body: TestRequest):
 
     if team_row is None:
         raise HTTPException(status_code=401, detail="Team not found")
-    if not _verify_password(body.password, team_row["password_hash"]):
+    if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     with get_db(DB_PATH) as conn:

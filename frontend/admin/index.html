@@ -858,7 +858,7 @@
                                         <tbody id="standings-tbody">
                                             <tr>
                                                 <td
-                                                    colspan="5"
+                                                    colspan="6"
                                                     class="text-center py-4 text-muted"
                                                 >
                                                     请先选择赛区
@@ -883,12 +883,22 @@
                                 class="card-header gradient-dark d-flex align-items-center justify-content-between"
                             >
                                 <span id="teams-label">-- 赛区</span>
-                                <button
-                                    class="btn btn-sm btn-light"
-                                    onclick="loadTeams()"
-                                >
-                                    刷新
-                                </button>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input
+                                        type="text"
+                                        id="teams-search"
+                                        class="form-control form-control-sm"
+                                        placeholder="搜索队伍ID或姓名..."
+                                        style="width:200px;"
+                                        oninput="filterTeams()"
+                                    />
+                                    <button
+                                        class="btn btn-sm btn-light"
+                                        onclick="loadTeams()"
+                                    >
+                                        刷新
+                                    </button>
+                                </div>
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
@@ -906,7 +916,7 @@
                                         <tbody id="teams-tbody">
                                             <tr>
                                                 <td
-                                                    colspan="5"
+                                                    colspan="6"
                                                     class="text-center py-4 text-muted"
                                                 >
                                                     请先选择赛区
@@ -1212,7 +1222,7 @@
                                         <tbody id="rec-tbody">
                                             <tr>
                                                 <td
-                                                    colspan="5"
+                                                    colspan="6"
                                                     class="text-center py-4 text-muted"
                                                 >
                                                     请先选择赛区
@@ -1306,6 +1316,7 @@
             var _currentSid = ""; // 原始完整 session ID，用于摄像头 API
             var _prevState = ""; // 上一次比赛状态，用于检测比赛结束
             var _teamNameMap = {}; // team_id → team_name
+            var _allTeams = []; // cache for search filtering
 
             /* ================================================================
    AUTH HELPER
@@ -2126,52 +2137,91 @@
 ================================================================ */
             async function loadTeams() {
                 if (!currentZone) return;
+                document.getElementById("teams-search").value = "";
                 try {
                     var r = await api(
                         "GET",
                         "/api/admin/zones/" + currentZone + "/teams",
                     );
-                    var d = r.ok ? await r.json() : [];
-                    var tbody = document.getElementById("teams-tbody");
-                    if (!d.length) {
-                        tbody.innerHTML =
-                            '<tr><td colspan="6" class="text-center py-4 text-muted">暂无队伍</td></tr>';
-                        return;
-                    }
-                    tbody.innerHTML = d
-                        .map(function (t) {
-                            var ts = t.created_at
-                                ? new Date(t.created_at).toLocaleString("zh-CN")
-                                : "--";
-                            return (
-                                "<tr>" +
-                                '<td class="ps-3 fw-semibold">' +
-                                esc(t.id) +
-                                "</td>" +
-                                "<td>" +
-                                esc(t.name || "--") +
-                                "</td>" +
-                                "<td>" +
-                                ts +
-                                "</td>" +
-                                "<td>" +
-                                (t.active_slot != null ? t.active_slot : "--") +
-                                "</td>" +
-                                "<td><code>" +
-                                esc(t.active_version || "--") +
-                                "</code></td>" +
-                                '<td><a href="#" class="btn btn-sm btn-outline-primary" onclick="impersonateTeam(\'' +
-                                esc(t.id) +
-                                "');return false\">查看界面</a> " +
-                                '<a href="#" class="btn btn-sm btn-outline-secondary" onclick="viewTeamCode(\'' +
-                                esc(t.id) +
-                                "');return false\">查看代码</a></td>" +
-                                "</tr>"
-                            );
-                        })
-                        .join("");
+                    _allTeams = r.ok ? await r.json() : [];
+                    renderTeams(_allTeams);
                 } catch (e) {
                     console.warn("teams", e);
+                }
+            }
+
+            function renderTeams(list) {
+                var tbody = document.getElementById("teams-tbody");
+                if (!list.length) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="6" class="text-center py-4 text-muted">暂无队伍</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = list
+                    .map(function (t) {
+                        var ts = t.created_at
+                            ? new Date(t.created_at).toLocaleString("zh-CN")
+                            : "--";
+                        return (
+                            "<tr>" +
+                            '<td class="ps-3 fw-semibold">' +
+                            esc(t.id) +
+                            "</td>" +
+                            "<td>" +
+                            esc(t.name || "--") +
+                            "</td>" +
+                            "<td>" +
+                            ts +
+                            "</td>" +
+                            "<td>" +
+                            (t.active_slot != null ? t.active_slot : "--") +
+                            "</td>" +
+                            "<td><code>" +
+                            esc(t.active_version || "--") +
+                            "</code></td>" +
+                            '<td><a href="#" class="btn btn-sm btn-outline-primary" onclick="impersonateTeam(\'' +
+                            esc(t.id) +
+                            "');return false\">查看界面</a> " +
+                            '<a href="#" class="btn btn-sm btn-outline-secondary" onclick="viewTeamCode(\'' +
+                            esc(t.id) +
+                            "');return false\">查看代码</a> " +
+                            '<a href="#" class="btn btn-sm btn-outline-danger" onclick="deleteTeam(\'' +
+                            esc(t.id) +
+                            "');return false\">删除</a></td>" +
+                            "</tr>"
+                        );
+                    })
+                    .join("");
+            }
+
+            function filterTeams() {
+                var q = document.getElementById("teams-search").value.trim().toLowerCase();
+                if (!q) {
+                    renderTeams(_allTeams);
+                    return;
+                }
+                var filtered = _allTeams.filter(function (t) {
+                    return (t.id || "").toLowerCase().indexOf(q) !== -1 ||
+                           (t.name || "").toLowerCase().indexOf(q) !== -1;
+                });
+                renderTeams(filtered);
+            }
+
+            async function deleteTeam(teamId) {
+                if (!confirm('确认删除队伍 "' + teamId + '"？此操作将删除该队伍的所有提交记录、测试记录和积分数据，且不可撤销。')) return;
+                if (!confirm('再次确认：真的要删除队伍 "' + teamId + '" 吗？')) return;
+                try {
+                    var r = await api("DELETE", "/api/admin/teams/" + encodeURIComponent(teamId));
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast("队伍 " + teamId + " 已删除", "success");
+                        loadTeams();
+                        loadZones();
+                    } else {
+                        toast(d.detail || "删除失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
                 }
             }
 

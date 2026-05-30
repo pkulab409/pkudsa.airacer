@@ -1309,14 +1309,14 @@
                 const requestBtn =
                     slot?.version &&
                     !["waiting", "running"].includes(slot.queue_status)
-                        ? `<button class="btn btn-outline-primary btn-sm" onclick="location.href='/testrace/?zoneId=${encodeURIComponent(S.zoneId)}&teamId=${encodeURIComponent(S.teamId)}&password=${encodeURIComponent(S.password)}'">
+                        ? `<button class="btn btn-outline-primary btn-sm" onclick="requestTest('${def.key}')">
         <i class="bi bi-play-circle me-1"></i>申请测试
        </button>`
                         : "";
                 const requestStatusBtn =
                     slot?.version &&
                     ["waiting", "running"].includes(slot.queue_status)
-                        ? `<button class="btn btn-outline-secondary btn-sm" onclick="location.href='/testrace/?zoneId=${encodeURIComponent(S.zoneId)}&teamId=${encodeURIComponent(S.teamId)}&password=${encodeURIComponent(S.password)}'">
+                        ? `<button class="btn btn-outline-secondary btn-sm" onclick="requestTest('${def.key}')">
         <i class="bi bi-clock-history me-1"></i>${slot.queue_status === "running" ? "运行中" : "排队中"}
        </button>`
                         : "";

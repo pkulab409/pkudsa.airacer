@@ -300,6 +300,8 @@ async def _recover_stuck_races() -> None:
 
 async def _race_event_worker_loop() -> None:
     """主循环：每 2 秒取 race 队列头部，全部发射给 simnode。"""
+    from server.blueprints.races import _dequeue_race
+
     # 启动时恢复 stuck races
     await _recover_stuck_races()
 
