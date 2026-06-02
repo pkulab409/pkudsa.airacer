@@ -796,25 +796,25 @@ Robot {
 }
 DEF car_1 CarPhoenix {
   name "car_1"
-  translation 52.9 -26 0.40
+  translation 51.5 -26 0.4
 }
 DEF car_2 CarThunder {
   name "car_2"
-  translation 53 -31.7 0.40
+  translation 51.8 -31.7 0.4
 }
 DEF car_3 CarViper {
   name "car_3"
-  translation 47 -26 0.40
+  translation 45.5 -26 0.4
 }
 DEF car_4 CarNova {
   name "car_4"
-  translation 47 -31.7 0.40
+  translation 45.7 -31.7 0.4
 }
 DEF car_5 CarFrost {
   name "car_5"
-  translation 41 -26 0.40
+  translation 39.6 -26 0.4
 }
 DEF car_6 CarShadow {
   name "car_6"
-  translation 41 -31.7 0.40
+  translation 39.7 -31.7 0.4
 }

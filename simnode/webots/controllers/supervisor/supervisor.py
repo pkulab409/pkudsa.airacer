@@ -59,6 +59,12 @@ cars = []
 for cc in cars_config:
     node = robot.getFromDef(cc['car_slot'])
     code_path = cc.get('code_path', '')
+    # 计算发车格补偿时间：到CP0(起终点线)的直线距离 / 6 m/s
+    trans_field = node.getField('translation')
+    spawn_pos = trans_field.getSFVec3f()
+    cp0 = CHECKPOINTS[0]
+    dist_to_start = math.sqrt((spawn_pos[0] - cp0['cx']) ** 2 + (spawn_pos[1] - cp0['cy']) ** 2)
+    start_offset_time = dist_to_start / 6.0
     cars.append({
         "team_id":             cc['team_id'],
         "car_slot":            cc['car_slot'],
@@ -83,6 +89,7 @@ for cc in cars_config:
         "finish_time":         None,       # sim time when car completed total_laps
         "laps_data":           [],         # list of lap times (float)
         "last_cp_time":        0.0,        # sim time when last checkpoint was passed (for 60s idle rule)
+        "start_offset_time":   start_offset_time,  # 发车格补偿时间
     })
 
 # ---------------------------------------------------------------------------
@@ -263,8 +270,11 @@ def check_car_collisions(cars, sim_time, events):
 # ---------------------------------------------------------------------------
 
 def compute_final_rankings(cars):
+    def adjusted_finish(c):
+        return c['finish_time'] - c.get('start_offset_time', 0.0)
+
     finished   = sorted([c for c in cars if c['finish_time'] is not None],
-                        key=lambda c: c['finish_time'])
+                        key=adjusted_finish)
     unfinished = sorted([c for c in cars if c['finish_time'] is None],
                         key=lambda c: (-c['lap'], -c['lap_progress']))
     ranked = finished + unfinished
@@ -275,7 +285,7 @@ def compute_final_rankings(cars):
             "team_name":  c['team_name'],
             "laps":       c['lap'],
             "best_lap":   round(c['best_lap_time'], 3) if c['best_lap_time'] is not None else None,
-            "total_time": round(c['finish_time'], 3) if c['finish_time'] is not None else None,
+            "total_time": round(adjusted_finish(c), 3) if c['finish_time'] is not None else None,
             "status":     c['status'],
             "collision_major_count": c['collision_major_count'],
         }

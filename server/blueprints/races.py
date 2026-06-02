@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from server.blueprints.submission import (
     VALID_WORLDS,
+    _validate_impersonation_bearer,
     _verify_password,
 )
 from server.config.config import DB_PATH
@@ -115,7 +116,7 @@ async def create_race(body: CreateRaceRequest):
         team_row = db_get_team_secure(conn, body.team_id)
     if team_row is None:
         raise HTTPException(status_code=401, detail="Team not found")
-    if not _verify_password(body.password, team_row["password_hash"]):
+    if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     zone_id = team_row["zone_id"]
