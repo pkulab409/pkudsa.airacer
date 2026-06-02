@@ -159,11 +159,12 @@ class RaceRunner:
             args = [webots_bin, "--minimize", world_file]
 
         logger.info(f"启动 Webots: {args}")
+        # 使用 DEVNULL 而非 PIPE，避免文件描述符泄漏 (PIPE 从未被读取/关闭)
         self._webots_proc = subprocess.Popen(
             args,
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
 
         self._observer.make_snapshot("race_event", {

@@ -1,5 +1,6 @@
 import logging
 import threading
+import time as _time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from simnode.race_runner import RaceRunner
@@ -7,6 +8,9 @@ from simnode.telemetry_observer import TelemetryObserver
 from simnode.config.config import Config
 
 logger = logging.getLogger(__name__)
+
+# 已结束比赛在内存中保留的最长时间（秒），超时自动清理
+_RACE_RECORD_TTL = 300  # 5 分钟，足够前端轮询结果
 
 
 class _RaceRecord:
@@ -24,6 +28,7 @@ class _RaceRecord:
         self.status   = "waiting"   # waiting → running → completed | error | cancelled
         self.result:  Optional[Dict[str, Any]] = None
         self.error:   Optional[str] = None
+        self._finished_at: Optional[float] = None  # 比赛结束时的时间戳
 
 
 class RaceManager:
@@ -53,6 +58,9 @@ class RaceManager:
         ws_push_callback: Optional[Callable[[dict], None]] = None,
     ) -> str:
         """创建并启动一场比赛，返回 race_id。"""
+        # 先清理已结束的过期记录，释放文件描述符
+        self.cleanup_stale_races()
+
         max_concurrent = Config.get("MAX_CONCURRENT_RACES", 4)
         with self._lock:
             if race_id in self._races:
@@ -91,12 +99,14 @@ class RaceManager:
                 with self._lock:
                     record.status = "completed"
                     record.result = result
+                    record._finished_at = _time.time()
                 logger.info(f"比赛 {race_id} 结束: {result.get('finish_reason')}")
             except Exception as e:
                 logger.exception(f"比赛 {race_id} 异常: {e}")
                 with self._lock:
                     record.status = "error"
                     record.error  = str(e)
+                    record._finished_at = _time.time()
                 try:
                     observer.make_snapshot("race_error", {
                         "error_type": "runner_exception",
@@ -158,6 +168,7 @@ class RaceManager:
         with self._lock:
             if rec.status not in ("completed", "error"):
                 rec.status = "cancelled"
+                rec._finished_at = _time.time()
                 try:
                     rec.observer.make_snapshot("race_ended", {
                         "reason":         "cancelled",
@@ -184,3 +195,14 @@ class RaceManager:
     def get_stream_url(self, race_id: str, host: str = None) -> str:
         h = host or Config.get("SIMNODE_HOST", "localhost:5000")
         return f"ws://{h}/race/{race_id}/stream"
+
+    # ------------------------------------------------------------------
+
+    def cleanup_stale_races(self):
+        """清理已结束的比赛记录。"""
+        with self._lock:
+            now = _time.time()
+            for race_id, record in list(self._races.items()):
+                if record._finished_at and (now - record._finished_at) > _RACE_RECORD_TTL:
+                    del self._races[race_id]
+                    logger.info(f"已清理过期比赛记录: {race_id}")
