@@ -394,7 +394,7 @@ def list_teams(conn) -> List[Dict]:
 
 
 def db_delete_team(conn, team_id: str) -> bool:
-    """删除队伍及其所有关联数据（submissions, test_runs, race_points）。"""
+    """删除队伍及���所有关联数据（submissions, test_runs, race_points）。"""
     row = conn.execute("SELECT id FROM teams WHERE id=?", (team_id,)).fetchone()
     if row is None:
         return False
@@ -834,7 +834,7 @@ def list_races_by_participant(conn, team_id: str, limit: int = 20) -> List[Dict]
            WHERE participant_ids LIKE ?
            ORDER BY created_at DESC
            LIMIT ?""",
-        (f"%{team_id}%", limit),
+        (f'%"{team_id}"%', limit),
     ).fetchall()
     return [dict(r) for r in rows]
 
