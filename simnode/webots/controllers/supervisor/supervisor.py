@@ -102,6 +102,10 @@ existing_slots = {c['car_slot'] for c in cars}
 for slot in expected_slots:
     if slot not in existing_slots:
         node = robot.getFromDef(slot)
+        if node is not None:
+            print(f"[INIT] Removing empty slot without team: slot={slot}")
+            node.remove()
+
 
 
 for car in cars:
