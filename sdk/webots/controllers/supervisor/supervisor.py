@@ -77,7 +77,7 @@ for cc in cars_config:
         "lap_progress":        0.0,
         "status":              "normal",   # "normal" | "stopped" | "disqualified"
         "boost_remaining":     0.0,
-        "checkpoint_next":     0,          # Start detection uses finish line (per‑car)
+        "checkpoint_next":     1,          # After CP0 triggers start, wait for CP1 next
         "lap_started":         False,      # True once the car has crossed CP0 for the first time
         "lap_start_time":      0.0,
         "best_lap_time":       None,

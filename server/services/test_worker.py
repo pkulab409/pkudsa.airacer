@@ -40,7 +40,7 @@ _DEFAULT_CODE_PATH = (
 )
 
 # 单场比赛最大轮询时间（超过则标记超时），防止 worker 异常导致 DB 永久 running
-_POLL_TOTAL_TIMEOUT = 900.0  # 15 分钟
+_POLL_TOTAL_TIMEOUT = 7200.0  # 2 小时
 
 
 async def _test_worker_loop() -> None:
