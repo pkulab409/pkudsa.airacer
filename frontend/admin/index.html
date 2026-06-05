@@ -733,6 +733,13 @@
                                 >
                                     &#128274; 锁定提交
                                 </button>
+                                <button
+                                    class="btn btn-outline-warning"
+                                    onclick="doToggleZoneRegistration()"
+                                    id="btn-zone-toggle-registration"
+                                >
+                                    &#128275; 关闭注册
+                                </button>
                             </div>
                         </div>
 
@@ -889,7 +896,7 @@
                                         id="teams-search"
                                         class="form-control form-control-sm"
                                         placeholder="搜索队伍ID或姓名..."
-                                        style="width:200px;"
+                                        style="width: 200px"
                                         oninput="filterTeams()"
                                     />
                                     <button
@@ -910,7 +917,9 @@
                                                 <th>注册时间</th>
                                                 <th>激活槽位</th>
                                                 <th>版本</th>
-                                                <th style="width:100px;">操作</th>
+                                                <th style="width: 100px">
+                                                    操作
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody id="teams-tbody">
@@ -1076,14 +1085,37 @@
 
                         <!-- Danger zone -->
                         <!-- Registration control (all zones) -->
-                        <div class="ctrl-card mb-4" style="border: 2px solid #f59e0b;">
-                            <div class="fw-bold mb-2" style="font-size:1rem;color:#92400e;">队伍注册管理（全部赛区）</div>
-                            <p class="text-muted mb-3" style="font-size:.875rem;">
+                        <div
+                            class="ctrl-card mb-4"
+                            style="border: 2px solid #f59e0b"
+                        >
+                            <div
+                                class="fw-bold mb-2"
+                                style="font-size: 1rem; color: #92400e"
+                            >
+                                队伍注册管理（全部赛区）
+                            </div>
+                            <p
+                                class="text-muted mb-3"
+                                style="font-size: 0.875rem"
+                            >
                                 关闭/打开所有赛区的队伍注册。关闭后新队伍无法注册，但不影响已有队伍提交代码。
                             </p>
                             <div class="d-flex gap-2">
-                                <button id="btn-close-all-reg" class="btn btn-warning" onclick="doToggleAllRegistration(false)">关闭所有赛区注册</button>
-                                <button id="btn-open-all-reg" class="btn btn-outline-warning" onclick="doToggleAllRegistration(true)">打开所有赛区注册</button>
+                                <button
+                                    id="btn-close-all-reg"
+                                    class="btn btn-warning"
+                                    onclick="doToggleAllRegistration(false)"
+                                >
+                                    关闭所有赛区注册
+                                </button>
+                                <button
+                                    id="btn-open-all-reg"
+                                    class="btn btn-outline-warning"
+                                    onclick="doToggleAllRegistration(true)"
+                                >
+                                    打开所有赛区注册
+                                </button>
                             </div>
                         </div>
 
@@ -1256,45 +1288,127 @@
         >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <div class="modal-header" style="background: linear-gradient(135deg, #991b1b, #dc2626); color: #fff;">
+                    <div
+                        class="modal-header"
+                        style="
+                            background: linear-gradient(
+                                135deg,
+                                #991b1b,
+                                #dc2626
+                            );
+                            color: #fff;
+                        "
+                    >
                         <h5 class="modal-title" id="changePasswordModalLabel">
                             <i class="bi bi-key me-2"></i>修改管理员密码
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"
+                        ></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="cp-old-pwd" class="form-label">旧密码</label>
-                            <input type="password" id="cp-old-pwd" class="form-control" placeholder="请输入旧密码" />
+                            <label for="cp-old-pwd" class="form-label"
+                                >旧密码</label
+                            >
+                            <input
+                                type="password"
+                                id="cp-old-pwd"
+                                class="form-control"
+                                placeholder="请输入旧密码"
+                            />
                         </div>
                         <div class="mb-3">
-                            <label for="cp-new-pwd" class="form-label">新密码</label>
-                            <input type="password" id="cp-new-pwd" class="form-control" placeholder="请输入新密码（至少4位）" />
+                            <label for="cp-new-pwd" class="form-label"
+                                >新密码</label
+                            >
+                            <input
+                                type="password"
+                                id="cp-new-pwd"
+                                class="form-control"
+                                placeholder="请输入新密码（至少4位）"
+                            />
                         </div>
                         <div class="mb-3">
-                            <label for="cp-confirm-pwd" class="form-label">确认新密码</label>
-                            <input type="password" id="cp-confirm-pwd" class="form-control" placeholder="请再次输入新密码" onkeydown="if(event.key==='Enter')doChangePassword()" />
+                            <label for="cp-confirm-pwd" class="form-label"
+                                >确认新密码</label
+                            >
+                            <input
+                                type="password"
+                                id="cp-confirm-pwd"
+                                class="form-control"
+                                placeholder="请再次输入新密码"
+                                onkeydown="
+                                    if (event.key === 'Enter')
+                                        doChangePassword();
+                                "
+                            />
                         </div>
-                        <div id="cp-error" class="text-danger" style="font-size: 0.85rem; display: none;"></div>
+                        <div
+                            id="cp-error"
+                            class="text-danger"
+                            style="font-size: 0.85rem; display: none"
+                        ></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-danger" onclick="doChangePassword()">确认修改</button>
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-danger"
+                            onclick="doChangePassword()"
+                        >
+                            确认修改
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- 查看代码 Modal -->
-        <div class="modal fade" id="codeViewModal" tabindex="-1" aria-hidden="true">
+        <div
+            class="modal fade"
+            id="codeViewModal"
+            tabindex="-1"
+            aria-hidden="true"
+        >
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content">
-                    <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #334155); color: #fff;">
-                        <h5 class="modal-title"><i class="bi bi-code-slash me-2"></i><span id="code-modal-team-name">队伍代码</span></h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div
+                        class="modal-header"
+                        style="
+                            background: linear-gradient(
+                                135deg,
+                                #1e293b,
+                                #334155
+                            );
+                            color: #fff;
+                        "
+                    >
+                        <h5 class="modal-title">
+                            <i class="bi bi-code-slash me-2"></i
+                            ><span id="code-modal-team-name">队伍代码</span>
+                        </h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                        ></button>
                     </div>
                     <div class="modal-body">
-                        <ul class="nav nav-tabs mb-3" id="code-modal-tabs" role="tablist"></ul>
+                        <ul
+                            class="nav nav-tabs mb-3"
+                            id="code-modal-tabs"
+                            role="tablist"
+                        ></ul>
                         <div class="tab-content" id="code-modal-panels"></div>
                     </div>
                 </div>
@@ -1545,6 +1659,11 @@
                             '<div class="text-muted mb-3" style="font-size:.82rem;">队伍数：' +
                             (z.team_count != null ? z.team_count : "--") +
                             "</div>" +
+                            '<div class="mb-3" style="font-size:.82rem;">' +
+                            (z.registration_open
+                                ? '<span class="badge bg-success px-2">注册开放</span>'
+                                : '<span class="badge bg-danger px-2">注册关闭</span>') +
+                            "</div>" +
                             '<button class="btn btn-sm btn-primary w-100" onclick="selZone(\'' +
                             z.zone_id +
                             "');nav('control',null)\">" +
@@ -1601,6 +1720,8 @@
                 // Update per-zone lock button
                 var zoneState = z ? z.state : null;
                 _updateZoneLockButton(zoneState);
+                // Update per-zone registration button
+                _updateZoneRegistrationButton(z);
                 loadTeamNameMap();
                 loadPendingSession();
             }
@@ -2195,23 +2316,39 @@
             }
 
             function filterTeams() {
-                var q = document.getElementById("teams-search").value.trim().toLowerCase();
+                var q = document
+                    .getElementById("teams-search")
+                    .value.trim()
+                    .toLowerCase();
                 if (!q) {
                     renderTeams(_allTeams);
                     return;
                 }
                 var filtered = _allTeams.filter(function (t) {
-                    return (t.id || "").toLowerCase().indexOf(q) !== -1 ||
-                           (t.name || "").toLowerCase().indexOf(q) !== -1;
+                    return (
+                        (t.id || "").toLowerCase().indexOf(q) !== -1 ||
+                        (t.name || "").toLowerCase().indexOf(q) !== -1
+                    );
                 });
                 renderTeams(filtered);
             }
 
             async function deleteTeam(teamId) {
-                if (!confirm('确认删除队伍 "' + teamId + '"？此操作将删除该队伍的所有提交记录、测试记录和积分数据，且不可撤销。')) return;
-                if (!confirm('再次确认：真的要删除队伍 "' + teamId + '" 吗？')) return;
+                if (
+                    !confirm(
+                        '确认删除队伍 "' +
+                            teamId +
+                            '"？此操作将删除该队伍的所有提交记录、测试记录和积分数据，且不可撤销。',
+                    )
+                )
+                    return;
+                if (!confirm('再次确认：真的要删除队伍 "' + teamId + '" 吗？'))
+                    return;
                 try {
-                    var r = await api("DELETE", "/api/admin/teams/" + encodeURIComponent(teamId));
+                    var r = await api(
+                        "DELETE",
+                        "/api/admin/teams/" + encodeURIComponent(teamId),
+                    );
                     var d = await r.json();
                     if (r.ok) {
                         toast("队伍 " + teamId + " 已删除", "success");
@@ -2242,7 +2379,10 @@
                             encodeURIComponent(d.token),
                         "_blank",
                     );
-                    toast("已在新建标签页打开队伍 " + teamId + " 的界面", "success");
+                    toast(
+                        "已在新建标签页打开队伍 " + teamId + " 的界面",
+                        "success",
+                    );
                 } catch (e) {
                     toast("请求失败: " + e.message, "danger");
                 }
@@ -2266,19 +2406,32 @@
                         var show = i === 0 ? " show active" : "";
                         var isRace = s.is_race_active ? " (参赛)" : "";
                         tabsHtml +=
-                            '<button class="nav-link' + active + '" id="code-tab-' + i +
-                            '" data-bs-toggle="tab" data-bs-target="#code-panel-' + i +
+                            '<button class="nav-link' +
+                            active +
+                            '" id="code-tab-' +
+                            i +
+                            '" data-bs-toggle="tab" data-bs-target="#code-panel-' +
+                            i +
                             '" type="button" role="tab">' +
-                            esc(s.slot_name) + isRace + '</button>';
+                            esc(s.slot_name) +
+                            isRace +
+                            "</button>";
                         panelsHtml +=
-                            '<div class="tab-pane fade' + show + '" id="code-panel-' + i +
+                            '<div class="tab-pane fade' +
+                            show +
+                            '" id="code-panel-' +
+                            i +
                             '" role="tabpanel"><pre class="bg-dark text-light p-3 rounded" style="max-height:500px;overflow:auto;font-size:.8rem;line-height:1.5;">' +
-                            esc(s.code || "(无代码)") + '</pre></div>';
+                            esc(s.code || "(无代码)") +
+                            "</pre></div>";
                     });
-                    document.getElementById("code-modal-team-name").textContent =
-                        teamId + " 的提交代码";
-                    document.getElementById("code-modal-tabs").innerHTML = tabsHtml;
-                    document.getElementById("code-modal-panels").innerHTML = panelsHtml;
+                    document.getElementById(
+                        "code-modal-team-name",
+                    ).textContent = teamId + " 的提交代码";
+                    document.getElementById("code-modal-tabs").innerHTML =
+                        tabsHtml;
+                    document.getElementById("code-modal-panels").innerHTML =
+                        panelsHtml;
                     var modal = new bootstrap.Modal(
                         document.getElementById("codeViewModal"),
                     );
@@ -2406,6 +2559,70 @@
                 }
             }
 
+            // ── Per-zone registration open/close (control panel) ──
+            function _updateZoneRegistrationButton(z) {
+                var btn = document.getElementById(
+                    "btn-zone-toggle-registration",
+                );
+                if (!btn) return;
+                if (!z) {
+                    btn.style.display = "none";
+                    return;
+                }
+                btn.style.display = "";
+                if (z.registration_open) {
+                    btn.textContent = "\u{1F515} 关闭注册";
+                    btn.className = "btn btn-outline-warning";
+                    btn.title = "关闭当前赛区的队伍注册，新队伍将无法注册";
+                } else {
+                    btn.textContent = "\u{1F514} 打开注册";
+                    btn.className = "btn btn-outline-success";
+                    btn.title = "打开当前赛区的队伍注册，允许新队伍注册";
+                }
+            }
+
+            async function doToggleZoneRegistration() {
+                if (!currentZone) {
+                    toast("请先选择赛区", "warning");
+                    return;
+                }
+                var z = _zones.find(function (x) {
+                    return x.zone_id === currentZone;
+                });
+                if (!z) return;
+                var isOpen = z.registration_open;
+                var action = isOpen
+                    ? "close-registration"
+                    : "open-registration";
+                var label = isOpen ? "关闭" : "打开";
+                var msg =
+                    "确认" +
+                    label +
+                    '赛区 "' +
+                    currentZone +
+                    '" 的队伍注册？' +
+                    (isOpen
+                        ? "关闭后新队伍将无法注册。"
+                        : "打开后新队伍可自由注册。");
+                if (!confirm(msg)) return;
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" + currentZone + "/" + action,
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast(isOpen ? "注册已关闭" : "注册已打开", "success");
+                        await loadZones();
+                        selZone(currentZone);
+                    } else {
+                        toast(d.detail || d.message || "操作失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
             // ── Global registration open/close (all zones at once) ──
             async function doToggleAllRegistration(open) {
                 var action = open ? "open-registration" : "close-registration";
@@ -2417,12 +2634,25 @@
                 for (var i = 0; i < _zones.length; i++) {
                     var zid = _zones[i].zone_id;
                     try {
-                        var r = await api("POST", "/api/admin/zones/" + zid + "/" + action);
+                        var r = await api(
+                            "POST",
+                            "/api/admin/zones/" + zid + "/" + action,
+                        );
                         if (r.ok) zones.push(zid);
                         else failed++;
-                    } catch (e) { failed++; }
+                    } catch (e) {
+                        failed++;
+                    }
                 }
-                toast("已" + label + " " + zones.length + " 个赛区注册" + (failed ? "（" + failed + "个失败）" : ""), "success");
+                toast(
+                    "已" +
+                        label +
+                        " " +
+                        zones.length +
+                        " 个赛区注册" +
+                        (failed ? "（" + failed + "个失败）" : ""),
+                    "success",
+                );
                 await loadZones();
             }
 
@@ -2495,7 +2725,9 @@
                         })
                         .join("");
                     if (currentZone === zid) {
-                        var _cfgZone = _zones.find(function (x) { return x.zone_id === zid; });
+                        var _cfgZone = _zones.find(function (x) {
+                            return x.zone_id === zid;
+                        });
                         if (_cfgZone) {
                             setCtrlBadge(_cfgZone.state);
                             highlightStage(_cfgZone.current_stage);
@@ -2708,7 +2940,8 @@
             async function doChangePassword() {
                 var oldPwd = document.getElementById("cp-old-pwd").value;
                 var newPwd = document.getElementById("cp-new-pwd").value;
-                var confirmPwd = document.getElementById("cp-confirm-pwd").value;
+                var confirmPwd =
+                    document.getElementById("cp-confirm-pwd").value;
                 var errEl = document.getElementById("cp-error");
 
                 errEl.style.display = "none";
