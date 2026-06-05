@@ -132,6 +132,12 @@ class RaceRunner:
 
         self._race_dir.mkdir(parents=True, exist_ok=True)
 
+        # 清理可能残留的 STOP 文件，防止新比赛立即被误停
+        stale_stop = self._race_dir / "STOP"
+        if stale_stop.exists():
+            stale_stop.unlink()
+            logger.info(f"已清理残留 STOP 文件: {stale_stop}")
+
         config_path = os.path.join(self._tmp_dir.name, "race_config.json")
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
@@ -228,15 +234,16 @@ class RaceRunner:
         self.force_stop()
 
     def graceful_stop(self, timeout: float = 15.0) -> bool:
-        """Write STOP signal file and wait for Webots to exit gracefully.
-        Returns True if Webots exited cleanly, False if force-killed."""
+        """优雅停止比赛，确保 STOP 文件始终被删除。"""
         stop_file = self._race_dir / "STOP"
         try:
             self._race_dir.mkdir(parents=True, exist_ok=True)
             stop_file.write_text("stop", encoding="utf-8")
-            logger.info(f"比赛 {self.race_id}: 已写入 STOP 信号")
-        except Exception as e:
-            logger.warning(f"写入 STOP 信号失败 ({self.race_id}): {e}")
+        finally:
+            try:
+                stop_file.unlink(missing_ok=True)
+            except Exception as e:
+                logger.warning(f"Failed to remove STOP file ({self.race_id}): {e}")
 
         if self._webots_proc is None or self._webots_proc.poll() is not None:
             return True

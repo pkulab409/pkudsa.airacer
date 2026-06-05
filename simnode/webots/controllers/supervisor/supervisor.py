@@ -59,12 +59,12 @@ cars = []
 for cc in cars_config:
     node = robot.getFromDef(cc['car_slot'])
     code_path = cc.get('code_path', '')
-    # 计算发车格补偿时间：到CP0(起终点线)的直线距离 / 6 m/s
+    # 已移除发车格补偿逻辑，计时将在车辆首次通过 CP0 时记录
     trans_field = node.getField('translation')
     spawn_pos = trans_field.getSFVec3f()
-    cp0 = CHECKPOINTS[0]
-    dist_to_start = math.sqrt((spawn_pos[0] - cp0['cx']) ** 2 + (spawn_pos[1] - cp0['cy']) ** 2)
-    start_offset_time = dist_to_start / 6.0
+    # 保留获取起始坐标的代码以便调试，未再计算补偿时间
+    _ = spawn_pos
+
     cars.append({
         "team_id":             cc['team_id'],
         "car_slot":            cc['car_slot'],
@@ -89,8 +89,22 @@ for cc in cars_config:
         "finish_time":         None,       # sim time when car completed total_laps
         "laps_data":           [],         # list of lap times (float)
         "last_cp_time":        0.0,        # sim time when last checkpoint was passed (for 60s idle rule)
-        "start_offset_time":   start_offset_time,  # 发车格补偿时间
     })
+
+# ---------------------------------------------------------------------------
+# Finish line mapping
+# ---------------------------------------------------------------------------
+
+FINISH_LINES = [
+    {"cx": 29.5, "cy": -30.0, "half_w": 0.5, "half_h": 4.0},  # start_line_right_1 (cars 1 & 2)
+    {"cx": 13.15, "cy": -30.0, "half_w": 0.5, "half_h": 4.0}, # start_line_right_3 (cars 3 & 4)
+    {"cx": -3.4, "cy": -30.0, "half_w": 0.5, "half_h": 4.0},  # start_line_right_5 (cars 5 & 6)
+]
+
+# After building car state list, add finish line mapping
+for idx, car in enumerate(cars):
+    line_idx = idx // 2
+    car["finish_line"] = FINISH_LINES[line_idx]
 
 # ---------------------------------------------------------------------------
 # IPC helpers
@@ -138,32 +152,27 @@ def disqualify_car(car, reason, sim_time):
 
 def check_checkpoints(car, sim_time, events):
     """
-    CP0 serves as both the start trigger and the lap-complete trigger.
-
-    State machine:
-      - car['lap_started'] == False:
-          Waiting for first CP0 crossing to start the lap timer.
-          On crossing CP0 → set lap_started=True, record lap_start_time,
-          set checkpoint_next=1.
-      - car['lap_started'] == True, checkpoint_next >= 1:
-          Waiting for intermediate checkpoints in order.
-          On crossing the expected CP → advance checkpoint_next.
-      - car['lap_started'] == True, checkpoint_next == 0 (back to start/finish):
-          Car has completed a full lap circuit.
-          On crossing CP0 → count the lap, check for race completion.
+    CP0 serves as both the start trigger and the lap‑complete trigger.
     """
     x, y, heading = car['x'], car['y'], car['heading']
     cp_idx = car['checkpoint_next']
-    cp = CHECKPOINTS[cp_idx]
+    # Use per‑car finish line for the start/finish (cp_idx == 0)
+    if cp_idx == 0:
+        cp = car['finish_line']
+    else:
+        cp = CHECKPOINTS[cp_idx]
 
     if not in_checkpoint(x, y, cp):
+        return
+    # For the finish line we do not require heading alignment; for other checkpoints keep it
+    if cp_idx != 0 and not heading_matches(heading, cp['track_heading']):
         return
 
     # Detect: must cross the checkpoint in correct sequence order only
     if cp_idx == 0 and not car['lap_started']:
-        # First crossing of start/finish line — begin lap timing
+        # First crossing of start/finish line — start of race (global time 0)
         car['lap_started'] = True
-        car['lap_start_time'] = sim_time
+        # 全局起始时间统一为 0，故不记录个人 lap_start_time
         car['checkpoint_next'] = 1
         car['lap_progress'] = 0.0
         car['checkpoints_passed'] += 1
@@ -190,14 +199,16 @@ def check_checkpoints(car, sim_time, events):
 
     elif cp_idx == 0 and car['lap_started']:
         # Crossed start/finish after completing the full circuit
-        lap_time = sim_time - car['lap_start_time']
+        # 计算本圈时间时仍使用两次 CP0 之间的间隔
+        lap_time = sim_time - (car.get('last_lap_end_time', 0.0) if 'last_lap_end_time' in car else 0.0)
         car['laps_data'].append(lap_time)
         if car['best_lap_time'] is None or lap_time < car['best_lap_time']:
             car['best_lap_time'] = lap_time
         car['lap'] += 1
-        car['lap_start_time'] = sim_time
+        # 记录本圈结束时间，供下一圈计算间隔使用
+        car['last_lap_end_time'] = sim_time
         car['lap_progress'] = 0.0
-        car['checkpoint_next'] = 1
+        car['checkpoint_next'] = 0  # after lap complete, wait for finish line again
         car['checkpoints_passed'] += 1
         car['last_cp_time'] = sim_time
 
@@ -271,7 +282,8 @@ def check_car_collisions(cars, sim_time, events):
 
 def compute_final_rankings(cars):
     def adjusted_finish(c):
-        return c['finish_time'] - c.get('start_offset_time', 0.0)
+        # 赛程起点统一为 0，结束时间即车辆最后一次通过 CP0 的时间
+        return c['finish_time']
 
     finished   = sorted([c for c in cars if c['finish_time'] is not None],
                         key=adjusted_finish)
@@ -453,6 +465,19 @@ def check_race_end(cars, sim_time, events):
         })
         finish_reason = reason
         race_finished = True
+
+# ---------------------------------------------------------------------------
+# Mapping from car team_id (or unique identifier) to its dedicated finish line X coordinate
+# (the white start_line_right_* solids). Each line serves as the car's personal finish line.
+# Adjust the keys if your config uses different identifiers.
+CAR_FINISH_LINE_X = {
+    "car_1": 29.5,
+    "car_2": 29.5,
+    "car_3": 13.15,
+    "car_4": 13.15,
+    "car_5": -3.4,
+    "car_6": -3.4,
+}
 
 # ---------------------------------------------------------------------------
 # Main loop

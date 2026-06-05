@@ -358,6 +358,8 @@ def run() -> None:
     config_path = os.environ.get('RACE_CONFIG_PATH')
     student_control_fn = None
     disqualified = False
+    stopped = False
+    stop_until = 0.0
 
     if config_path:
         try:
@@ -424,8 +426,11 @@ def run() -> None:
                 if cmd.get('cmd') == 'disqualify':
                     disqualified = True
                 elif cmd.get('cmd') == 'stop':
-                    # Supervisor requested permanent stop (race finished)
-                    disqualified = True  # reuse death path — brakes+idle
+                    duration = cmd.get('duration', 2.0)
+                    stopped = True
+                    stop_until = _sim_timestamp + duration
+                elif cmd.get('cmd') == 'none':
+                    stopped = False
             except (json.JSONDecodeError, ValueError):
                 pass
 
@@ -443,6 +448,26 @@ def run() -> None:
                 if fr_steer is not None:
                     fr_steer.setPosition(0.0)
             continue
+
+        if stopped:
+            if _sim_timestamp < stop_until:
+                # Still serving stop penalty — hold brakes
+                if use_driver:
+                    driver.setCruisingSpeed(0.0)
+                    driver.setSteeringAngle(0.0)
+                else:
+                    if left_motor is not None:
+                        left_motor.setVelocity(0.0)
+                    if right_motor is not None:
+                        right_motor.setVelocity(0.0)
+                    if fl_steer is not None:
+                        fl_steer.setPosition(0.0)
+                    if fr_steer is not None:
+                        fr_steer.setPosition(0.0)
+                continue
+            else:
+                # Stop penalty expired — resume normal driving
+                stopped = False
 
         left_frame = camera_to_bgr(left_camera) if left_camera is not None else None
         right_frame = camera_to_bgr(right_camera) if right_camera is not None else None

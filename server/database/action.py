@@ -394,7 +394,7 @@ def list_teams(conn) -> List[Dict]:
 
 
 def db_delete_team(conn, team_id: str) -> bool:
-    """删除队伍及���所有关联数据（submissions, test_runs, race_points）。"""
+    """删除队伍及所有关联数据（submissions, test_runs, race_points）。"""
     row = conn.execute("SELECT id FROM teams WHERE id=?", (team_id,)).fetchone()
     if row is None:
         return False
@@ -830,13 +830,20 @@ def get_race(conn, race_id: str) -> Optional[Dict]:
 def list_races_by_participant(conn, team_id: str, limit: int = 20) -> List[Dict]:
     """查找某队伍参与的所有 race（发起或被邀请）。"""
     rows = conn.execute(
-        """SELECT * FROM races
-           WHERE participant_ids LIKE ?
-           ORDER BY created_at DESC
-           LIMIT ?""",
-        (f'%"{team_id}"%', limit),
+        """SELECT * FROM races ORDER BY created_at DESC""",
     ).fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        participants = (
+            json.loads(r["participant_ids"])
+            if isinstance(r["participant_ids"], str)
+            else r["participant_ids"]
+        ) or []
+        if team_id in participants:
+            result.append(dict(r))
+            if len(result) >= limit:
+                break
+    return result
 
 
 def db_count_active_races_by_initiator(conn, team_id: str) -> int:

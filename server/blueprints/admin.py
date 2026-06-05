@@ -31,7 +31,7 @@ import secrets
 import sqlite3
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
@@ -605,28 +605,54 @@ async def zone_start_race(zone_id: str, _auth=Depends(require_admin)):
 
 
 @router.post("/zones/{zone_id}/stop-race")
-async def zone_stop_race(zone_id: str, _auth=Depends(require_admin)):
-    with get_db(DB_PATH) as conn:
-        row = db_get_running_session(conn, zone_id)
-    session_id = row["id"] if row else None
-    session_type = row["type"] if row else "placement"
+async def zone_stop_race(
+    zone_id: str,
+    request: Request,
+    credentials: HTTPBasicCredentials = Depends(require_admin),
+):
+    """
+    批量取消赛区内的比赛。
+    新增审计日志，记录调用者 IP、用户名以及被取消的 session_id。
+    """
+    # 获取当前正在运行的 session_id
+    session_id = _zone_running_session.get(zone_id)
+    if not session_id:
+        raise HTTPException(status_code=404, detail="No active race in this zone")
 
-    if session_id:
-        await asyncio.to_thread(simnode_cancel_race, session_id)
-        status = await asyncio.to_thread(simnode_get_status, session_id)
-        if status == "completed":
-            await _handle_finished(session_id, session_type, zone_id)
-        else:
-            await _handle_aborted(session_id, session_type, zone_id)
+    # ---------- P0: 审计日志 ----------
+    logger.warning(
+        "[AUDIT] zone_stop_race: zone=%s session=%s client=%s user=%s",
+        zone_id,
+        session_id,
+        request.client.host if request else "unknown",
+        credentials.username if credentials else "unknown",
+    )
+    # ----------------------------------
 
+    # 调用 SimNode 取消比赛
+    await asyncio.to_thread(simnode_cancel_race, session_id)
     return {"status": "stopping", "zone_id": zone_id}
 
 
 @router.post("/zones/{zone_id}/reset")
-async def zone_reset(zone_id: str, _auth=Depends(require_admin)):
+async def zone_reset(
+    zone_id: str,
+    request: Request,
+    _auth=Depends(require_admin),
+    credentials: HTTPBasicCredentials = Depends(require_admin),
+):
+    """
+    重置赛区状态。为防止“幽灵” STOP 文件导致 admin_stop，
+    先检查并取消正在运行的 SimNode 比赛。
+    """
+    # ---------- P1: 先取消正在运行的比赛 ----------
+    if session_id := _zone_running_session.get(zone_id):
+        await asyncio.to_thread(simnode_cancel_race, session_id)
+    # ------------------------------------------------
+
     sm = get_zone_sm(zone_id)
-    sm.reset()
-    _zone_running_session.pop(zone_id, None)
+    sm.reset()  # 只重置状态机
+    _zone_running_session.pop(zone_id, None)  # 清除本地记录
     await _broadcast("idle", zone_id=zone_id)
     return {"status": "idle", "zone_id": zone_id}
 
@@ -1144,3 +1170,4 @@ async def delete_team(team_id: str, _auth=Depends(require_admin)):
         if not db_delete_team(conn, team_id):
             raise HTTPException(status_code=404, detail=f"队伍不存在: {team_id}")
     return {"status": "deleted", "team_id": team_id}
+

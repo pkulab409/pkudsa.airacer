@@ -1308,14 +1308,14 @@
     </button>`;
                 const requestBtn =
                     slot?.version &&
-                    !["waiting", "running"].includes(slot.queue_status)
+                    !["queued", "running"].includes(slot.queue_status)
                         ? `<button class="btn btn-outline-primary btn-sm" onclick="location.href='/testrace/?zoneId=${encodeURIComponent(S.zoneId)}&teamId=${encodeURIComponent(S.teamId)}&password=${encodeURIComponent(S.password)}'">
         <i class="bi bi-play-circle me-1"></i>申请测试
        </button>`
                         : "";
                 const requestStatusBtn =
                     slot?.version &&
-                    ["waiting", "running"].includes(slot.queue_status)
+                    ["queued", "running"].includes(slot.queue_status)
                         ? `<button class="btn btn-outline-secondary btn-sm" onclick="location.href='/testrace/?zoneId=${encodeURIComponent(S.zoneId)}&teamId=${encodeURIComponent(S.teamId)}&password=${encodeURIComponent(S.password)}'">
         <i class="bi bi-clock-history me-1"></i>${slot.queue_status === "running" ? "运行中" : "排队中"}
        </button>`
@@ -1353,7 +1353,7 @@
             function buildTestBadge(status) {
                 if (!status || status === "none" || status === "no_run")
                     return `<span class="test-badge test-badge-none">无测试</span>`;
-                if (status === "waiting")
+                if (status === "queued")
                     return `<span class="test-badge test-badge-waiting"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 排队中</span>`;
                 if (status === "running")
                     return `<span class="test-badge test-badge-running"><span class="spinner-border spinner-border-sm" style="width:.65rem;height:.65rem;"></span> 运行中</span>`;

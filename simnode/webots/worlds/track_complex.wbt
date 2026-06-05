@@ -496,108 +496,6 @@ GenericTrafficLight {
   state "green"
 }
 Solid {
-  translation 54.6 -26 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_1"
-}
-Solid {
-  translation 54.8 -31.4 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_2"
-}
-Solid {
-  translation 48.6 -26 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_3"
-}
-Solid {
-  translation 48.8 -31.4 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_4"
-}
-Solid {
-  translation 42.6 -26 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_5"
-}
-Solid {
-  translation 42.8 -31.6 0.1005
-  rotation 0 0 1 1.6
-  children [
-    Shape {
-      appearance PBRAppearance {
-        baseColor 0.96 0.96 0.96
-        roughness 0.5
-        metalness 0
-      }
-      geometry Box {
-        size 3 1 0.001
-      }
-    }
-  ]
-  name "pre_grid_6"
-}
-Solid {
   translation 56 -29 0.1005
   rotation 0 0 1 -1.5708003061004252
   children [
@@ -796,25 +694,40 @@ Robot {
 }
 DEF car_1 CarPhoenix {
   name "car_1"
-  translation 51.5 -26 0.4
+  translation 26.5 -26 0.4
 }
 DEF car_2 CarThunder {
   name "car_2"
-  translation 51.8 -31.7 0.4
+  translation 26.5 -31.7 0.4
 }
 DEF car_3 CarViper {
   name "car_3"
-  translation 45.5 -26 0.4
+  translation 10.15 -26 0.4
 }
 DEF car_4 CarNova {
   name "car_4"
-  translation 45.7 -31.7 0.4
+  translation 10.05 -31.7 0.4
 }
 DEF car_5 CarFrost {
   name "car_5"
-  translation 39.6 -26 0.4
+  translation -6.4 -26 0.4
 }
 DEF car_6 CarShadow {
   name "car_6"
-  translation 39.7 -31.7 0.4
+  translation -6.4 -31.7 0.4
+}
+DEF start_line_right_1 Solid {
+  translation 29.5 -30 0.1
+  children [ Shape { appearance PBRAppearance { baseColor 0.96 0.96 0.96 roughness 0.5 metalness 0 } geometry Box { size 0.1 8 0.001 } } ]
+  name "start_line_right_1"
+}
+DEF start_line_right_3 Solid {
+  translation 13.15 -30 0.1
+  children [ Shape { appearance PBRAppearance { baseColor 0.96 0.96 0.96 roughness 0.5 metalness 0 } geometry Box { size 0.1 8 0.001 } } ]
+  name "start_line_right_3"
+}
+DEF start_line_right_5 Solid {
+  translation -3.4 -30 0.1
+  children [ Shape { appearance PBRAppearance { baseColor 0.96 0.96 0.96 roughness 0.5 metalness 0 } geometry Box { size 0.1 8 0.001 } } ]
+  name "start_line_right_5"
 }

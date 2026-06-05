@@ -77,7 +77,7 @@ for cc in cars_config:
         "lap_progress":        0.0,
         "status":              "normal",   # "normal" | "stopped" | "disqualified"
         "boost_remaining":     0.0,
-        "checkpoint_next":     1,          # After CP0 triggers start, wait for CP1 next
+        "checkpoint_next":     0,          # Start detection uses finish line (per‑car)
         "lap_started":         False,      # True once the car has crossed CP0 for the first time
         "lap_start_time":      0.0,
         "best_lap_time":       None,
@@ -87,6 +87,19 @@ for cc in cars_config:
         "laps_data":           [],         # list of lap times (float)
         "start_offset_time":   start_offset_time,  # 发车格补偿时间
     })
+
+# After building car state list, add finish line mapping
+# Define finish line positions (center coordinates) matching the white lines
+FINISH_LINES = [
+    {"cx": 29.5, "cy": -30.0, "half_w": 0.05, "half_h": 4.0},  # start_line_right_1 (cars 1 & 2)
+    {"cx": 13.15, "cy": -30.0, "half_w": 0.05, "half_h": 4.0}, # start_line_right_3 (cars 3 & 4)
+    {"cx": -3.4, "cy": -30.0, "half_w": 0.05, "half_h": 4.0},  # start_line_right_5 (cars 5 & 6)
+]
+
+# Assign each car its corresponding finish line (two cars per line)
+for idx, car in enumerate(cars):
+    line_idx = idx // 2  # integer division, 0 for first two cars, 1 for next two, 2 for last two
+    car["finish_line"] = FINISH_LINES[line_idx]
 
 # ---------------------------------------------------------------------------
 # IPC helpers
@@ -106,31 +119,27 @@ def clear_cmd(car):
 
 def check_checkpoints(car, sim_time, events):
     """
-    CP0 serves as both the start trigger and the lap-complete trigger.
-
-    State machine:
-      - car['lap_started'] == False:
-          Waiting for first CP0 crossing to start the lap timer.
-          On crossing CP0 → set lap_started=True, record lap_start_time,
-          set checkpoint_next=1.
-      - car['lap_started'] == True, checkpoint_next == 1/2/3:
-          Waiting for intermediate checkpoints in order.
-          On crossing the expected CP → advance checkpoint_next.
-      - car['lap_started'] == True, checkpoint_next == 0 (back to start/finish):
-          Car has completed a full lap circuit.
-          On crossing CP0 → count the lap, check for race completion.
+    CP0 serves as both the start trigger and the lap‑complete trigger.
     """
     x, y, heading = car['x'], car['y'], car['heading']
     cp_idx = car['checkpoint_next']
-    cp = CHECKPOINTS[cp_idx]
+    # Use the normal checkpoint for intermediate points, but for the start/finish
+    # use the car‑specific finish line defined in `car['finish_line']`.
+    if cp_idx == 0:
+        cp = car['finish_line']
+    else:
+        cp = CHECKPOINTS[cp_idx]
 
     if not in_checkpoint(x, y, cp):
         return
-    if not heading_matches(heading, cp['track_heading']):
+    # For the finish line we do not require heading alignment (white line is
+    # visible from both directions). For normal checkpoints keep the heading
+    # check.
+    if cp_idx != 0 and not heading_matches(heading, cp['track_heading']):
         return
 
     if cp_idx == 0 and not car['lap_started']:
-        # First crossing of start/finish line — begin lap timing
+        # First crossing of start/finish line — begin lap timing (same as before)
         car['lap_started'] = True
         car['lap_start_time'] = sim_time
         car['checkpoint_next'] = 1
@@ -153,7 +162,7 @@ def check_checkpoints(car, sim_time, events):
         })
 
     elif cp_idx == 0 and car['lap_started']:
-        # Crossed start/finish after completing the full circuit
+        # Crossed the car‑specific finish line after completing the circuit
         lap_time = sim_time - car['lap_start_time']
         car['laps_data'].append(lap_time)
         if car['best_lap_time'] is None or lap_time < car['best_lap_time']:

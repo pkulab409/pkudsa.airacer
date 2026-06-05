@@ -39,57 +39,12 @@ _DEFAULT_CODE_PATH = (
     pathlib.Path(__file__).resolve().parent.parent.parent / "sdk" / "team_controller.py"
 )
 
-# ---------------------------------------------------------------------------
-# 背压重试：simnode 并发槽满时等待而不要立刻失败
-# ---------------------------------------------------------------------------
-
-_RETRY_BACKOFF_START = 2.0
-_RETRY_BACKOFF_MAX = 60.0
-_RETRY_TOTAL_TIMEOUT = 600.0
-
 # 单场比赛最大轮询时间（超过则标记超时），防止 worker 异常导致 DB 永久 running
 _POLL_TOTAL_TIMEOUT = 900.0  # 15 分钟
 
 
-async def _start_race_with_retry(
-    race_id: str,
-    session_type: str,
-    total_laps: int,
-    cars: list,
-    world: str = "complex",
-    slot_name: str = "",
-) -> None:
-    waited = 0.0
-    delay = _RETRY_BACKOFF_START
-
-    while True:
-        try:
-            await asyncio.to_thread(
-                simnode_start_race, race_id, session_type, total_laps, cars, world
-            )
-            return
-        except RuntimeError as exc:
-            msg = str(exc)
-            if "409" in msg or "并发" in msg:
-                if waited >= _RETRY_TOTAL_TIMEOUT:
-                    raise RuntimeError(
-                        f"SimNode 持续繁忙，已等待 {waited:.0f}s，放弃: {msg}"
-                    ) from exc
-                logger.info(
-                    "SimNode 并发已满，%s 秒后重试 (已等待 %.0fs, slot=%s)",
-                    delay,
-                    waited,
-                    slot_name,
-                )
-                await asyncio.sleep(delay)
-                waited += delay
-                delay = min(delay * 2, _RETRY_BACKOFF_MAX)
-                continue
-            raise
-
-
 async def _test_worker_loop() -> None:
-    """主循环：每 2 秒取队列头部任务，全部发射给 simnode，由其背压排队。"""
+    """主循环：每 2 秒取队列头部任务，全部发射给 simnode（SimNode 内部排队管理并发）。"""
     from server.blueprints.submission import dequeue_test
 
     # 启动时恢复 stuck test_runs
@@ -165,35 +120,31 @@ async def _run_single_test_impl(task: dict) -> None:
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     race_id = f"test_{team_id}_{task['slot_name']}_{timestamp}"
 
-    # 3. 标记 test_run 为 running
-    now = datetime.datetime.now().isoformat()
-    with get_db(DB_PATH) as conn:
-        update_test_run(conn, test_run_id, status="running", started_at=now)
-
-    # 4. 调用 Sim Node（并发满时自动重试等待）
+    # 3. 调用 Sim Node（SimNode 内部管理并发排队，不再拒绝）
     world_key = task.get("world_key", "complex")
     try:
-        await _start_race_with_retry(
+        await asyncio.to_thread(
+            simnode_start_race,
             race_id,
             "test",
             3,
             cars,
             world=world_key,
-            slot_name=task.get("slot_name", ""),
         )
     except RuntimeError as exc:
         _mark_error(test_run_id, f"simnode_unreachable: {exc}")
         return
 
-    logger.info(f"测试赛已启动: {race_id}")
+    logger.info(f"测试赛已提交到 SimNode: {race_id}")
 
-    # 5. 轮询等待完成（带总超时保护）
+    # 4. 轮询等待完成（SimNode 可能先返回 queued，再变为 running）
+    db_running_set = False  # 是否已将 DB 状态更新为 running
     none_strikes = 0
     poll_start = _time.monotonic()
     while True:
         await asyncio.sleep(5)
 
-        # 总超时检查：防止 worker 异常导致 DB 永久 "running"
+        # 总超时检查：防止 worker 异常导致 DB 永久 running
         if _time.monotonic() - poll_start > _POLL_TOTAL_TIMEOUT:
             _mark_error(test_run_id, "poll_timeout")
             return
@@ -208,6 +159,17 @@ async def _run_single_test_impl(task: dict) -> None:
             continue
 
         none_strikes = 0
+
+        # 当 SimNode 状态变为 running 时，更新 DB（前端可看到"运行时"）
+        if status == "running" and not db_running_set:
+            db_running_set = True
+            now = datetime.datetime.now().isoformat()
+            try:
+                with get_db(DB_PATH) as conn:
+                    update_test_run(conn, test_run_id, status="running", started_at=now)
+                logger.info(f"测试赛开始执行 (SimNode 确认): {race_id}")
+            except Exception as e:
+                logger.warning(f"更新 test_run running 状态失败: {e}")
 
         if status == "completed":
             result = await asyncio.to_thread(simnode_get_result, race_id)
@@ -264,11 +226,15 @@ async def _recover_stuck_test_runs() -> None:
 
 
 async def _recover_stuck_races() -> None:
-    """Backend 启动时：将 DB 中状态为 running 的 races 与 simnode 同步。"""
+    """Backend 启动时：将 DB 中状态为 running/waiting 的 races 与 simnode 同步。
+    内存队列在重启后丢失，因此 waiting 状态记录需要同样恢复。"""
+    import json as _json
+    from server.database.action import update_race as db_update_race
+
     try:
         with get_db(DB_PATH) as conn:
             rows = conn.execute(
-                "SELECT id FROM races WHERE status = 'running'"
+                "SELECT id FROM races WHERE status IN ('running', 'waiting')"
             ).fetchall()
     except Exception as e:
         logger.warning(f"恢复 stuck races 查询失败: {e}")
@@ -277,20 +243,75 @@ async def _recover_stuck_races() -> None:
     if not rows:
         return
 
-    from server.database.action import update_race as db_update_race
-
-    logger.info(f"发现 {len(rows)} 条 running 状态的 race，正在恢复...")
+    logger.info(f"发现 {len(rows)} 条 stuck race (running/waiting)，正在恢复...")
     for row in rows:
         race_id = row["id"]
+        short_id = race_id[:8]
+        sim_race_id = f"race_{short_id}"
+
+        # 尝试从 SimNode 获取状态和结果
+        sim_status = None
         try:
+            import urllib.request
+            import urllib.error
+            req = urllib.request.Request(
+                f"http://localhost:5000/race/{sim_race_id}/status",
+                method="GET"
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                sim_status = _json.loads(resp.read()).get("status")
+        except Exception:
+            pass
+
+        if sim_status == "completed":
+            # try to get result
+            try:
+                req2 = urllib.request.Request(
+                    f"http://localhost:5000/race/{sim_race_id}/result",
+                    method="GET"
+                )
+                with urllib.request.urlopen(req2, timeout=5) as resp2:
+                    result = _json.loads(resp2.read())
+                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                with get_db(DB_PATH) as conn:
+                    db_update_race(
+                        conn, race_id, status="done",
+                        finished_at=now_iso,
+                        finish_reason=result.get("finish_reason", "grace_period_expired"),
+                        result=_json.dumps(result, ensure_ascii=False),
+                    )
+                logger.info(f"race {race_id} 已恢复为 done (SimNode completed)")
+            except Exception:
+                with get_db(DB_PATH) as conn:
+                    db_update_race(
+                        conn, race_id, status="error",
+                        finish_reason="recovered_after_restart",
+                    )
+                logger.info(f"race {race_id} 已恢复为 error (SimNode completed 但取结果失败)")
+        elif sim_status in ("running", "queued"):
+            # Mark DB as error and cancel on SimNode to free resources
+            try:
+                cancel_req = urllib.request.Request(
+                    f"http://localhost:5000/race/{sim_race_id}/cancel",
+                    method="POST"
+                )
+                urllib.request.urlopen(cancel_req, timeout=3)
+                logger.info(f"SimNode race {sim_race_id} 已取消 ({sim_status})")
+            except Exception:
+                logger.warning(f"取消 SimNode race {sim_race_id} 失败，将被自动清理")
             with get_db(DB_PATH) as conn:
                 db_update_race(
                     conn, race_id, status="error",
                     finish_reason="recovered_after_restart",
                 )
-            logger.info(f"race {race_id} 已恢复为 error (recovered_after_restart)")
-        except Exception as e:
-            logger.warning(f"恢复 race {race_id} 失败: {e}")
+            logger.info(f"race {race_id} 已恢复为 error (SimNode {sim_status}, 已取消)")
+        else:
+            with get_db(DB_PATH) as conn:
+                db_update_race(
+                    conn, race_id, status="error",
+                    finish_reason="recovered_after_restart",
+                )
+            logger.info(f"race {race_id} 已恢复为 error (SimNode 无记录)")
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +320,7 @@ async def _recover_stuck_races() -> None:
 
 
 async def _race_event_worker_loop() -> None:
-    """主循环：每 2 秒取 race 队列头部，全部发射给 simnode。"""
+    """主循环：每 2 秒取 race 队列头部，全部发射给 simnode（SimNode 内部排队管理并发）。"""
     from server.blueprints.races import _dequeue_race
 
     # 启动时恢复 stuck races
@@ -386,29 +407,25 @@ async def _run_single_race_event_impl(race_id: str) -> None:
             }
         )
 
-    # 4. 标记 running
+    # 4. 调用 Sim Node（SimNode 内部管理并发排队，不再拒绝）
     sim_race_id = f"race_{race_id[:8]}"
-    now = datetime.datetime.now().isoformat()
-    with get_db(DB_PATH) as conn:
-        db_update_race(conn, race_id, status="running", started_at=now)
-
-    # 5. 调 Sim Node（并发满时自动重试等待）
     try:
-        await _start_race_with_retry(
+        await asyncio.to_thread(
+            simnode_start_race,
             sim_race_id,
             "test",
             total_laps,
             cars,
             world=world_key,
-            slot_name=f"race_{race_id[:6]}",
         )
     except RuntimeError as exc:
         _mark_race_error(race_id, f"simnode_unreachable: {exc}")
         return
 
-    logger.info(f"测试赛事已启动: {sim_race_id} (race_id={race_id})")
+    logger.info(f"测试赛事已提交到 SimNode: {sim_race_id} (race_id={race_id})")
 
-    # 6. 轮询等待完成（带总超时保护）
+    # 5. 轮询等待完成（SimNode 可能先返回 queued，再变为 running）
+    db_running_set = False
     none_strikes = 0
     poll_start = _time.monotonic()
     while True:
@@ -429,6 +446,17 @@ async def _run_single_race_event_impl(race_id: str) -> None:
             continue
 
         none_strikes = 0
+
+        # 当 SimNode 状态变为 running 时，更新 DB
+        if status == "running" and not db_running_set:
+            db_running_set = True
+            now = datetime.datetime.now().isoformat()
+            try:
+                with get_db(DB_PATH) as conn:
+                    db_update_race(conn, race_id, status="running", started_at=now)
+                logger.info(f"测试赛事开始执行 (SimNode 确认): {sim_race_id}")
+            except Exception as e:
+                logger.warning(f"更新 race running 状态失败: {e}")
 
         if status == "completed":
             result = await asyncio.to_thread(simnode_get_result, sim_race_id)
