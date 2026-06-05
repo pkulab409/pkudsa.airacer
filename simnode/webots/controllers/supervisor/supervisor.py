@@ -94,6 +94,16 @@ for cc in cars_config:
     })
 
 
+
+# After building the initial cars list, remove any car slots that are not present in the race configuration.
+# This directly deletes empty slots from the Webots scene.
+expected_slots = ["car_1", "car_2", "car_3", "car_4", "car_5", "car_6"]
+existing_slots = {c['car_slot'] for c in cars}
+for slot in expected_slots:
+    if slot not in existing_slots:
+        node = robot.getFromDef(slot)
+
+
 for car in cars:
     if not car['has_code']:
         print(f"[INIT] Removing car without code: team_id={car['team_id']} slot={car['car_slot']}")
