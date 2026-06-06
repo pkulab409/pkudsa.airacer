@@ -1,4 +1,4 @@
-#VRML_SIM R2025a utf8
+﻿#VRML_SIM R2025a utf8
 
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/CurvedRoadSegment.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/road/protos/Road.proto"
@@ -16,8 +16,8 @@ WorldInfo {
   title "AI Racer - Complex Track (track_complex)"
 }
 Viewpoint {
-  orientation 0.060326000586088356 -0.034556234582527615 -0.9975803929031306 4.1798535487189685
-  position 61.4984009211618 -56.54304483169025 11.612246674526045
+  orientation -0.28288016857974363 0.582316481205031 0.762158989936671 1.1349133602067913
+  position -64.19237621953822 -47.780854776017776 106.0348968458327
 }
 Background {
   skyColor [
@@ -495,11 +495,193 @@ GenericTrafficLight {
   rotation 0 0 1 -2.8797903061004253
   state "green"
 }
+Solid {
+  translation 56 -29 0.1005
+  rotation 0 0 1 -1.5708003061004252
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_0"
+}
+Solid {
+  translation 199 0 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_1"
+}
+Solid {
+  translation 199 103 0.1005
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_2"
+}
+Solid {
+  translation 158 160 0.1005
+  rotation 0 0 1 -1.5707996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_3"
+}
+Solid {
+  translation 92 159 0.1005
+  rotation 0 0 1 -1.5708003061004252
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_4"
+}
+Solid {
+  translation 47.5 60 0.1005
+  rotation 0 0 1 3.141592653589793
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_5"
+}
+Solid {
+  translation -5 150 0.1005
+  rotation 0 0 1 -1.5707996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_6"
+}
+Solid {
+  translation -22 98 0.1005
+  rotation 0 0 1 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_7"
+}
+Solid {
+  translation -18 40 0.1005
+  rotation 0 0 1 -1.4398996938995747
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.8 1
+        transparency 1
+        roughness 0.3
+        metalness 0
+      }
+      geometry Box {
+        size 8 0.1 2
+      }
+    }
+  ]
+  name "checkpoint_8"
+}
+YieldSign {
+  translation 181 -23 0.1
+  rotation 0 0 1 3.141592653589793
+  name "danger_mark_1"
+  height 5
+  signBoards [
+    YieldPanel {
+      translation 0 0 2
+    }
+  ]
+}
+YieldSign {
+  translation 75 16 0.1
+  rotation 0 0 1 1.7016996938995748
+  name "danger_mark_2"
+  height 4
+  signBoards [
+    YieldPanel {
+      translation 0 0 2
+    }
+  ]
+}
 Robot {
   children [
-    Camera {
-      translation 75 65 100
-      rotation 0 1 0 0
+    DEF OVERHEAD_CAM Camera {
+      translation 56 -29 25
+      rotation 0 1 0 1.5708
       name "overhead_cam"
       fieldOfView 1.1
       width 640
@@ -509,7 +691,6 @@ Robot {
   name "supervisor"
   controller "supervisor"
   supervisor TRUE
-  window "<none>"
 }
 DEF car_1 CarPhoenix {
   name "car_1"
@@ -534,13 +715,6 @@ DEF car_5 CarFrost {
 DEF car_6 CarShadow {
   name "car_6"
   translation -6.4 -31.7 0.4
-}
-// Replace rightmost column start line with a single line covering both rows
-DEF start_line_right_column Solid {
-  translation 29.5 -28.85 0.5
-  rotation 0 0 1 1.5707963267948966
-  children [ Shape { appearance PBRAppearance { baseColor 0.96 0.96 0.96 roughness 0.5 metalness 0 } geometry Box { size 0.2 8 0.001 } } ]
-  name "start_line_right_column"
 }
 DEF start_line_right_1 Solid {
   translation 29.5 -30 0.1
