@@ -3,8 +3,8 @@ Tea submission and test-status endpoints.
 
 POST /api/submit                  — upload base64-encoded Python driver (slot_name optional)
 POST /api/activate                — switch which slot is the race-active one
-POST /api/test-request            — enqueue manual test request for an uploaded slot
 GET  /api/test-status/{team_id}   — all 3 slot statuses (Basic Auth)
+GET  /api/active-code/{team_id}   — view race-active submission code (Basic Auth)
 """
 
 import asyncio
@@ -354,6 +354,49 @@ async def get_test_status(
             }
 
     return {"team_id": team_id, "slots": slots_data}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/active-code/{team_id} — view race-active submission code
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/active-code/{team_id}")
+async def get_active_code(
+    team_id: str,
+    credentials: HTTPBasicCredentials = Depends(_basic_security),
+):
+    """返回当前参赛槽位的代码内容，供队伍确认比赛用代码。"""
+    _require_team_auth(team_id, credentials)
+
+    with get_db(DB_PATH) as conn:
+        from server.database.action import db_get_all_slots_code
+
+        slots = db_get_all_slots_code(conn, team_id)
+
+    # 找到 is_race_active 的那个
+    active = None
+    for slot in slots:
+        if slot.get("is_race_active"):
+            active = slot
+            break
+
+    if active is None:
+        raise HTTPException(status_code=404, detail="当前没有设置参赛槽位")
+
+    code = ""
+    code_path = active.get("code_path")
+    if code_path and pathlib.Path(code_path).exists():
+        code = pathlib.Path(code_path).read_text(encoding="utf-8")
+    else:
+        raise HTTPException(status_code=404, detail="参赛代码文件不存在")
+
+    return {
+        "team_id": team_id,
+        "slot_name": active["slot_name"],
+        "submitted_at": active["submitted_at"],
+        "code": code,
+    }
 
 
 # ---------------------------------------------------------------------------

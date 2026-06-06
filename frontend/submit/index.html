@@ -831,31 +831,169 @@
         <!-- ══════════════════════════════════════════════════
      修改密码 Modal
      ══════════════════════════════════════════════════ -->
-        <div class="modal fade" id="changeTeamPasswordModal" tabindex="-1" aria-hidden="true">
+        <div
+            class="modal fade"
+            id="changeTeamPasswordModal"
+            tabindex="-1"
+            aria-hidden="true"
+        >
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
-                    <div class="modal-header" style="background:linear-gradient(135deg,#991b1b,#dc2626);color:#fff;">
-                        <h5 class="modal-title"><i class="bi bi-key me-2"></i>修改队伍密码</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div
+                        class="modal-header"
+                        style="
+                            background: linear-gradient(
+                                135deg,
+                                #991b1b,
+                                #dc2626
+                            );
+                            color: #fff;
+                        "
+                    >
+                        <h5 class="modal-title">
+                            <i class="bi bi-key me-2"></i>修改队伍密码
+                        </h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                        ></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="ctp-old-pwd" class="form-label">旧密码</label>
-                            <input type="password" id="ctp-old-pwd" class="form-control" placeholder="请输入当前密码" />
+                            <label for="ctp-old-pwd" class="form-label"
+                                >旧密码</label
+                            >
+                            <input
+                                type="password"
+                                id="ctp-old-pwd"
+                                class="form-control"
+                                placeholder="请输入当前密码"
+                            />
                         </div>
                         <div class="mb-3">
-                            <label for="ctp-new-pwd" class="form-label">新密码</label>
-                            <input type="password" id="ctp-new-pwd" class="form-control" placeholder="请输入新密码（至少4位）" />
+                            <label for="ctp-new-pwd" class="form-label"
+                                >新密码</label
+                            >
+                            <input
+                                type="password"
+                                id="ctp-new-pwd"
+                                class="form-control"
+                                placeholder="请输入新密码（至少4位）"
+                            />
                         </div>
                         <div class="mb-3">
-                            <label for="ctp-confirm-pwd" class="form-label">确认新密码</label>
-                            <input type="password" id="ctp-confirm-pwd" class="form-control" placeholder="请再次输入新密码" onkeydown="if(event.key==='Enter')doChangeTeamPassword()" />
+                            <label for="ctp-confirm-pwd" class="form-label"
+                                >确认新密码</label
+                            >
+                            <input
+                                type="password"
+                                id="ctp-confirm-pwd"
+                                class="form-control"
+                                placeholder="请再次输入新密码"
+                                onkeydown="
+                                    if (event.key === 'Enter')
+                                        doChangeTeamPassword();
+                                "
+                            />
                         </div>
-                        <div id="ctp-error" class="text-danger" style="font-size:.85rem;display:none;"></div>
+                        <div
+                            id="ctp-error"
+                            class="text-danger"
+                            style="font-size: 0.85rem; display: none"
+                        ></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-danger" onclick="doChangeTeamPassword()">确认修改</button>
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            取消
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-danger"
+                            onclick="doChangeTeamPassword()"
+                        >
+                            确认修改
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════════
+     查看参赛代码 Modal
+     ══════════════════════════════════════════════════ -->
+        <div
+            class="modal fade"
+            id="viewCodeModal"
+            tabindex="-1"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div
+                        class="modal-header"
+                        style="
+                            background: linear-gradient(
+                                135deg,
+                                #1e3a5f,
+                                #2563eb
+                            );
+                            color: #fff;
+                        "
+                    >
+                        <h5 class="modal-title">
+                            <i class="bi bi-file-earmark-code me-2"></i
+                            >当前参赛代码
+                        </h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                        ></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div
+                            id="view-code-loading"
+                            class="text-center py-5 text-muted"
+                        >
+                            <span
+                                class="spinner-border spinner-border-sm me-2"
+                            ></span
+                            >加载中...
+                        </div>
+                        <div
+                            id="view-code-info"
+                            class="px-3 pt-3 pb-1"
+                            style="font-size: 0.85rem"
+                        ></div>
+                        <pre
+                            id="view-code-content"
+                            class="m-0 p-3"
+                            style="
+                                max-height: 60vh;
+                                overflow-y: auto;
+                                background: #1e1e1e;
+                                color: #d4d4d4;
+                                font-size: 0.8rem;
+                                line-height: 1.5;
+                                border-radius: 0;
+                                white-space: pre;
+                                tab-size: 4;
+                            "
+                        ></pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            关闭
+                        </button>
                     </div>
                 </div>
             </div>
@@ -930,6 +1068,26 @@
 
             function fmtTime(iso) {
                 if (!iso) return null;
+                // 兼容 "%Y%m%d_%H%M%S" 格式（如 "20260606_223000"）
+                var match = iso.match(
+                    /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/,
+                );
+                if (match) {
+                    var d = new Date(
+                        parseInt(match[1]),
+                        parseInt(match[2]) - 1,
+                        parseInt(match[3]),
+                        parseInt(match[4]),
+                        parseInt(match[5]),
+                        parseInt(match[6]),
+                    );
+                    return d.toLocaleString("zh-CN", {
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                    });
+                }
                 try {
                     const d = new Date(iso);
                     return d.toLocaleString("zh-CN", {
@@ -1327,6 +1485,11 @@
                     : `<button class="btn btn-outline-success btn-sm btn-activate" disabled>
         <i class="bi bi-check-circle-fill me-1"></i>已参赛
        </button>`;
+                const viewCodeBtn = isActive
+                    ? `<button class="btn btn-outline-info btn-sm" onclick="viewActiveCode()">
+        <i class="bi bi-file-earmark-code me-1"></i>查看代码
+       </button>`
+                    : ``;
 
                 return `
     <div class="card slot-card ${activeClass} h-100 position-relative overflow-visible">
@@ -1345,6 +1508,7 @@
           ${requestBtn}
           ${requestStatusBtn}
           ${activateBtn}
+          ${viewCodeBtn}
         </div>
       </div>
     </div>`;
@@ -1442,6 +1606,48 @@
                         "danger",
                         data.message || data.detail || "设置失败",
                     );
+                }
+            }
+
+            // ── View active code ────────────────────────────────────────────────────────
+            async function viewActiveCode() {
+                const loading = document.getElementById("view-code-loading");
+                const info = document.getElementById("view-code-info");
+                const content = document.getElementById("view-code-content");
+
+                loading.classList.remove("d-none");
+                info.innerHTML = "";
+                content.textContent = "";
+
+                const modal = new bootstrap.Modal(
+                    document.getElementById("viewCodeModal"),
+                );
+                modal.show();
+
+                let resp, data;
+                try {
+                    resp = await fetch(
+                        "/api/active-code/" + encodeURIComponent(S.teamId),
+                        {
+                            headers: { Authorization: authHeader() },
+                        },
+                    );
+                    data = await resp.json();
+                } catch (e) {
+                    loading.classList.add("d-none");
+                    info.innerHTML = `<div class="alert alert-danger py-2">网络错误: ${esc(e.message)}</div>`;
+                    return;
+                }
+
+                loading.classList.add("d-none");
+
+                if (resp.ok) {
+                    info.innerHTML =
+                        `<span class="badge bg-info me-2">${esc(data.slot_name)}</span>` +
+                        `<span class="text-muted">上传于 ${fmtTime(data.submitted_at)}</span>`;
+                    content.textContent = data.code;
+                } else {
+                    info.innerHTML = `<div class="alert alert-warning py-2">${esc(data.detail || "加载失败")}</div>`;
                 }
             }
 
@@ -1639,7 +1845,8 @@
             async function doChangeTeamPassword() {
                 const oldPwd = document.getElementById("ctp-old-pwd").value;
                 const newPwd = document.getElementById("ctp-new-pwd").value;
-                const confirmPwd = document.getElementById("ctp-confirm-pwd").value;
+                const confirmPwd =
+                    document.getElementById("ctp-confirm-pwd").value;
                 const errEl = document.getElementById("ctp-error");
 
                 errEl.style.display = "none";
@@ -1702,7 +1909,8 @@
                         }),
                     );
                 } else {
-                    errEl.textContent = data.detail || data.message || "修改失败";
+                    errEl.textContent =
+                        data.detail || data.message || "修改失败";
                     errEl.style.display = "block";
                 }
             }
@@ -1734,10 +1942,22 @@
                             return;
                         } else {
                             const data = await r.json();
-                            console.warn("Impersonation failed:", data.detail || data.message);
-                            alert("模拟登录失败: " + (data.detail || data.message || "token 无效或已过期"));
+                            console.warn(
+                                "Impersonation failed:",
+                                data.detail || data.message,
+                            );
+                            alert(
+                                "模拟登录失败: " +
+                                    (data.detail ||
+                                        data.message ||
+                                        "token 无效或已过期"),
+                            );
                             // Clean URL
-                            window.history.replaceState({}, document.title, "/submit/");
+                            window.history.replaceState(
+                                {},
+                                document.title,
+                                "/submit/",
+                            );
                         }
                     } catch (e) {
                         console.warn("Impersonation error:", e);
