@@ -85,23 +85,6 @@ def db_delete_zone(conn, zone_id: str) -> bool:
             f"DELETE FROM race_points WHERE team_id IN ({placeholders})", params
         )
 
-        # Collect submission IDs for these teams
-        sub_ids = [
-            r[0]
-            for r in conn.execute(
-                f"SELECT id FROM submissions WHERE team_id IN ({placeholders})", params
-            ).fetchall()
-        ]
-
-        if sub_ids:
-            sub_placeholders = ",".join("?" for _ in sub_ids)
-            sub_params = list(sub_ids)
-            # Delete test_runs for these submissions
-            conn.execute(
-                f"DELETE FROM test_runs WHERE submission_id IN ({sub_placeholders})",
-                sub_params,
-            )
-
         # Delete submissions for these teams
         conn.execute(
             f"DELETE FROM submissions WHERE team_id IN ({placeholders})", params
@@ -555,49 +538,6 @@ def db_get_submission_by_id(conn, submission_id: str) -> Optional[Dict]:
     row = conn.execute(
         "SELECT id, team_id, code_path, submitted_at, slot_name, is_active, is_race_active "
         "FROM submissions WHERE id = ?",
-        (submission_id,),
-    ).fetchone()
-    return dict(row) if row else None
-
-
-# ---------------------------------------------------------------------------
-# TestRuns
-# ---------------------------------------------------------------------------
-
-
-def create_test_run(
-    conn, submission_id: str, queued_at: str, world_key: str = "complex"
-) -> int:
-    cur = conn.execute(
-        "INSERT INTO test_runs (submission_id, status, queued_at, world_key) VALUES (?, 'queued', ?, ?)",
-        (submission_id, queued_at, world_key),
-    )
-    return cur.lastrowid
-
-
-def update_test_run(conn, test_run_id: int, **kwargs) -> None:
-    allowed = {
-        "status",
-        "started_at",
-        "finished_at",
-        "laps_completed",
-        "best_lap_time",
-        "collisions_minor",
-        "collisions_major",
-        "timeout_warnings",
-        "finish_reason",
-    }
-    fields = {k: v for k, v in kwargs.items() if k in allowed}
-    if not fields:
-        return
-    set_clause = ", ".join(f"{k} = ?" for k in fields)
-    values = list(fields.values()) + [test_run_id]
-    conn.execute(f"UPDATE test_runs SET {set_clause} WHERE id = ?", values)
-
-
-def get_latest_test_run(conn, submission_id: str) -> Optional[Dict]:
-    row = conn.execute(
-        "SELECT * FROM test_runs WHERE submission_id = ? ORDER BY id DESC LIMIT 1",
         (submission_id,),
     ).fetchone()
     return dict(row) if row else None

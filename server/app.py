@@ -35,10 +35,9 @@ async def lifespan(app: FastAPI):
 
     hb_task = asyncio.create_task(_heartbeat_loop())
     live_task = asyncio.create_task(_sim_live_loop())
-    test_task = asyncio.create_task(_serve_test_queue())
     race_task = asyncio.create_task(_serve_race_event_queue())
     yield
-    for t in (hb_task, live_task, test_task, race_task):
+    for t in (hb_task, live_task, race_task):
         t.cancel()
         try:
             await t
@@ -130,13 +129,6 @@ async def _heartbeat_loop() -> None:
 # ---------------------------------------------------------------------------
 # Live telemetry: poll simnode every 1 s for all running zones
 # ---------------------------------------------------------------------------
-
-
-async def _serve_test_queue() -> None:
-    """启动测试队列消费者 worker（旧式 test_runs）。"""
-    from server.services.test_worker import _test_worker_loop
-
-    await _test_worker_loop()
 
 
 async def _serve_race_event_queue() -> None:

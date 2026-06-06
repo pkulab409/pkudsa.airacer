@@ -14,7 +14,6 @@ import os
 import pathlib
 import secrets
 import tempfile
-import threading
 import time
 from typing import Optional
 
@@ -26,12 +25,10 @@ from pydantic import BaseModel
 from sdk.validate_controller import validate as _sdk_validate
 from server.config.config import DB_PATH, SUBMISSIONS_DIR
 from server.database.action import (
-    create_test_run,
     db_activate_submission_slot,
     db_create_submission_with_slot,
     db_get_submission_by_slot,
     db_get_team_secure,
-    get_latest_test_run,
 )
 from server.database.models import get_db
 
@@ -54,47 +51,6 @@ def _verify_password(plain: str, hashed: str) -> bool:
         return _bcrypt.checkpw(plain.encode(), hashed.encode())
     except:
         return False
-
-
-# In-memory test queue
-# ---------------------------------------------------------------------------
-
-_test_queue: list[dict] = []
-_test_queue_lock = threading.Lock()
-
-
-def enqueue_test(
-    submission_id: str,
-    test_run_id: int,
-    slot_name: str,
-    team_id: str,
-    world_key: str = "complex",
-) -> int:
-    with _test_queue_lock:
-        _test_queue.append(
-            {
-                "submission_id": submission_id,
-                "test_run_id": test_run_id,
-                "slot_name": slot_name,
-                "team_id": team_id,
-                "world_key": world_key,
-            }
-        )
-        return len(_test_queue)
-
-
-def dequeue_test() -> Optional[dict]:
-    """Pop next test task from the queue. Returns None if empty."""
-    with _test_queue_lock:
-        return _test_queue.pop(0) if _test_queue else None
-
-
-def queue_position(submission_id: str) -> Optional[int]:
-    with _test_queue_lock:
-        for idx, entry in enumerate(_test_queue):
-            if entry["submission_id"] == submission_id:
-                return idx + 1
-        return None
 
 
 # ---------------------------------------------------------------------------
@@ -138,9 +94,7 @@ def _require_team_auth(
 def _validate_impersonation_bearer(token: str, team_id: str) -> bool:
     now = time.time()
     # Cleanup expired tokens
-    expired = [
-        k for k, v in _impersonation_sessions.items() if v["expires_at"] < now
-    ]
+    expired = [k for k, v in _impersonation_sessions.items() if v["expires_at"] < now]
     for k in expired:
         del _impersonation_sessions[k]
 
@@ -166,7 +120,8 @@ async def impersonate_login_public(body: dict):
         raise HTTPException(status_code=400, detail="Missing token")
 
     # Validate against admin's impersonate tokens
-    from server.blueprints.admin import _impersonate_tokens, _cleanup_expired_tokens
+    from server.blueprints.admin import _cleanup_expired_tokens, _impersonate_tokens
+
     _cleanup_expired_tokens()
     entry = _impersonate_tokens.pop(admin_token, None)
     if entry is None:
@@ -211,13 +166,6 @@ class ActivateRequest(BaseModel):
     team_id: str
     password: str
     slot_name: str  # which slot to make race-active
-
-
-class TestRequest(BaseModel):
-    team_id: str
-    password: str
-    slot_name: str  # which slot to request test for
-    world: str = "complex"  # "basic" | "complex"
 
 
 class ChangeTeamPasswordRequest(BaseModel):
@@ -361,7 +309,9 @@ async def activate_slot(body: ActivateRequest):
         team_row = db_get_team_secure(conn, body.team_id)
         if team_row is None:
             raise HTTPException(status_code=401, detail="Team not found")
-        if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
+        if not _verify_password(
+            body.password, team_row["password_hash"]
+        ) and not _validate_impersonation_bearer(body.password, body.team_id):
             raise HTTPException(status_code=401, detail="Invalid password")
 
         success = db_activate_submission_slot(conn, body.team_id, slot)
@@ -371,76 +321,6 @@ async def activate_slot(body: ActivateRequest):
             )
 
     return {"status": "activated", "slot_name": slot, "team_id": body.team_id}
-
-
-@router.post("/api/test-request")
-async def request_test(body: TestRequest):
-    slot = body.slot_name.lower()
-    if slot not in VALID_SLOTS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"slot_name must be one of: {', '.join(VALID_SLOTS)}",
-        )
-
-    world_key = body.world.lower()
-    if world_key not in VALID_WORLDS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"world must be one of: {', '.join(VALID_WORLDS)}",
-        )
-
-    # 赛程已开始则拒绝测试
-    from server.race.state_machine import all_running_zones
-
-    running = all_running_zones()
-    if running:
-        raise HTTPException(
-            status_code=409,
-            detail=f"赛程已在进行中 ({len(running)} 个赛区)，无法提交测试申请",
-        )
-
-    with get_db(DB_PATH) as conn:
-        team_row = db_get_team_secure(conn, body.team_id)
-
-    if team_row is None:
-        raise HTTPException(status_code=401, detail="Team not found")
-    if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
-        raise HTTPException(status_code=401, detail="Invalid password")
-
-    with get_db(DB_PATH) as conn:
-        submission = db_get_submission_by_slot(conn, body.team_id, slot)
-
-        if submission is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"槽位 '{slot}' 尚无提交，请先上传代码",
-            )
-
-        last_run = get_latest_test_run(conn, submission["id"])
-
-        if last_run and last_run["status"] in ("queued", "running"):
-            queue_pos = queue_position(submission["id"])
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"测试已在队列中，当前位置 {queue_pos}"
-                    if queue_pos is not None
-                    else "测试已在队列中"
-                ),
-            )
-
-        queued_at = datetime.datetime.now().isoformat()
-        test_run_id = create_test_run(conn, submission["id"], queued_at, world_key)
-        queue_pos = enqueue_test(
-            submission["id"], test_run_id, slot, body.team_id, world_key
-        )
-
-    return {
-        "status": "queued",
-        "slot_name": slot,
-        "version": submission["submitted_at"],
-        "queue_position": queue_pos,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -465,42 +345,12 @@ async def get_test_status(
                 slots_data[slot] = {
                     "version": None,
                     "is_race_active": False,
-                    "test": None,
                 }
                 continue
-
-            run = get_latest_test_run(conn, sub["id"])
-
-            test_info = None
-            queue_status = "no_run"
-            queue_pos_val = None
-
-            if run:
-                status = run["status"]
-                if status == "queued":
-                    queue_status = "waiting"
-                    queue_pos_val = queue_position(sub["id"])
-                elif status == "running":
-                    queue_status = "running"
-                elif status in ("done", "skipped"):
-                    queue_status = "done"
-                    test_info = {
-                        "laps_completed": run["laps_completed"],
-                        "best_lap_time": run["best_lap_time"],
-                        "collisions_minor": run["collisions_minor"],
-                        "collisions_major": run["collisions_major"],
-                        "timeout_warnings": run["timeout_warnings"],
-                        "finish_reason": run["finish_reason"],
-                        "finished_at": run["finished_at"],
-                        "world_key": run.get("world_key", "complex"),
-                    }
 
             slots_data[slot] = {
                 "version": sub["submitted_at"],
                 "is_race_active": bool(sub["is_race_active"]),
-                "queue_status": queue_status,
-                "queue_position": queue_pos_val,
-                "test": test_info,
             }
 
     return {"team_id": team_id, "slots": slots_data}
