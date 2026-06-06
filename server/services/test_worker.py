@@ -39,104 +39,43 @@ _DEFAULT_CODE_PATH = (
 _POLL_TOTAL_TIMEOUT = 7200.0  # 2 小时
 
 
-async def _recover_stuck_races() -> None:
-    """Backend 启动时：将 DB 中状态为 running/waiting 的 races 与 simnode 同步。
-    内存队列在重启后丢失，因此 waiting 状态记录需要同样恢复。"""
-    import json as _json
+async def _recover_stuck_races() -> list[str]:
+    """Backend 启动时恢复 stuck races。
 
+    假设 SimNode 已经重启过（内存清空），
+    把 DB 中 running → waiting（重置状态），
+    然后返回所有需要重新入队发送给 SimNode 的 race_id 列表。
+    """
     from server.database.action import update_race as db_update_race
 
     try:
         with get_db(DB_PATH) as conn:
             rows = conn.execute(
-                "SELECT id FROM races WHERE status IN ('running', 'waiting')"
+                "SELECT id, status FROM races WHERE status IN ('running', 'waiting')"
             ).fetchall()
     except Exception as e:
         logger.warning(f"恢复 stuck races 查询失败: {e}")
-        return
+        return []
 
     if not rows:
-        return
+        return []
 
-    logger.info(f"发现 {len(rows)} 条 stuck race (running/waiting)，正在恢复...")
+    recovered: list[str] = []
     for row in rows:
         race_id = row["id"]
-        short_id = race_id[:8]
-        sim_race_id = f"race_{short_id}"
+        cur_status = row["status"]
 
-        # 尝试从 SimNode 获取状态和结果
-        sim_status = None
-        try:
-            import urllib.error
-            import urllib.request
-
-            req = urllib.request.Request(
-                f"http://localhost:5000/race/{sim_race_id}/status", method="GET"
-            )
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                sim_status = _json.loads(resp.read()).get("status")
-        except Exception:
-            pass
-
-        if sim_status == "completed":
-            # try to get result
-            try:
-                req2 = urllib.request.Request(
-                    f"http://localhost:5000/race/{sim_race_id}/result", method="GET"
-                )
-                with urllib.request.urlopen(req2, timeout=5) as resp2:
-                    result = _json.loads(resp2.read())
-                now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                with get_db(DB_PATH) as conn:
-                    db_update_race(
-                        conn,
-                        race_id,
-                        status="done",
-                        finished_at=now_iso,
-                        finish_reason=result.get(
-                            "finish_reason", "grace_period_expired"
-                        ),
-                        result=_json.dumps(result, ensure_ascii=False),
-                    )
-                logger.info(f"race {race_id} 已恢复为 done (SimNode completed)")
-            except Exception:
-                with get_db(DB_PATH) as conn:
-                    db_update_race(
-                        conn,
-                        race_id,
-                        status="error",
-                        finish_reason="recovered_after_restart",
-                    )
-                logger.info(
-                    f"race {race_id} 已恢复为 error (SimNode completed 但取结果失败)"
-                )
-        elif sim_status in ("running", "queued"):
-            # Mark DB as error and cancel on SimNode to free resources
-            try:
-                cancel_req = urllib.request.Request(
-                    f"http://localhost:5000/race/{sim_race_id}/cancel", method="POST"
-                )
-                urllib.request.urlopen(cancel_req, timeout=3)
-                logger.info(f"SimNode race {sim_race_id} 已取消 ({sim_status})")
-            except Exception:
-                logger.warning(f"取消 SimNode race {sim_race_id} 失败，将被自动清理")
+        if cur_status == "running":
             with get_db(DB_PATH) as conn:
-                db_update_race(
-                    conn,
-                    race_id,
-                    status="error",
-                    finish_reason="recovered_after_restart",
-                )
-            logger.info(f"race {race_id} 已恢复为 error (SimNode {sim_status}, 已取消)")
-        else:
-            with get_db(DB_PATH) as conn:
-                db_update_race(
-                    conn,
-                    race_id,
-                    status="error",
-                    finish_reason="recovered_after_restart",
-                )
-            logger.info(f"race {race_id} 已恢复为 error (SimNode 无记录)")
+                db_update_race(conn, race_id, status="waiting", started_at=None)
+            logger.info(f"race {race_id} 从 running 恢复为 waiting")
+
+        recovered.append(race_id)
+
+    logger.info(
+        f"发现 {len(recovered)} 条 stuck race，已全部恢复为 waiting，等待重新发送"
+    )
+    return recovered
 
 
 # ---------------------------------------------------------------------------
@@ -146,10 +85,13 @@ async def _recover_stuck_races() -> None:
 
 async def _race_event_worker_loop() -> None:
     """主循环：每 2 秒取 race 队列头部，全部发射给 simnode（SimNode 内部排队管理并发）。"""
-    from server.blueprints.races import _dequeue_race
+    from server.blueprints.races import _dequeue_race, _enqueue_race
 
-    # 启动时恢复 stuck races
-    await _recover_stuck_races()
+    # 启动时恢复 stuck races：running→waiting，并重新入队发送给 SimNode
+    recovered = await _recover_stuck_races()
+    for race_id in recovered:
+        _enqueue_race(race_id)
+        logger.info(f"race {race_id} 已重新入队")
 
     running = set()
 
