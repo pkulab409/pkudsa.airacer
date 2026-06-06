@@ -131,7 +131,6 @@ Robot {
   ]
   name "supervisor"
   controller "supervisor"
-  window "<none>"
   supervisor TRUE
 }
 DEF car_1 Robot {
@@ -295,7 +294,6 @@ DEF car_1 Robot {
     mass 1
   }
   controller "car"
-  window "<none>"
 }
 DEF car_2 Robot {
   translation -3 0.5 0.04
@@ -458,7 +456,6 @@ DEF car_2 Robot {
     mass 1
   }
   controller "car"
-  window "<none>"
 }
 DEF car_3 Robot {
   translation -5 -0.5 0.04
@@ -621,7 +618,6 @@ DEF car_3 Robot {
     mass 1
   }
   controller "car"
-  window "<none>"
 }
 DEF car_4 Robot {
   translation -5 0.5 0.04
@@ -784,7 +780,6 @@ DEF car_4 Robot {
     mass 1
   }
   controller "car"
-  window "<none>"
 }
 Road {
   translation 8 4 6
