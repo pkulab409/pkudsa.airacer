@@ -29,6 +29,7 @@ import json
 import pathlib
 import secrets
 import sqlite3
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -44,8 +45,8 @@ from server.config.config import (
 )
 from server.database.action import (
     db_create_zone,
-    db_delete_zone,
     db_delete_team,
+    db_delete_zone,
     db_ensure_default_zone,
     db_get_placement_rankings,
     db_get_running_session,
@@ -97,13 +98,12 @@ from server.utils.simnode_client import (
     start_race as simnode_start_race,
 )
 
-import time
-
 # ---------------------------------------------------------------------------
 # Admin impersonate token (in-memory, 5-min TTL)
 # ---------------------------------------------------------------------------
 
 _impersonate_tokens: dict[str, dict] = {}  # token → {team_id, expires_at}
+
 
 def _cleanup_expired_tokens():
     now = time.time()
@@ -1044,6 +1044,37 @@ async def close_event(_auth=Depends(require_admin)):
 
 
 # ---------------------------------------------------------------------------
+# Test race global switch
+# ---------------------------------------------------------------------------
+
+
+@router.post("/disable-test-races")
+async def disable_test_races(_auth=Depends(require_admin)):
+    """关闭测试赛（正赛期间使用，避免与赛程竞争）。"""
+    from server.blueprints.races import set_test_race_enabled
+
+    set_test_race_enabled(False)
+    return {"status": "test_races_disabled"}
+
+
+@router.post("/enable-test-races")
+async def enable_test_races(_auth=Depends(require_admin)):
+    """打开测试赛。"""
+    from server.blueprints.races import set_test_race_enabled
+
+    set_test_race_enabled(True)
+    return {"status": "test_races_enabled"}
+
+
+@router.get("/test-races-status")
+async def get_test_races_status(_auth=Depends(require_admin)):
+    """查询当前测试赛开关状态。"""
+    from server.blueprints.races import is_test_race_enabled
+
+    return {"enabled": is_test_race_enabled()}
+
+
+# ---------------------------------------------------------------------------
 # Change password
 # ---------------------------------------------------------------------------
 
@@ -1112,12 +1143,14 @@ async def view_team_code(team_id: str, _auth=Depends(require_admin)):
         code_path = slot.get("code_path")
         if code_path and pathlib.Path(code_path).exists():
             code = pathlib.Path(code_path).read_text(encoding="utf-8")
-        result.append({
-            "slot_name": slot["slot_name"],
-            "submitted_at": slot["submitted_at"],
-            "is_race_active": bool(slot["is_race_active"]),
-            "code": code,
-        })
+        result.append(
+            {
+                "slot_name": slot["slot_name"],
+                "submitted_at": slot["submitted_at"],
+                "is_race_active": bool(slot["is_race_active"]),
+                "code": code,
+            }
+        )
 
     if not result:
         raise HTTPException(status_code=404, detail=f"队伍 {team_id} 尚无提交代码")
@@ -1170,4 +1203,3 @@ async def delete_team(team_id: str, _auth=Depends(require_admin)):
         if not db_delete_team(conn, team_id):
             raise HTTPException(status_code=404, detail=f"队伍不存在: {team_id}")
     return {"status": "deleted", "team_id": team_id}
-

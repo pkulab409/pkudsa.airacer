@@ -1119,6 +1119,47 @@
                             </div>
                         </div>
 
+                        <!-- Test race switch -->
+                        <div
+                            class="ctrl-card mb-4"
+                            style="border: 2px solid #3b82f6"
+                        >
+                            <div
+                                class="fw-bold mb-2"
+                                style="font-size: 1rem; color: #1e40af"
+                            >
+                                测试赛开关（全局）
+                            </div>
+                            <p
+                                class="text-muted mb-3"
+                                style="font-size: 0.875rem"
+                            >
+                                关闭后所有用户发起的测试赛（多车测试）将被拒绝。
+                                正赛期间建议关闭，避免与赛程竞争仿真资源。
+                            </p>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button
+                                    id="btn-disable-test-races"
+                                    class="btn btn-primary"
+                                    onclick="doToggleTestRaces(false)"
+                                >
+                                    关闭测试赛
+                                </button>
+                                <button
+                                    id="btn-enable-test-races"
+                                    class="btn btn-outline-primary"
+                                    onclick="doToggleTestRaces(true)"
+                                >
+                                    打开测试赛
+                                </button>
+                                <span
+                                    id="test-races-status-badge"
+                                    class="badge bg-success fs-6 px-3 py-2"
+                                    >已开启</span
+                                >
+                            </div>
+                        </div>
+
                         <!-- Danger zone -->
                         <div class="danger-zone">
                             <div class="danger-zone-title">
@@ -1499,6 +1540,7 @@
 ================================================================ */
             async function bootApp() {
                 await loadZones();
+                loadTestRaceStatus();
                 nav(
                     "overview",
                     document.querySelector("#main-nav .nav-link.active"),
@@ -2685,6 +2727,52 @@
                     }
                 } catch (e) {
                     toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            // ── Test race toggle ──
+            async function doToggleTestRaces(enable) {
+                var action = enable
+                    ? "enable-test-races"
+                    : "disable-test-races";
+                var msg = enable
+                    ? "确认打开测试赛？"
+                    : "确认关闭测试赛？关闭后所有用户将无法发起测试赛。";
+                if (!confirm(msg)) return;
+                try {
+                    var r = await api("POST", "/api/admin/" + action);
+                    var d = await r.json();
+                    if (r.ok) {
+                        await loadTestRaceStatus();
+                        toast(
+                            enable ? "测试赛已开启" : "测试赛已关闭",
+                            "success",
+                        );
+                    } else {
+                        toast(d.detail || d.message || "操作失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            async function loadTestRaceStatus() {
+                try {
+                    var r = await api("GET", "/api/admin/test-races-status");
+                    if (!r.ok) return;
+                    var d = await r.json();
+                    var badge = document.getElementById(
+                        "test-races-status-badge",
+                    );
+                    if (d.enabled) {
+                        badge.textContent = "已开启";
+                        badge.className = "badge bg-success fs-6 px-3 py-2";
+                    } else {
+                        badge.textContent = "已关闭";
+                        badge.className = "badge bg-danger fs-6 px-3 py-2";
+                    }
+                } catch (e) {
+                    // silent
                 }
             }
 

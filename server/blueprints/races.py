@@ -12,6 +12,22 @@ import threading
 import uuid
 from typing import Optional
 
+# 全局开关：是否允许发起测试赛（正赛期间应关闭，避免竞争）
+test_race_enabled: bool = True
+_test_race_lock = threading.Lock()
+
+
+def set_test_race_enabled(enabled: bool) -> None:
+    global test_race_enabled
+    with _test_race_lock:
+        test_race_enabled = enabled
+
+
+def is_test_race_enabled() -> bool:
+    with _test_race_lock:
+        return test_race_enabled
+
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
@@ -98,6 +114,13 @@ def _dequeue_race() -> Optional[str]:
 @router.post("/api/races")
 async def create_race(body: CreateRaceRequest):
     """用户发起一场测试赛事。"""
+    # 0. 检查全局开关
+    if not is_test_race_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="测试赛已关闭，当前正在进行正赛赛程，无法发起测试赛",
+        )
+
     # 1. 校验参数
     world_key = body.world.lower()
     if world_key not in VALID_WORLDS:
@@ -116,7 +139,9 @@ async def create_race(body: CreateRaceRequest):
         team_row = db_get_team_secure(conn, body.team_id)
     if team_row is None:
         raise HTTPException(status_code=401, detail="Team not found")
-    if not _verify_password(body.password, team_row["password_hash"]) and not _validate_impersonation_bearer(body.password, body.team_id):
+    if not _verify_password(
+        body.password, team_row["password_hash"]
+    ) and not _validate_impersonation_bearer(body.password, body.team_id):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     zone_id = team_row["zone_id"]
