@@ -458,12 +458,11 @@ def db_create_submission_with_slot(
     submitted_at: Optional[str] = None,
 ) -> str:
     """创建提交：禁用该 slot 旧版本 + 创建新提交，自动处理 is_race_active。"""
-    # 检查该 slot 是否已有竞速活跃提交
+    # 检查该 team 是否已有任何 slot 是竞速活跃状态
     has_race_active = conn.execute(
-        """SELECT COUNT(*) AS cnt FROM submissions
-           WHERE team_id = ? AND slot_name = ? AND is_race_active = 1""",
-        (team_id, slot_name),
-    ).fetchone()["cnt"]
+        "SELECT COUNT(*) FROM submissions WHERE team_id = ? AND is_race_active = 1",
+        (team_id,),
+    ).fetchone()[0]
 
     # 禁用该 slot 的所有旧提交
     conn.execute(
@@ -484,16 +483,12 @@ def db_create_submission_with_slot(
             code_path,
             now,
             slot_name,
-            1 if not has_race_active else 0,
+            0,  # 新上传默认不激活参赛，由 db_activate_submission_slot 控制
         ),
     )
 
     # 如果该 team 没有任何 race_active 提交，则自动激活新提交
-    any_race_active = conn.execute(
-        "SELECT COUNT(*) FROM submissions WHERE team_id = ? AND is_race_active = 1",
-        (team_id,),
-    ).fetchone()[0]
-    if not any_race_active:
+    if not has_race_active:
         conn.execute(
             "UPDATE submissions SET is_race_active = 1 WHERE id = ?",
             (submission_id,),

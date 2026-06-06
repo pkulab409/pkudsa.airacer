@@ -91,6 +91,19 @@ _MIGRATIONS = [
     "ALTER TABLE races      ADD COLUMN name             TEXT",
     "ALTER TABLE race_sessions ADD COLUMN name          TEXT",
     "ALTER TABLE zones       ADD COLUMN registration_open INTEGER NOT NULL DEFAULT 1",
+    # 修复：同 team 多个 slot 同时 is_race_active=1 的数据，只保留最近的一个
+    """
+    UPDATE submissions SET is_race_active = 0 WHERE id IN (
+        SELECT s1.id FROM submissions s1
+        WHERE s1.is_race_active = 1
+        AND EXISTS (
+            SELECT 1 FROM submissions s2
+            WHERE s2.team_id = s1.team_id
+            AND s2.is_race_active = 1
+            AND s2.submitted_at > s1.submitted_at
+        )
+    )
+    """.strip(),
 ]
 
 
