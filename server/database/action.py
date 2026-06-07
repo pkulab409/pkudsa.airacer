@@ -220,21 +220,16 @@ def db_get_zone_detailed(conn, zone_id: str) -> Optional[Dict]:
         (zone_id,),
     ).fetchall()
 
-    standings = conn.execute(
-        """SELECT rp.team_id, t.name, SUM(rp.points) AS points
-           FROM race_points rp
-           JOIN teams t ON rp.team_id = t.id
-           JOIN race_sessions rs ON rp.session_id = rs.id
-           WHERE rs.zone_id = ?
-           GROUP BY rp.team_id
-           ORDER BY points DESC""",
-        (zone_id,),
-    ).fetchall()
+    standings = db_get_zone_standings(conn, zone_id)
+
+    # 前端用 points 字段名
+    for s in standings:
+        s["points"] = s.pop("total_score", 0)
 
     return {
         **dict(zone),
         "teams": [dict(t) for t in teams],
-        "standings": [dict(s) for s in standings],
+        "standings": standings,
     }
 
 
