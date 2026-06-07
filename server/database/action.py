@@ -171,16 +171,24 @@ def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
                 rec["best_lap_time"] = bt
             rec["finished_sessions"] += 1
 
-    # 补上队伍名称
+    # 补上队伍名称 + 该赛区未参赛的队伍
     team_ids = list(scores.keys())
-    if team_ids:
-        placeholders = ",".join("?" * len(team_ids))
-        teams = conn.execute(
-            f"SELECT id, name FROM teams WHERE id IN ({placeholders})", team_ids
-        ).fetchall()
-        for t in teams:
-            if scores.get(t["id"]):
-                scores[t["id"]]["name"] = t["name"]
+    # 获取该赛区所有队伍
+    all_zone_teams = conn.execute(
+        "SELECT id, name FROM teams WHERE zone_id = ?", (zone_id,)
+    ).fetchall()
+    for t in all_zone_teams:
+        tid = t["id"]
+        if tid in scores:
+            scores[tid]["name"] = t["name"]
+        else:
+            scores[tid] = {
+                "team_id": tid,
+                "name": t["name"],
+                "total_score": 0,
+                "best_lap_time": None,
+                "finished_sessions": 0,
+            }
 
     result = sorted(scores.values(), key=lambda x: x["total_score"], reverse=True)
     return result
