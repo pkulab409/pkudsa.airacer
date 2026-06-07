@@ -124,9 +124,9 @@ def db_get_zone_teams(conn, zone_id: str) -> List[Dict]:
 
 
 def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
-    """从 race_sessions.result 读取排名计算积分。"""
+    """从 race_sessions.result 读取排名计算积分（仅分组赛 + 半决赛）。"""
     rows = conn.execute(
-        "SELECT result FROM race_sessions WHERE zone_id=? AND result IS NOT NULL",
+        "SELECT result FROM race_sessions WHERE zone_id=? AND type IN ('group_stage','semi','final') AND result IS NOT NULL",
         (zone_id,),
     ).fetchall()
 
