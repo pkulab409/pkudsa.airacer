@@ -347,53 +347,34 @@ def create_team(
 
 def get_team(conn, team_id: str) -> Optional[Dict]:
     row = conn.execute(
-        "SELECT id, name, password_hash, created_at FROM teams WHERE id = ?",
-        (team_id,),
+        "SELECT id, name, zone_id, created_at FROM teams WHERE id = ?", (team_id,)
     ).fetchone()
     return dict(row) if row else None
 
 
 def db_get_team_secure(conn, team_id: str) -> Optional[Dict]:
-    """获取team完整信息（含 zone_id），用于鉴权和操作。"""
     row = conn.execute(
-        "SELECT id, name, password_hash, zone_id, created_at FROM teams WHERE id = ?",
+        "SELECT id, name, password_hash, zone_id FROM teams WHERE id = ?",
         (team_id,),
     ).fetchone()
     return dict(row) if row else None
 
 
-def db_update_team_password(conn, team_id: str, new_password_hash: str) -> bool:
-    """更新队伍密码哈希。返回 True 表示更新成功，False 表示队伍不存在。"""
-    cur = conn.execute(
-        "UPDATE teams SET password_hash = ? WHERE id = ?",
-        (new_password_hash, team_id),
-    )
-    return cur.rowcount > 0
+def db_update_team_password(conn, team_id: str, new_hash: str) -> None:
+    conn.execute("UPDATE teams SET password_hash = ? WHERE id = ?", (new_hash, team_id))
 
 
 def list_teams(conn) -> List[Dict]:
-    rows = conn.execute("SELECT id, name, zone_id FROM teams ORDER BY name").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, zone_id, created_at FROM teams ORDER BY created_at"
+    ).fetchall()
     return [dict(r) for r in rows]
 
 
 def db_delete_team(conn, team_id: str) -> bool:
-    """删除队伍及所有关联数据（submissions, test_runs, race_points）。"""
     row = conn.execute("SELECT id FROM teams WHERE id=?", (team_id,)).fetchone()
     if row is None:
         return False
-
-    # Delete test_runs linked to this team's submissions
-    sub_ids = [
-        r[0]
-        for r in conn.execute(
-            "SELECT id FROM submissions WHERE team_id=?", (team_id,)
-        ).fetchall()
-    ]
-    if sub_ids:
-        placeholders = ",".join("?" for _ in sub_ids)
-        conn.execute(
-            f"DELETE FROM test_runs WHERE submission_id IN ({placeholders})", sub_ids
-        )
 
     # Delete submissions
     conn.execute("DELETE FROM submissions WHERE team_id=?", (team_id,))
@@ -553,9 +534,17 @@ def create_race_session(
     started_at: str,
 ) -> None:
     conn.execute(
-        """INSERT INTO race_sessions (id, type, team_ids, total_laps, phase, started_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-        (race_id, session_type, json.dumps(team_ids), total_laps, phase, started_at),
+        """INSERT INTO race_sessions
+           (id, type, team_ids, total_laps, phase, started_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            race_id,
+            session_type,
+            json.dumps(team_ids),
+            total_laps,
+            phase,
+            started_at,
+        ),
     )
 
 
@@ -808,3 +797,103 @@ def db_get_all_slots_code(conn, team_id: str) -> List[Dict]:
             seen.add(r["slot_name"])
             result.append(dict(r))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Race history & race_prepare
+# ---------------------------------------------------------------------------
+
+
+def db_get_race_history(conn, zone_id: str, limit: int = 50) -> List[Dict]:
+    """获取赛区已完成的正赛历史，按时间倒序。"""
+    rows = conn.execute(
+        """SELECT id, type, team_ids, total_laps, phase, result, name, finished_at
+           FROM race_sessions
+           WHERE zone_id=? AND phase IN ('recording_ready', 'finished')
+           ORDER BY finished_at DESC LIMIT ?""",
+        (zone_id, limit),
+    ).fetchall()
+
+    results = []
+    for row in rows:
+        d = dict(row)
+        d["team_ids"] = json.loads(d["team_ids"]) if d["team_ids"] else []
+        r = json.loads(d["result"]) if d["result"] else {}
+        rankings = r.get("final_rankings", [])
+        d["rankings"] = [
+            {
+                "team_id": e.get("team_id"),
+                "rank": e.get("rank"),
+                "best_lap": e.get("best_lap") or e.get("best_lap_time"),
+            }
+            for e in rankings[:4]
+        ]
+        results.append(d)
+    return results
+
+
+def db_create_prepared_race(
+    conn,
+    race_id: str,
+    race_type: str,
+    zone_id: str,
+    participant_ids: List[str],
+    total_laps: int = 3,
+    name: Optional[str] = None,
+    created_at: Optional[str] = None,
+) -> None:
+    """创建一条 race_prepare 记录（待执行的正赛计划）。"""
+    if created_at is None:
+        created_at = datetime.datetime.now(datetime.UTC).isoformat()
+    conn.execute(
+        """INSERT INTO race_prepare
+           (id, type, zone_id, initiator, participant_ids, status,
+            world_key, total_laps, created_at, name)
+           VALUES (?, ?, ?, NULL, ?, 'prepared', 'complex', ?, ?, ?)""",
+        (
+            race_id,
+            race_type,
+            zone_id,
+            json.dumps(participant_ids),
+            total_laps,
+            created_at,
+            name,
+        ),
+    )
+
+
+def db_get_zone_prepared_races(conn, zone_id: str) -> List[Dict]:
+    """获取赛区所有待执行的 race_prepare 记录。"""
+    rows = conn.execute(
+        """SELECT * FROM race_prepare
+           WHERE zone_id=? AND status='prepared'
+           ORDER BY created_at""",
+        (zone_id,),
+    ).fetchall()
+
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["participant_ids"] = (
+            json.loads(d["participant_ids"]) if d["participant_ids"] else []
+        )
+        results.append(d)
+    return results
+
+
+def db_clear_prepared_races(conn, zone_id: str, race_type: str) -> None:
+    """删除赛区指定阶段的 race_prepare 记录，为新生成做准备。"""
+    conn.execute(
+        "DELETE FROM race_prepare WHERE zone_id=? AND type=?",
+        (zone_id, race_type),
+    )
+
+
+def db_update_prepared_race(conn, race_id: str, **kwargs) -> None:
+    allowed = {"status"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed}
+    if not fields:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [race_id]
+    conn.execute(f"UPDATE race_prepare SET {set_clause} WHERE id = ?", values)

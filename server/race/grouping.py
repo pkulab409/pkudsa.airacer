@@ -60,54 +60,57 @@ def snake_draft_group(ranked_team_ids: list[str], num_sessions: int) -> list[lis
     return groups
 
 
-def select_group_stage_advancers(session_results: list[dict]) -> list[str]:
+def select_placement_advancers(
+    session_results: list[dict],
+    top_n: int = 12,
+) -> list[str]:
     """
-    小组赛 → 半决赛 的晋级筛选。
-
-    规则: 每组第1名全部晋级 + 所有第2名中完赛时间最短的那个也晋级。
-
-    这是 bracket.py 中 "advancement.group_stage = sessions + 1" 的具体实现：
-    K 个小组，K 个第1名 + 1 个最佳第2名 = K+1 队晋级。
+    排位赛晋级筛选：合并所有场次成绩，按 best_lap_time 排序取前 top_n 名。
 
     session_results: 每场比赛的结果列表，格式:
         [
             {
                 "session_id": "...",
-                "rankings": [
-                    {"team_id": "...", "rank": 1, "finish_time": 123.4, "best_lap_time": 30.2},
-                    ...
-                ]
+                "rankings": [{"team_id": "...", "rank": 1, "best_lap_time": 30.2}, ...]
             },
             ...
         ]
 
-    返回: 晋级半决赛的队伍 ID 列表。
+    返回: 晋级队伍 ID 列表（按 best_lap_time 升序）。
     """
-    winners: list[str] = []  # 各组第一名
-    runner_ups: list[tuple[str, float]] = []  # 各组第二名 (team_id, finish_time)
+    all_teams: list[tuple[str, float]] = []
+    seen: set[str] = set()
 
     for sr in session_results:
-        # 按名次排序
+        for entry in sr.get("rankings", []):
+            tid = entry.get("team_id")
+            if not tid or tid in seen:
+                continue
+            bt = entry.get("best_lap_time") or entry.get("best_lap")
+            if bt is not None:
+                seen.add(tid)
+                all_teams.append((tid, bt))
+
+    all_teams.sort(key=lambda x: x[1])  # 最快圈时升序
+    return [tid for tid, _ in all_teams[:top_n]]
+
+
+def select_group_stage_advancers(session_results: list[dict]) -> list[str]:
+    """
+    分组赛 → 半决赛 的晋级筛选。
+
+    规则: 每组前 4 名晋级。
+
+    session_results: 每场比赛的结果列表，格式同上。
+
+    返回: 晋级半决赛的队伍 ID 列表。
+    """
+    advancers: list[str] = []
+    for sr in session_results:
         rankings = sorted(sr.get("rankings", []), key=lambda r: r.get("rank", 99))
-        if not rankings:
-            continue
-
-        # 第一名直接晋级
-        winners.append(rankings[0]["team_id"])
-
-        # 收集第二名及其完赛时间，用于后续比较
-        if len(rankings) >= 2:
-            ru = rankings[1]
-            ft = ru.get("finish_time") or ru.get("best_lap_time")
-            if ft is not None:
-                runner_ups.append((ru["team_id"], ft))
-
-    # 所有第二名中完赛时间最短的（即成绩最好的）也晋级
-    if runner_ups:
-        runner_ups.sort(key=lambda x: x[1])  # 按完赛时间升序，最快的在前
-        winners.append(runner_ups[0][0])  # 最快的第二名
-
-    return winners
+        for r in rankings[:4]:  # 每组取前 4
+            advancers.append(r["team_id"])
+    return advancers
 
 
 def select_semi_finalists(session_results: list[dict]) -> list[str]:

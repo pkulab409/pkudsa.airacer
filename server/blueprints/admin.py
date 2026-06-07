@@ -30,6 +30,7 @@ import pathlib
 import secrets
 import sqlite3
 import time
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -42,6 +43,9 @@ from server.config.config import (
     DB_PATH,
     RECORDINGS_DIR,
     SUBMISSIONS_DIR,
+)
+from server.database.action import (
+    create_race as db_create_race,
 )
 from server.database.action import (
     db_create_zone,
@@ -68,6 +72,7 @@ from server.database.models import get_db
 from server.race.bracket import compute_bracket
 from server.race.grouping import (
     select_group_stage_advancers,
+    select_placement_advancers,
     select_semi_finalists,
     snake_draft_group,
 )
@@ -153,6 +158,13 @@ class ZoneSetSessionBody(BaseModel):
     name: Optional[str] = None  # 可读名称
 
 
+class ZoneCreateRaceBody(BaseModel):
+    session_type: str  # placement / group_stage / semi / final
+    team_ids: list[str]
+    total_laps: int
+    name: Optional[str] = None
+
+
 class ChangePasswordBody(BaseModel):
     old_password: str
     new_password: str
@@ -218,28 +230,30 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
 
     all_teams_list: list[list[str]] = []
 
-    if stage == "placement":
+    if stage == "qualification":
+        # 资格赛：每队单独 1 场
+        all_teams_list = [[tid] for tid in all_teams]
+    elif stage == "placement":
+        # 排位赛：每批 6 车，按队伍列表顺序均分
         all_teams_list = [
             all_teams[i * cars_per : (i + 1) * cars_per] for i in range(total_sessions)
         ]
     elif stage == "group_stage":
+        # 分组赛：按排位赛成绩蛇形分 2 组
         ranked = db_get_placement_rankings(conn, zone_id)
         ranked_ids = [r["team_id"] for r in ranked] if ranked else all_teams
         all_teams_list = snake_draft_group(ranked_ids, total_sessions)
     elif stage == "semi":
+        # 半决赛：分组赛每组前 4 晋级后均分到 2 场
         prev = db_get_stage_session_results(conn, zone_id, "group_stage")
         advancers = select_group_stage_advancers(prev)
         all_teams_list = [
             advancers[i * cars_per : (i + 1) * cars_per] for i in range(total_sessions)
         ]
     elif stage == "final":
-        prev_stage = "semi" if "semi" in bracket["stages"] else "placement"
-        prev = db_get_stage_session_results(conn, zone_id, prev_stage)
-        if prev_stage == "semi":
-            advancers = select_semi_finalists(prev)
-        else:
-            advancers = [r["team_id"] for r in db_get_placement_rankings(conn, zone_id)]
-            advancers = advancers[:cars_per]
+        # 决赛：半决赛每场前 2 晋级
+        prev = db_get_stage_session_results(conn, zone_id, "semi")
+        advancers = select_semi_finalists(prev)
         all_teams_list = [advancers[:cars_per]]
     else:
         all_teams_list = [all_teams[:cars_per]]
@@ -255,6 +269,7 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
 
     # 可读阶段名前缀
     stage_prefix = {
+        "qualification": "资格赛",
         "placement": "排位赛",
         "group_stage": "小组赛",
         "semi": "半决赛",
@@ -442,8 +457,269 @@ async def get_pending_session(zone_id: str, _auth=Depends(require_admin)):
 
 
 # ---------------------------------------------------------------------------
-# Stage sessions queue
+# Race history & prepare
 # ---------------------------------------------------------------------------
+
+
+@router.get("/zones/{zone_id}/race-history")
+async def get_race_history(zone_id: str, _auth=Depends(require_admin)):
+    """获取赛区已完成的正赛历史。"""
+    from server.database.action import db_get_race_history
+
+    with get_db(DB_PATH) as conn:
+        history = db_get_race_history(conn, zone_id)
+    return {"zone_id": zone_id, "history": history}
+
+
+@router.get("/zones/{zone_id}/prepared-races")
+async def get_prepared_races(zone_id: str, _auth=Depends(require_admin)):
+    """获取赛区待执行的 race_prepare 记录。"""
+    from server.database.action import db_get_zone_prepared_races
+
+    with get_db(DB_PATH) as conn:
+        prepared = db_get_zone_prepared_races(conn, zone_id)
+    return {"zone_id": zone_id, "prepared": prepared}
+
+
+@router.post("/zones/{zone_id}/generate-stage/{stage_name}")
+async def generate_stage(
+    zone_id: str,
+    stage_name: str,
+    body: dict = {},
+    request: Request = None,
+    _auth=Depends(require_admin),
+):
+    from fastapi import Request as _Request
+
+    body_dict = body if isinstance(body, dict) else {}
+
+    """
+    生成某个阶段的比赛计划写入 race_prepare 表。
+    placement 需要 body.eliminate_team_id 指定淘汰队伍。
+    """
+    from server.database.action import (
+        db_clear_prepared_races,
+        db_create_prepared_race,
+        db_get_race_history,
+    )
+
+    stage_prefix = {
+        "qualification": "资格赛",
+        "placement": "排位赛",
+        "group_stage": "小组赛",
+        "semi": "半决赛",
+        "final": "决赛",
+    }
+
+    if stage_name not in stage_prefix:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效阶段: {stage_name}",
+        )
+
+    with get_db(DB_PATH) as conn:
+        team_count = db_get_zone_team_count(conn, zone_id)
+        bracket = compute_bracket(team_count)
+        all_teams = db_get_zone_team_ids(conn, zone_id)
+
+        # ── 阶段条件检查 ─────────────────────────
+        if stage_name == "qualification":
+            # 资格赛：不能有已完成的正赛
+            history = db_get_race_history(conn, zone_id, limit=1)
+            if history:
+                raise HTTPException(
+                    status_code=409,
+                    detail="已有正赛记录，请先重置赛区",
+                )
+
+        elif stage_name == "placement":
+            _check_stage_done(conn, zone_id, "qualification", bracket, "资格赛")
+            eliminate_team = body_dict.get("eliminate_team_id", "")
+            if not eliminate_team:
+                raise HTTPException(
+                    status_code=409,
+                    detail="need_elimination",
+                    headers={"X-Need-Elimination": "true"},
+                )
+            if eliminate_team not in all_teams:
+                raise HTTPException(
+                    status_code=400, detail=f"队伍 {eliminate_team} 不在本赛区"
+                )
+            all_teams = [t for t in all_teams if t != eliminate_team]
+            bracket = compute_bracket(len(all_teams))  # 重新计算 24 队 bracket
+
+        elif stage_name == "group_stage":
+            _check_stage_done(conn, zone_id, "placement", bracket, "排位赛")
+
+        elif stage_name == "semi":
+            _check_stage_done(conn, zone_id, "group_stage", bracket, "分组赛")
+
+        elif stage_name == "final":
+            _check_stage_done(conn, zone_id, "semi", bracket, "半决赛")
+
+        # ── 清除旧计划 + 生成新计划 ─────────────
+        db_clear_prepared_races(conn, zone_id, stage_name)
+
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        sessions = _build_stage_sessions(conn, zone_id, stage_name, bracket, all_teams)
+
+        pfx = stage_prefix[stage_name]
+        created = 0
+        for i, s in enumerate(sessions):
+            race_id = str(uuid.uuid4())
+            sname = f"{pfx} 第{i + 1}场" if len(sessions) > 1 else pfx
+            db_create_prepared_race(
+                conn,
+                race_id=race_id,
+                race_type=stage_name,
+                zone_id=zone_id,
+                participant_ids=s["team_ids"],
+                total_laps=s["total_laps"],
+                name=sname,
+                created_at=ts,
+            )
+            created += 1
+
+    return {
+        "status": "generated",
+        "stage": stage_name,
+        "stage_name": pfx,
+        "count": created,
+    }
+
+
+@router.post("/zones/{zone_id}/execute-prepared-race/{race_id}")
+async def execute_prepared_race(
+    zone_id: str,
+    race_id: str,
+    _auth=Depends(require_admin),
+):
+    """将 race_prepare 中的记录转为实际比赛（写入 races + race_sessions 并入队）。"""
+    from server.blueprints.races import _enqueue_race
+    from server.database.action import (
+        db_get_zone_prepared_races,
+        db_update_prepared_race,
+    )
+
+    with get_db(DB_PATH) as conn:
+        prepared = db_get_zone_prepared_races(conn, zone_id)
+        target = None
+        for p in prepared:
+            if p["id"] == race_id:
+                target = p
+                break
+
+    if target is None:
+        raise HTTPException(status_code=404, detail="未找到该比赛计划")
+
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    with get_db(DB_PATH) as conn:
+        db_create_race(
+            conn,
+            race_id=race_id,
+            race_type=target["type"],
+            zone_id=zone_id,
+            initiator=None,
+            participant_ids=target["participant_ids"],
+            world_key=target.get("world_key", "complex"),
+            total_laps=target["total_laps"],
+            name=target["name"],
+            created_at=now,
+        )
+
+        db_upsert_session(
+            conn,
+            race_id,
+            target["type"],
+            target["participant_ids"],
+            target["total_laps"],
+            zone_id,
+            name=target["name"],
+        )
+
+        db_update_prepared_race(conn, race_id, status="executed")
+
+    _enqueue_race(race_id)
+
+    return {
+        "status": "executed",
+        "race_id": race_id,
+        "name": target["name"],
+    }
+
+
+def _check_stage_done(
+    conn, zone_id: str, stage: str, bracket: dict, stage_name: str
+) -> None:
+    total = bracket["sessions_per_stage"].get(stage, 0)
+    finished = conn.execute(
+        "SELECT COUNT(*) FROM race_sessions WHERE zone_id=? AND type=? AND phase IN ('recording_ready','finished')",
+        (zone_id, stage),
+    ).fetchone()[0]
+    if finished < total:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{stage_name}未完成（{finished}/{total}），无法生成下一阶段",
+        )
+
+
+def _build_stage_sessions(
+    conn, zone_id: str, stage: str, bracket: dict, all_teams: list[str]
+) -> list[dict]:
+    """计算某阶段的场次数据（不写 DB），返回 [{team_ids, total_laps}, ...]"""
+    cars_per = bracket["cars_per_session"][stage]
+    total_sessions = bracket["sessions_per_stage"][stage]
+    laps = bracket["laps_per_stage"][stage]
+    sessions: list[dict] = []
+
+    if stage == "qualification":
+        for tid in all_teams:
+            sessions.append({"team_ids": [tid], "total_laps": laps})
+
+    elif stage == "placement":
+        for i in range(total_sessions):
+            chunk = all_teams[i * cars_per : (i + 1) * cars_per]
+            sessions.append({"team_ids": chunk, "total_laps": laps})
+
+    elif stage == "group_stage":
+        # 排位赛取前 12 名，蛇形分 2 组
+        ranked = db_get_placement_rankings(conn, zone_id)
+        top_n = bracket["advancement"].get("placement", 12)
+        advancer_ids = (
+            select_placement_advancers(
+                [
+                    {
+                        "rankings": [
+                            {
+                                "team_id": r["team_id"],
+                                "best_lap_time": r["best_lap_time"],
+                            }
+                            for r in ranked
+                        ]
+                    }
+                ],
+                top_n=top_n,
+            )
+            if ranked
+            else all_teams[:top_n]
+        )
+        groups = snake_draft_group(advancer_ids, total_sessions)
+        for g in groups:
+            sessions.append({"team_ids": g, "total_laps": laps})
+
+    elif stage == "semi":
+        prev = db_get_stage_session_results(conn, zone_id, "group_stage")
+        advancers = select_group_stage_advancers(prev)
+        for i in range(total_sessions):
+            chunk = advancers[i * cars_per : (i + 1) * cars_per]
+            sessions.append({"team_ids": chunk, "total_laps": laps})
+
+    elif stage == "final":
+        prev = db_get_stage_session_results(conn, zone_id, "semi")
+        advancers = select_semi_finalists(prev)
+        sessions.append({"team_ids": advancers[:cars_per], "total_laps": laps})
+
+    return sessions
 
 
 @router.get("/zones/{zone_id}/stage-sessions")
@@ -484,6 +760,75 @@ async def get_stage_sessions(zone_id: str, _auth=Depends(require_admin)):
 # ---------------------------------------------------------------------------
 # Zone-scoped race control
 # ---------------------------------------------------------------------------
+
+
+_VALID_STAGES = {"qualification", "placement", "group_stage", "semi", "final"}
+
+
+@router.post("/zones/{zone_id}/create-race")
+async def zone_create_race(
+    zone_id: str,
+    body: ZoneCreateRaceBody,
+    _auth=Depends(require_admin),
+):
+    """管理员手动创建一场正赛（入队等待 worker 消费）。"""
+    if body.session_type not in _VALID_STAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"session_type 必须是: {', '.join(_VALID_STAGES)}",
+        )
+
+    with get_db(DB_PATH) as conn:
+        zone = db_get_zone(conn, zone_id)
+        if zone is None:
+            raise HTTPException(status_code=404, detail=f"赛区未找到: {zone_id}")
+
+        # 验证队伍存在且有代码
+        try:
+            teams_data = db_get_teams_with_code(conn, body.team_ids)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # 创建 races 记录
+        race_id = str(uuid.uuid4())
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        db_create_race(
+            conn,
+            race_id=race_id,
+            race_type=body.session_type,
+            zone_id=zone_id,
+            initiator=None,
+            participant_ids=body.team_ids,
+            world_key="complex",
+            total_laps=body.total_laps,
+            name=body.name,
+            created_at=now,
+        )
+
+        # 创建 race_sessions 记录（worker 完成时更新 phase/result）
+        db_upsert_session(
+            conn,
+            race_id,
+            body.session_type,
+            body.team_ids,
+            body.total_laps,
+            zone_id,
+            name=body.name,
+        )
+
+    # 入队
+    from server.blueprints.races import _enqueue_race
+
+    _enqueue_race(race_id)
+
+    return {
+        "status": "created",
+        "race_id": race_id,
+        "session_type": body.session_type,
+        "team_count": len(body.team_ids),
+        "total_laps": body.total_laps,
+        "name": body.name,
+    }
 
 
 @router.post("/zones/{zone_id}/set-session")

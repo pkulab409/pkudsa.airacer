@@ -57,6 +57,7 @@ async def list_recordings():
                 "session_id": subdir.name,
                 "session_type": meta.get("session_type"),
                 "zone_id": meta.get("zone_id"),
+                "name": meta.get("name"),
                 "recorded_at": meta.get("recorded_at") or meta.get("finished_at"),
                 "finish_reason": meta.get("finish_reason"),
                 "teams": meta.get("teams", []),
@@ -66,23 +67,41 @@ async def list_recordings():
 
     results.sort(key=lambda r: r.get("recorded_at") or "", reverse=True)
 
-    # 批量查 DB 获取可读名称
-    session_ids = [r["session_id"] for r in results]
-    if session_ids:
-        placeholders = ",".join("?" * len(session_ids))
-        try:
-            with get_db(DB_PATH) as conn:
-                rows = conn.execute(
-                    f"SELECT id, name FROM race_sessions WHERE id IN ({placeholders})",
-                    session_ids,
-                ).fetchall()
-            name_map: Dict[str, str] = {}
-            for r in rows:
-                name_map[r["id"]] = r["name"] if r["name"] else None
+    # 逐个查 DB 获取可读名称
+    try:
+        with get_db(DB_PATH) as conn:
             for r in results:
-                r["name"] = name_map.get(r["session_id"])
-        except Exception:
-            pass  # DB 查不到也不影响
+                if r.get("name"):
+                    continue  # metadata.json 已有名称，跳过
+                sid = r["session_id"]
+                # 处理旧录像目录名 race_XXXXXXXX → 匹配 UUID 前缀
+                lookup_id = sid
+                if sid.startswith("race_"):
+                    lookup_id = sid[5:] + "%"  # race_044f3d9e → 044f3d9e%
+                    row = conn.execute(
+                        "SELECT name FROM race_sessions WHERE id LIKE ? LIMIT 1",
+                        (lookup_id,),
+                    ).fetchone()
+                    if not row:
+                        row = conn.execute(
+                            "SELECT name FROM races WHERE id LIKE ? LIMIT 1",
+                            (lookup_id,),
+                        ).fetchone()
+                else:
+                    row = conn.execute(
+                        "SELECT name FROM race_sessions WHERE id = ?",
+                        (sid,),
+                    ).fetchone()
+                    if not row:
+                        row = conn.execute(
+                            "SELECT name FROM races WHERE id = ?",
+                            (sid,),
+                        ).fetchone()
+                r["name"] = (row["name"] if row and row["name"] else None) or sid
+    except Exception as ex:
+        import logging
+
+        logging.getLogger(__name__).warning(f"录像名称查询失败: {ex}")
 
     return results
 

@@ -681,20 +681,118 @@
                         </div>
 
                         <!-- Session queue -->
-                        <div
-                            class="ctrl-card"
-                            id="session-queue-card"
-                            style="display: none"
-                        >
-                            <h5>
-                                赛程队列
-                                <span
-                                    class="text-muted fw-normal"
-                                    id="queue-stage-label"
-                                    style="font-size: 0.875rem"
-                                ></span>
-                            </h5>
-                            <div id="session-queue-list"></div>
+                        <div class="ctrl-card" id="session-queue-card">
+                            <h5>赛程管理</h5>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="doGenerateStage('qualification')"
+                                >
+                                    生成资格赛
+                                </button>
+                                <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="doGenerateStage('placement')"
+                                >
+                                    生成排位赛
+                                </button>
+                                <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="doGenerateStage('group_stage')"
+                                >
+                                    生成分组赛
+                                </button>
+                                <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="doGenerateStage('semi')"
+                                >
+                                    生成半决赛
+                                </button>
+                                <button
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="doGenerateStage('final')"
+                                >
+                                    生成决赛
+                                </button>
+                            </div>
+                            <div
+                                class="mb-2"
+                                style="max-height: 250px; overflow-y: auto"
+                            >
+                                <div
+                                    id="prepared-list"
+                                    style="font-size: 0.82rem"
+                                >
+                                    <div class="text-muted">
+                                        暂无待执行的比赛计划
+                                    </div>
+                                </div>
+                            </div>
+                            <h6 class="mt-3 mb-1">比赛历史</h6>
+                            <div style="max-height: 200px; overflow-y: auto">
+                                <div
+                                    id="history-list"
+                                    style="font-size: 0.78rem"
+                                >
+                                    <div class="text-muted">暂无比赛记录</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual create race -->
+                        <div class="ctrl-card" id="create-race-card">
+                            <h5>手动创建比赛</h5>
+                            <div class="mb-2">
+                                <label class="form-label">阶段类型</label>
+                                <select
+                                    id="cr-stage"
+                                    class="form-select form-select-sm"
+                                >
+                                    <option value="placement">排位赛</option>
+                                    <option value="group_stage">小组赛</option>
+                                    <option value="semi">半决赛</option>
+                                    <option value="final">决赛</option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">参赛队伍</label>
+                                <div
+                                    id="cr-teams"
+                                    style="
+                                        max-height: 120px;
+                                        overflow-y: auto;
+                                        font-size: 0.82rem;
+                                    "
+                                >
+                                    <div class="text-muted">请先选择赛区</div>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">圈数</label>
+                                <input
+                                    id="cr-laps"
+                                    type="number"
+                                    class="form-control form-control-sm"
+                                    value="3"
+                                    min="1"
+                                    max="20"
+                                />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">名称（可选）</label>
+                                <input
+                                    id="cr-name"
+                                    type="text"
+                                    class="form-control form-control-sm"
+                                    placeholder="如 排位赛 第1场"
+                                />
+                            </div>
+                            <button
+                                class="btn btn-primary btn-sm w-100"
+                                onclick="doCreateRace()"
+                            >
+                                &#9654; 创建并开始
+                            </button>
                         </div>
 
                         <!-- Action buttons -->
@@ -1766,6 +1864,8 @@
                 _updateZoneRegistrationButton(z);
                 loadTeamNameMap();
                 loadPendingSession();
+                loadPreparedAndHistory();
+                loadCreateRaceTeams();
             }
 
             async function loadTeamNameMap() {
@@ -1856,7 +1956,7 @@
                     );
                     if (r.ok) {
                         loadPendingSession();
-                        loadSessionQueue();
+                        loadPreparedAndHistory();
                         loadZones();
                     }
                 } catch (e) {
@@ -1870,6 +1970,7 @@
                 disqualified: "违规出局",
             };
             var STAGE_NAMES = {
+                qualification: "资格赛",
                 placement: "排位赛",
                 group_stage: "分组赛",
                 semi: "半决赛",
@@ -1960,10 +2061,10 @@
                 } catch (e) {
                     card.style.display = "none";
                 }
-                loadSessionQueue();
+                loadPreparedAndHistory();
             }
 
-            /* ── Session queue ── */
+            // ── Race management ── */
             function getSessionNum(sid) {
                 var parts = sid ? sid.split("_") : [];
                 var n = parseInt(parts[parts.length - 2], 10);
@@ -1978,92 +2079,238 @@
                 aborted: "已中止",
             };
 
-            async function loadSessionQueue() {
+            // ── Race management ──
+
+            function loadPreparedAndHistory() {
                 if (!currentZone) return;
-                var card = document.getElementById("session-queue-card");
-                var listDiv = document.getElementById("session-queue-list");
-                if (!card || !listDiv) return;
+                loadPreparedRaces();
+                loadRaceHistory();
+            }
+
+            async function loadPreparedRaces() {
+                var div = document.getElementById("prepared-list");
+                if (!div) return;
                 try {
                     var r = await api(
                         "GET",
-                        "/api/admin/zones/" + currentZone + "/stage-sessions",
+                        "/api/admin/zones/" + currentZone + "/prepared-races",
                     );
                     var d = r.ok ? await r.json() : null;
-                    if (!d || !d.sessions || !d.sessions.length) {
-                        card.style.display = "none";
+                    var prepared = d && d.prepared ? d.prepared : [];
+                    if (!prepared.length) {
+                        div.innerHTML =
+                            '<div class="text-muted">暂无待执行的比赛计划</div>';
                         return;
                     }
-                    card.style.display = "block";
-                    setText(
-                        "queue-stage-label",
-                        d.current_stage
-                            ? "(" +
-                                  (STAGE_NAMES[d.current_stage] ||
-                                      d.current_stage) +
-                                  ")"
-                            : "",
-                    );
-
-                    // Filter to current stage only
-                    var curStage = d.current_stage;
-                    var sessions = d.sessions.filter(function (s) {
-                        return s.type === curStage;
-                    });
-                    if (!sessions.length) {
-                        card.style.display = "none";
-                        return;
-                    }
-
-                    // Sort: running → waiting → completed/aborted
-                    var order = {
-                        running: 0,
-                        waiting: 1,
-                        recording_ready: 2,
-                        finished: 2,
-                        aborted: 3,
-                    };
-                    sessions.sort(function (a, b) {
-                        return (order[a.phase] || 9) - (order[b.phase] || 9);
-                    });
-
-                    listDiv.innerHTML = sessions
-                        .map(function (s) {
-                            var sname = STAGE_NAMES[s.type] || s.type;
-                            var num = getSessionNum(s.id);
-                            var teams = s.team_ids
-                                ? s.team_ids.map(teamDisplay).join(", ")
-                                : "--";
+                    div.innerHTML = prepared
+                        .map(function (p) {
+                            var teams = (p.participant_ids || [])
+                                .map(teamDisplay)
+                                .join(", ");
                             var meta =
-                                (PHASE_LABELS[s.phase] || s.phase) +
+                                esc(p.name || p.type) +
                                 "  ·  " +
-                                s.total_laps +
+                                p.total_laps +
                                 "圈  ·  " +
-                                s.team_count +
+                                (p.participant_ids || []).length +
                                 "车";
-                            var displayName = s.name
-                                ? esc(s.name)
-                                : sname + " " + num;
                             return (
-                                '<div class="session-row phase-' +
-                                s.phase +
-                                '">' +
-                                '<div class="session-row-num">' +
-                                esc(displayName) +
-                                "</div>" +
-                                '<div class="session-row-teams" title="' +
-                                esc(teams) +
-                                '">' +
-                                esc(teams) +
-                                "</div>" +
-                                '<div class="session-row-meta">' +
+                                '<div class="d-flex justify-content-between align-items-center py-1 border-bottom">' +
+                                "<div><strong>" +
                                 meta +
-                                "</div>" +
+                                "</strong><br><small>" +
+                                esc(teams) +
+                                "</small></div>" +
+                                '<button class="btn btn-success btn-sm py-0" onclick="doExecutePrepared(\'' +
+                                p.id +
+                                "')\">执行</button>" +
                                 "</div>"
                             );
                         })
                         .join("");
                 } catch (e) {
-                    card.style.display = "none";
+                    div.innerHTML = '<div class="text-danger">加载失败</div>';
+                }
+            }
+
+            async function loadRaceHistory() {
+                var div = document.getElementById("history-list");
+                if (!div) return;
+                try {
+                    var r = await api(
+                        "GET",
+                        "/api/admin/zones/" + currentZone + "/race-history",
+                    );
+                    var d = r.ok ? await r.json() : null;
+                    var history = d && d.history ? d.history : [];
+                    if (!history.length) {
+                        div.innerHTML =
+                            '<div class="text-muted">暂无比赛记录</div>';
+                        return;
+                    }
+                    div.innerHTML = history
+                        .map(function (h) {
+                            var sname = STAGE_NAMES[h.type] || h.type;
+                            var teams = (h.rankings || [])
+                                .map(function (rk) {
+                                    return (
+                                        '<span class="badge bg-secondary me-1">' +
+                                        esc(rk.team_id) +
+                                        " #" +
+                                        rk.rank +
+                                        "</span>"
+                                    );
+                                })
+                                .join("");
+                            return (
+                                '<div class="py-1 border-bottom">' +
+                                "<strong>" +
+                                esc(h.name || h.id) +
+                                "</strong>" +
+                                '<br><span class="badge bg-primary me-1">' +
+                                esc(sname) +
+                                "</span>" +
+                                "<br>" +
+                                teams +
+                                '<br><small class="text-muted">' +
+                                fmtIso(h.finished_at) +
+                                "</small>" +
+                                "</div>"
+                            );
+                        })
+                        .join("");
+                } catch (e) {
+                    div.innerHTML = '<div class="text-danger">加载失败</div>';
+                }
+            }
+
+            async function doGenerateStage(stage) {
+                if (!currentZone) return;
+                var btnText = STAGE_NAMES[stage] || stage;
+
+                if (stage === "placement") {
+                    // 先问淘汰队伍
+                    doEliminateAndGeneratePlacement();
+                    return;
+                }
+
+                if (!confirm("确认生成" + btnText + "的比赛计划？")) return;
+                _callGenerateStage(stage, {});
+            }
+
+            async function _callGenerateStage(stage, body) {
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" +
+                            currentZone +
+                            "/generate-stage/" +
+                            stage,
+                        body,
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast(
+                            d.stage_name + "已生成 " + d.count + " 场比赛",
+                            "success",
+                        );
+                        loadPreparedAndHistory();
+                    } else if (
+                        r.status === 409 &&
+                        d.detail === "need_elimination"
+                    ) {
+                        // 需要淘汰
+                        showEliminationPopup();
+                    } else {
+                        toast(d.detail || d.message || "生成失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            function showEliminationPopup() {
+                if (!currentZone) return;
+                var zone = _zones.find(function (z) {
+                    return z.zone_id === currentZone;
+                });
+                var card = document.getElementById("session-queue-card");
+                var prepared = document.getElementById("prepared-list");
+                if (!prepared) return;
+
+                // 从现有 prepared 数据加载队伍列表（通过 teams API）
+                api("GET", "/api/admin/zones/" + currentZone + "/teams")
+                    .then(function (r) {
+                        return r.ok ? r.json() : [];
+                    })
+                    .then(function (teams) {
+                        var teamOptions = (teams || [])
+                            .map(function (t) {
+                                return (
+                                    '<label class="form-check" style="font-size:0.82rem">' +
+                                    '<input type="radio" name="eliminate-team" class="form-check-input" value="' +
+                                    esc(t.id) +
+                                    '" /> ' +
+                                    esc(t.name || t.id) +
+                                    "</label>"
+                                );
+                            })
+                            .join("");
+                        prepared.innerHTML =
+                            '<div class="alert alert-warning py-2 mb-2" style="font-size:0.85rem">资格赛已完成，请选择要淘汰的队伍（1 队）</div>' +
+                            '<div style="max-height:200px;overflow-y:auto">' +
+                            teamOptions +
+                            "</div>" +
+                            '<button class="btn btn-danger btn-sm mt-2" onclick="doConfirmElimination()">确认淘汰并生成排位赛</button>';
+                    });
+            }
+
+            async function doConfirmElimination() {
+                var selected = document.querySelector(
+                    'input[name="eliminate-team"]:checked',
+                );
+                if (!selected) {
+                    toast("请选择要淘汰的队伍", "warning");
+                    return;
+                }
+                var teamId = selected.value;
+                _callGenerateStage("placement", { eliminate_team_id: teamId });
+            }
+
+            function doEliminateAndGeneratePlacement() {
+                // 先调用一次看是否需要淘汰
+                _callGenerateStage("placement", {});
+            }
+
+            async function doExecutePrepared(raceId) {
+                if (!currentZone) return;
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" +
+                            currentZone +
+                            "/execute-prepared-race/" +
+                            raceId,
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast(d.name + " 已开始执行", "success");
+                        loadPreparedAndHistory();
+                    } else {
+                        toast(d.detail || d.message || "执行失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
+            function fmtIso(iso) {
+                if (!iso) return "--";
+                try {
+                    var d = new Date(iso);
+                    return d.toLocaleString("zh-CN");
+                } catch (e) {
+                    return iso;
                 }
             }
 
@@ -2108,7 +2355,7 @@
                     renderVehicles(null, false);
                     toast("比赛已结束，回放和积分榜已更新", "success");
                     loadStandings();
-                    loadSessionQueue();
+                    loadPreparedAndHistory();
                     loadRecordings();
                 }
                 _prevState = msg.state;
@@ -2827,6 +3074,88 @@
                 }
             }
 
+            // ── Manual create race ──
+            async function loadCreateRaceTeams() {
+                if (!currentZone) return;
+                var div = document.getElementById("cr-teams");
+                if (!div) return;
+                try {
+                    var r = await api(
+                        "GET",
+                        "/api/admin/zones/" + currentZone + "/teams",
+                    );
+                    var teams = r.ok ? await r.json() : [];
+                    if (!teams.length) {
+                        div.innerHTML =
+                            '<div class="text-muted" style="font-size:.82rem;">该赛区暂无队伍</div>';
+                        return;
+                    }
+                    div.innerHTML = teams
+                        .map(function (t) {
+                            return (
+                                '<label class="form-check" style="font-size:.82rem">' +
+                                '<input type="checkbox" class="form-check-input cr-team-cb" value="' +
+                                esc(t.id) +
+                                '" /> ' +
+                                esc(t.name || t.id) +
+                                "</label>"
+                            );
+                        })
+                        .join("");
+                } catch (e) {
+                    div.innerHTML =
+                        '<div class="text-danger" style="font-size:.82rem;">加载失败</div>';
+                }
+            }
+
+            async function doCreateRace() {
+                var stage = document.getElementById("cr-stage").value;
+                var laps = parseInt(document.getElementById("cr-laps").value);
+                var name =
+                    document.getElementById("cr-name").value.trim() || null;
+
+                var teamIds = [];
+                document
+                    .querySelectorAll(".cr-team-cb:checked")
+                    .forEach(function (cb) {
+                        teamIds.push(cb.value);
+                    });
+
+                if (!teamIds.length) {
+                    toast("请至少选择一支队伍", "warning");
+                    return;
+                }
+                if (!laps || laps < 1) {
+                    toast("请输入有效的圈数", "warning");
+                    return;
+                }
+
+                try {
+                    var r = await api(
+                        "POST",
+                        "/api/admin/zones/" + currentZone + "/create-race",
+                        {
+                            session_type: stage,
+                            team_ids: teamIds,
+                            total_laps: laps,
+                            name: name,
+                        },
+                    );
+                    var d = await r.json();
+                    if (r.ok) {
+                        toast(
+                            "比赛已创建: " + (d.name || d.race_id.slice(0, 8)),
+                            "success",
+                        );
+                        document.getElementById("cr-name").value = "";
+                    } else {
+                        toast(d.detail || d.message || "创建失败", "danger");
+                    }
+                } catch (e) {
+                    toast("请求失败: " + e.message, "danger");
+                }
+            }
+
             function checkAllTeams(checked) {
                 document
                     .querySelectorAll(".cfg-team-cb")
@@ -2873,7 +3202,7 @@
                         // Refresh the session queue for the configured zone
                         if (currentZone === zid) {
                             loadPendingSession();
-                            loadSessionQueue();
+                            loadPreparedAndHistory();
                         }
                     } else {
                         toast(d.detail || d.message || "配置失败", "danger");

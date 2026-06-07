@@ -230,14 +230,7 @@ async def _run_single_race_event_impl(race_id: str) -> None:
             if result:
                 finished_at = datetime.datetime.now().isoformat()
                 with get_db(DB_PATH) as conn:
-                    db_update_race(
-                        conn,
-                        race_id,
-                        status="done",
-                        finished_at=finished_at,
-                        finish_reason=result.get("finish_reason", "unknown"),
-                        result=json.dumps(result, ensure_ascii=False),
-                    )
+                    _finish_race(conn, race_id, race, result, finished_at)
                 logger.info(f"测试赛事完成: {sim_race_id} (race_id={race_id})")
             else:
                 _mark_race_error(race_id, "no_result_from_simnode")
@@ -246,6 +239,31 @@ async def _run_single_race_event_impl(race_id: str) -> None:
         if status in ("error", "cancelled"):
             _mark_race_error(race_id, f"simnode_{status}")
             return
+
+
+def _write_recording_metadata(
+    race_id: str, name: str, race_type: str, result: dict, finished_at: str
+) -> None:
+    """写入 metadata.json 到磁盘，使录像接口可发现。"""
+    try:
+        from server.config.config import RECORDINGS_DIR
+
+        rec_dir = pathlib.Path(RECORDINGS_DIR) / race_id
+        rec_dir.mkdir(parents=True, exist_ok=True)
+        meta = {
+            "session_id": race_id,
+            "session_type": race_type,
+            "name": name,
+            "recorded_at": finished_at,
+            "finish_reason": result.get("finish_reason", "unknown"),
+            "final_rankings": result.get("final_rankings", []),
+        }
+        (rec_dir / "metadata.json").write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as e:
+        logger.warning(f"写入录像 metadata 失败 ({race_id}): {e}")
 
 
 def _mark_race_error(race_id: str, reason: str) -> None:
@@ -257,3 +275,60 @@ def _mark_race_error(race_id: str, reason: str) -> None:
             db_update_race(conn, race_id, status="error", finish_reason=reason)
     except Exception:
         logger.exception(f"写入错误状态失败 (race_id={race_id})")
+
+
+_TOURNAMENT_TYPES = {"qualification", "placement", "group_stage", "semi", "final"}
+_POINTS_TABLE = {1: 10, 2: 7, 3: 5, 4: 3}
+
+
+def _finish_race(
+    conn, race_id: str, race: dict, result: dict, finished_at: str
+) -> None:
+    """比赛完成后写入数据库，按类型分流。"""
+    from server.database.action import update_race as db_update_race
+    from server.database.action import update_race_session as db_update_race_session
+    from server.database.action import upsert_race_points as db_upsert_rp
+
+    race_type = race.get("type", "test")
+
+    # 1. 更新 races 表（所有类型通用）
+    db_update_race(
+        conn,
+        race_id,
+        status="done",
+        finished_at=finished_at,
+        finish_reason=result.get("finish_reason", "unknown"),
+        result=json.dumps(result, ensure_ascii=False),
+    )
+
+    # 2. 正赛类型：额外写入 race_sessions + race_points
+    if race_type in _TOURNAMENT_TYPES:
+        race_name = race.get("name") or ""
+        db_update_race_session(
+            conn,
+            race_id,
+            phase="recording_ready",
+            finished_at=finished_at,
+            result=result,
+        )
+
+        # 写入 metadata.json 到磁盘（录像接口需要）
+        _write_recording_metadata(race_id, race_name, race_type, result, finished_at)
+
+        final_rankings = result.get("final_rankings", [])
+        finished_rank = 1
+        for entry in final_rankings:
+            team_id = entry.get("team_id")
+            if not team_id:
+                continue
+            if entry.get("total_time") is not None:
+                points = _POINTS_TABLE.get(finished_rank, 1)
+                db_upsert_rp(
+                    conn,
+                    race_id,
+                    team_id,
+                    finished_rank,
+                    points,
+                    best_lap_time=entry.get("best_lap"),
+                )
+                finished_rank += 1

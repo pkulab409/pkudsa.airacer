@@ -78,6 +78,23 @@ CREATE TABLE IF NOT EXISTS races (
     result          TEXT,
     name            TEXT
 );
+
+CREATE TABLE IF NOT EXISTS race_prepare (
+    id              TEXT PRIMARY KEY,
+    type            TEXT NOT NULL,
+    zone_id         TEXT NOT NULL REFERENCES zones(id),
+    initiator       TEXT,
+    participant_ids TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'prepared',
+    world_key       TEXT NOT NULL DEFAULT 'complex',
+    total_laps      INTEGER NOT NULL DEFAULT 3,
+    created_at      TEXT NOT NULL,
+    started_at      TEXT,
+    finished_at     TEXT,
+    finish_reason   TEXT,
+    result          TEXT,
+    name            TEXT
+);
 """
 
 _MIGRATIONS = [
