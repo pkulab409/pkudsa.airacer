@@ -124,35 +124,27 @@ def db_get_zone_teams(conn, zone_id: str) -> List[Dict]:
 
 
 def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
-    """优先从 race_sessions.result 计算积分，fallback 到 race_points。"""
-    # 先从 race_sessions 直接计算
+    """从 race_sessions.result 读取排名计算积分。"""
     rows = conn.execute(
-        """SELECT id, type, result FROM race_sessions
-           WHERE zone_id=? AND phase IN ('recording_ready', 'finished')
-           AND result IS NOT NULL""",
+        "SELECT result FROM race_sessions WHERE zone_id=? AND result IS NOT NULL",
         (zone_id,),
     ).fetchall()
 
-    scores: dict[str, dict] = {}  # team_id → {points, best_lap, sessions}
     POINTS = {1: 10, 2: 7, 3: 5, 4: 3}
+    scores: dict[str, dict] = {}
 
-    for sid, stype, result_json in rows:
+    for (result_json,) in rows:
         data = (
             json.loads(result_json)
             if isinstance(result_json, str)
             else (result_json or {})
         )
-        rankings = data.get("final_rankings", [])
-        finished_rank = 1
-        for entry in rankings:
+        for entry in data.get("final_rankings", []):
             tid = entry.get("team_id")
             if not tid:
                 continue
-            if entry.get("total_time") is not None:
-                pts = POINTS.get(finished_rank, 1)
-                finished_rank += 1
-            else:
-                pts = 1
+            rank = entry.get("rank", 99)
+            pts = POINTS.get(rank, 1)
             bt = entry.get("best_lap") or entry.get("best_lap_time")
             rec = scores.get(tid)
             if rec is None:
@@ -165,32 +157,33 @@ def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
                 }
                 scores[tid] = rec
             rec["total_score"] += pts
+            rec["finished_sessions"] += 1
             if bt is not None and (
                 rec["best_lap_time"] is None or bt < rec["best_lap_time"]
             ):
                 rec["best_lap_time"] = bt
-            rec["finished_sessions"] += 1
 
-    # 补上队伍名称 + 该赛区未参赛的队伍
-    team_ids = list(scores.keys())
-    # 获取该赛区所有队伍
-    all_zone_teams = conn.execute(
-        "SELECT id, name FROM teams WHERE zone_id = ?", (zone_id,)
-    ).fetchall()
-    for t in all_zone_teams:
-        tid = t["id"]
-        if tid in scores:
-            scores[tid]["name"] = t["name"]
-        else:
-            scores[tid] = {
-                "team_id": tid,
-                "name": t["name"],
-                "total_score": 0,
-                "best_lap_time": None,
-                "finished_sessions": 0,
-            }
-
+    scored_ids = set(scores.keys())
     result = sorted(scores.values(), key=lambda x: x["total_score"], reverse=True)
+
+    all_teams = conn.execute(
+        "SELECT id, name FROM teams WHERE zone_id=?", (zone_id,)
+    ).fetchall()
+    for t in all_teams:
+        if t["id"] in scored_ids:
+            scores[t["id"]]["name"] = t["name"]
+        else:
+            result.append(
+                {
+                    "team_id": t["id"],
+                    "name": t["name"],
+                    "total_score": 0,
+                    "best_lap_time": None,
+                    "finished_sessions": 0,
+                }
+            )
+
+    result.sort(key=lambda x: x["total_score"], reverse=True)
     return result
 
 
