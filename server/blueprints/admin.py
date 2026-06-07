@@ -234,10 +234,9 @@ def _pre_create_stage_sessions(conn, zone_id: str, stage: str, bracket: dict) ->
         # 资格赛：每队单独 1 场
         all_teams_list = [[tid] for tid in all_teams]
     elif stage == "placement":
-        # 排位赛：每批 6 车，按队伍列表顺序均分
-        all_teams_list = [
-            all_teams[i * cars_per : (i + 1) * cars_per] for i in range(total_sessions)
-        ]
+        # 排位赛：按资格赛成绩蛇形分 4 批，每批 6 车
+        ranked = _get_qualification_rankings(conn, zone_id, all_teams)
+        all_teams_list = snake_draft_group(ranked, total_sessions)
     elif stage == "group_stage":
         # 分组赛：按排位赛成绩蛇形分 2 组
         ranked = db_get_placement_rankings(conn, zone_id)
@@ -648,6 +647,29 @@ async def execute_prepared_race(
     }
 
 
+def _get_qualification_rankings(conn, zone_id: str, team_ids: list[str]) -> list[str]:
+    """从资格赛成绩获取排序（best_lap_time 升序），只返回 team_ids 中的队伍。"""
+    results = db_get_stage_session_results(conn, zone_id, "qualification")
+    timed: list[tuple[str, float]] = []
+    seen: set[str] = set()
+    for sr in results:
+        for entry in sr.get("rankings", []):
+            tid = entry.get("team_id")
+            if not tid or tid in seen or tid not in team_ids:
+                continue
+            bt = entry.get("best_lap_time")
+            if bt is not None:
+                seen.add(tid)
+                timed.append((tid, bt))
+    timed.sort(key=lambda x: x[1])
+    # 没有成绩的排在末尾
+    ranked = [t for t, _ in timed]
+    for tid in team_ids:
+        if tid not in seen:
+            ranked.append(tid)
+    return ranked
+
+
 def _check_stage_done(
     conn, zone_id: str, stage: str, bracket: dict, stage_name: str
 ) -> None:
@@ -677,9 +699,11 @@ def _build_stage_sessions(
             sessions.append({"team_ids": [tid], "total_laps": laps})
 
     elif stage == "placement":
-        for i in range(total_sessions):
-            chunk = all_teams[i * cars_per : (i + 1) * cars_per]
-            sessions.append({"team_ids": chunk, "total_laps": laps})
+        # 排位赛：按资格赛成绩蛇形分 4 批，每批 6 车
+        ranked = _get_qualification_rankings(conn, zone_id, all_teams)
+        groups = snake_draft_group(ranked, total_sessions)
+        for g in groups:
+            sessions.append({"team_ids": g, "total_laps": laps})
 
     elif stage == "group_stage":
         # 排位赛取前 12 名，蛇形分 2 组
