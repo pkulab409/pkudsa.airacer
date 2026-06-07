@@ -241,31 +241,6 @@ async def _run_single_race_event_impl(race_id: str) -> None:
             return
 
 
-def _write_recording_metadata(
-    race_id: str, name: str, race_type: str, result: dict, finished_at: str
-) -> None:
-    """写入 metadata.json 到磁盘，使录像接口可发现。"""
-    try:
-        from server.config.config import RECORDINGS_DIR
-
-        rec_dir = pathlib.Path(RECORDINGS_DIR) / race_id
-        rec_dir.mkdir(parents=True, exist_ok=True)
-        meta = {
-            "session_id": race_id,
-            "session_type": race_type,
-            "name": name,
-            "recorded_at": finished_at,
-            "finish_reason": result.get("finish_reason", "unknown"),
-            "final_rankings": result.get("final_rankings", []),
-        }
-        (rec_dir / "metadata.json").write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-    except Exception as e:
-        logger.warning(f"写入录像 metadata 失败 ({race_id}): {e}")
-
-
 def _mark_race_error(race_id: str, reason: str) -> None:
     logger.warning(f"测试赛事失败 (race_id={race_id}): {reason}")
     try:
@@ -303,7 +278,6 @@ def _finish_race(
 
     # 2. 正赛类型：额外写入 race_sessions + race_points
     if race_type in _TOURNAMENT_TYPES:
-        race_name = race.get("name") or ""
         db_update_race_session(
             conn,
             race_id,
@@ -311,9 +285,6 @@ def _finish_race(
             finished_at=finished_at,
             result=result,
         )
-
-        # 写入 metadata.json 到磁盘（录像接口需要）
-        _write_recording_metadata(race_id, race_name, race_type, result, finished_at)
 
         final_rankings = result.get("final_rankings", [])
         finished_rank = 1
