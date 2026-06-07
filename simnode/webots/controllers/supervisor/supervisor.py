@@ -4,10 +4,10 @@ Handles race state, checkpoint detection, collision detection,
 telemetry recording, and IPC to car controllers via customData.
 """
 
-import os
+import datetime
 import json
 import math
-import datetime
+import os
 import pathlib
 import tempfile
 
@@ -20,15 +20,15 @@ from controller import Supervisor
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())  # 64 ms
 
-config_path = os.environ.get('RACE_CONFIG_PATH', 'race_config.json')
-with open(config_path, encoding='utf-8') as f:
+config_path = os.environ.get("RACE_CONFIG_PATH", "race_config.json")
+with open(config_path, encoding="utf-8") as f:
     config = json.load(f)
 
-session_id     = config['race_id']
-session_type   = config['session_type']
-total_laps     = config['total_laps']
-recording_path = config['recording_path']
-cars_config    = config['cars']  # list of dicts
+session_id = config["race_id"]
+session_type = config["session_type"]
+total_laps = config["total_laps"]
+recording_path = config["recording_path"]
+cars_config = config["cars"]  # list of dicts
 
 # ---------------------------------------------------------------------------
 # Checkpoints
@@ -36,19 +36,83 @@ cars_config    = config['cars']  # list of dicts
 # ---------------------------------------------------------------------------
 
 CHECKPOINTS = [
-    {"id": 0, "cx": 56.0,  "cy": -29.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 0.0},
-    {"id": 1, "cx": 199.0, "cy": 0.0,   "half_w": 12.0, "half_h": 12.0, "track_heading": 1.57},
-    {"id": 2, "cx": 199.0, "cy": 103.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 1.57},
-    {"id": 3, "cx": 158.0, "cy": 160.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 3.14},
-    {"id": 4, "cx": 92.0,  "cy": 159.0, "half_w": 12.0, "half_h": 12.0, "track_heading": -1.57},
-    {"id": 5, "cx": 47.5,  "cy": 60.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": -1.57},
-    {"id": 6, "cx": -5.0,  "cy": 150.0, "half_w": 12.0, "half_h": 12.0, "track_heading": 3.14},
-    {"id": 7, "cx": -22.0, "cy": 98.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": -1.0},
-    {"id": 8, "cx": -18.0, "cy": 40.0,  "half_w": 12.0, "half_h": 12.0, "track_heading": 0.2},
+    {
+        "id": 0,
+        "cx": 56.0,
+        "cy": -29.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 0.0,
+    },
+    {
+        "id": 1,
+        "cx": 199.0,
+        "cy": 0.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 1.57,
+    },
+    {
+        "id": 2,
+        "cx": 199.0,
+        "cy": 103.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 1.57,
+    },
+    {
+        "id": 3,
+        "cx": 158.0,
+        "cy": 160.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 3.14,
+    },
+    {
+        "id": 4,
+        "cx": 92.0,
+        "cy": 159.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": -1.57,
+    },
+    {
+        "id": 5,
+        "cx": 47.5,
+        "cy": 60.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": -1.57,
+    },
+    {
+        "id": 6,
+        "cx": -5.0,
+        "cy": 150.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 3.14,
+    },
+    {
+        "id": 7,
+        "cx": -22.0,
+        "cy": 98.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": -1.0,
+    },
+    {
+        "id": 8,
+        "cx": -18.0,
+        "cy": 40.0,
+        "half_w": 12.0,
+        "half_h": 12.0,
+        "track_heading": 0.2,
+    },
 ]
 
+
 def in_checkpoint(x, y, cp):
-    return abs(x - cp['cx']) < cp['half_w'] and abs(y - cp['cy']) < cp['half_h']
+    return abs(x - cp["cx"]) < cp["half_w"] and abs(y - cp["cy"]) < cp["half_h"]
 
 
 # ---------------------------------------------------------------------------
@@ -57,48 +121,49 @@ def in_checkpoint(x, y, cp):
 
 cars = []
 for cc in cars_config:
-    node = robot.getFromDef(cc['car_slot'])
-    code_path = cc.get('code_path', '')
+    node = robot.getFromDef(cc["car_slot"])
+    code_path = cc.get("code_path", "")
     # 已移除发车格补偿逻辑，计时将在车辆首次通过 CP0 时记录
-    trans_field = node.getField('translation')
+    trans_field = node.getField("translation")
     spawn_pos = trans_field.getSFVec3f()
     # 保留获取起始坐标的代码以便调试，未再计算补偿时间
     _ = spawn_pos
 
-    cars.append({
-        "team_id":             cc['team_id'],
-        "car_slot":            cc['car_slot'],
-        "team_name":           cc['team_name'],
-        "node":                node,
-        "x":                   0.0,
-        "y":                   0.0,
-        "heading":             0.0,
-        "speed":               0.0,
-        "lap":                 0,
-        "lap_progress":        0.0,
-        "checkpoints_passed":  0,          # Total checkpoints crossed (including CP0)
-        "status":              "idle" if code_path == "" else "normal",
-        "has_code":            code_path != "",
-        "boost_remaining":     0.0,
-        "checkpoint_next":     0,          # Start waiting for CP0 (start/finish line)
-        "lap_started":         False,      # True once the car has crossed CP0 for the first time
-        "lap_start_time":      0.0,
-        "best_lap_time":       None,
-        "collision_major_count": 0,
-        "stop_end_time":       None,       # sim time when stop penalty ends
-        "finish_time":         None,       # sim time when car completed total_laps
-        "laps_data":           [],         # list of lap times (float)
-        "last_cp_time":        0.0,        # sim time when last checkpoint was passed (for 60s idle rule)
-        "last_lap_end_time":    0.0,        # sim time when last lap was completed (for lap time calculation)
-        "finish_line_armed":    False,      # True after CP8 passed, consumed by finish line crossing
-    })
-
+    cars.append(
+        {
+            "team_id": cc["team_id"],
+            "car_slot": cc["car_slot"],
+            "team_name": cc["team_name"],
+            "node": node,
+            "x": 0.0,
+            "y": 0.0,
+            "heading": 0.0,
+            "speed": 0.0,
+            "lap": 0,
+            "lap_progress": 0.0,
+            "checkpoints_passed": 0,  # Total checkpoints crossed (including CP0)
+            "status": "idle" if code_path == "" else "normal",
+            "has_code": code_path != "",
+            "boost_remaining": 0.0,
+            "checkpoint_next": 0,  # Start waiting for CP0 (start/finish line)
+            "lap_started": False,  # True once the car has crossed CP0 for the first time
+            "lap_start_time": 0.0,
+            "best_lap_time": None,
+            "collision_major_count": 0,
+            "stop_end_time": None,  # sim time when stop penalty ends
+            "finish_time": None,  # sim time when car completed total_laps
+            "laps_data": [],  # list of lap times (float)
+            "last_cp_time": 0.0,  # sim time when last checkpoint was passed (for 60s idle rule)
+            "last_lap_end_time": 0.0,  # sim time when last lap was completed (for lap time calculation)
+            "finish_line_armed": False,  # True after CP8 passed, consumed by finish line crossing
+        }
+    )
 
 
 # After building the initial cars list, remove any car slots that are not present in the race configuration.
 # This directly deletes empty slots from the Webots scene.
 expected_slots = ["car_1", "car_2", "car_3", "car_4", "car_5", "car_6"]
-existing_slots = {c['car_slot'] for c in cars}
+existing_slots = {c["car_slot"] for c in cars}
 for slot in expected_slots:
     if slot not in existing_slots:
         node = robot.getFromDef(slot)
@@ -107,11 +172,12 @@ for slot in expected_slots:
             node.remove()
 
 
-
 for car in cars:
-    if not car['has_code']:
-        print(f"[INIT] Removing car without code: team_id={car['team_id']} slot={car['car_slot']}")
-        node = car.get('node')
+    if not car["has_code"]:
+        print(
+            f"[INIT] Removing car without code: team_id={car['team_id']} slot={car['car_slot']}"
+        )
+        node = car.get("node")
         if node is not None:
             node.remove()
 # ---------------------------------------------------------------------------
@@ -119,9 +185,24 @@ for car in cars:
 # ---------------------------------------------------------------------------
 
 FINISH_LINES = [
-    {"cx": 29.5, "cy": -30.0, "half_w": 0.5, "half_h": 4.0},  # start_line_right_1 (cars 1 & 2)
-    {"cx": 13.15, "cy": -30.0, "half_w": 0.5, "half_h": 4.0}, # start_line_right_3 (cars 3 & 4)
-    {"cx": -3.4, "cy": -30.0, "half_w": 0.5, "half_h": 4.0},  # start_line_right_5 (cars 5 & 6)
+    {
+        "cx": 29.5,
+        "cy": -30.0,
+        "half_w": 0.5,
+        "half_h": 4.0,
+    },  # start_line_right_1 (cars 1 & 2)
+    {
+        "cx": 13.15,
+        "cy": -30.0,
+        "half_w": 0.5,
+        "half_h": 4.0,
+    },  # start_line_right_3 (cars 3 & 4)
+    {
+        "cx": -3.4,
+        "cy": -30.0,
+        "half_w": 0.5,
+        "half_h": 4.0,
+    },  # start_line_right_5 (cars 5 & 6)
 ]
 
 # After building car state list, add finish line mapping
@@ -133,11 +214,12 @@ for idx, car in enumerate(cars):
 # IPC helpers
 # ---------------------------------------------------------------------------
 
+
 def send_cmd_to_car(car, cmd_dict):
-    node = car.get('node')
+    node = car.get("node")
     if node is None:
         return
-    field = node.getField('customData')
+    field = node.getField("customData")
     if field is None:
         return
     field.setSFString(json.dumps(cmd_dict))
@@ -146,138 +228,156 @@ def send_cmd_to_car(car, cmd_dict):
 def clear_cmd(car):
     send_cmd_to_car(car, {"cmd": "none"})
 
+
 def disqualify_car(car, reason, sim_time):
     """统一退赛处理：设状态、发IPC、冻结坐标后从场景中移除小车"""
-    car['status'] = 'disqualified'
+    car["status"] = "disqualified"
     send_cmd_to_car(car, {"cmd": "disqualify"})
     # 冻结最后的位置/朝向/速度，后续录像帧继续使用这些值
-    node = car.get('node')
+    node = car.get("node")
     if node is not None:
         pos = node.getPosition()
-        car['x'], car['y'] = pos[0], pos[1]
+        car["x"], car["y"] = pos[0], pos[1]
         ori = node.getOrientation()
-        car['heading'] = math.atan2(-ori[3], ori[0])
+        car["heading"] = math.atan2(-ori[3], ori[0])
         vel = node.getVelocity()
-        car['speed'] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
+        car["speed"] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
         node.remove()
     events_entry = {
         "type": "disqualified",
-        "team_id": car['team_id'],
+        "team_id": car["team_id"],
         "reason": reason,
         "sim_time": round(sim_time, 3),
     }
     print(f"[DQ] {car['team_id']} disqualified: {reason} (sim_time={sim_time:.1f})")
     return events_entry
 
+
 # ---------------------------------------------------------------------------
 # Checkpoint logic
 # ---------------------------------------------------------------------------
 
+
 def check_checkpoints(car, sim_time):
     """处理 CP0~CP8 检查点序列。出发线由 check_finish_line 独立处理。"""
-    x, y = car['x'], car['y']
-    cp_idx = car['checkpoint_next']
+    x, y = car["x"], car["y"]
+    cp_idx = car["checkpoint_next"]
     cp = CHECKPOINTS[cp_idx]
 
     if not in_checkpoint(x, y, cp):
         return
 
     # 序列推进: 0→1→...→8→0
-    car['checkpoint_next'] = (cp_idx + 1) % len(CHECKPOINTS)
-    car['checkpoints_passed'] += 1
-    car['last_cp_time'] = sim_time
-    car['lap_progress'] = cp_idx / len(CHECKPOINTS)  # CP0→0.0, CP8→8/9≈0.89
+    car["checkpoint_next"] = (cp_idx + 1) % len(CHECKPOINTS)
+    car["checkpoints_passed"] += 1
+    car["last_cp_time"] = sim_time
+    car["lap_progress"] = cp_idx / len(CHECKPOINTS)  # CP0→0.0, CP8→8/9≈0.89
 
     # CP8 通过后武装出发线
     if cp_idx == len(CHECKPOINTS) - 1:
-        car['finish_line_armed'] = True
+        car["finish_line_armed"] = True
+
 
 def check_finish_line(car, sim_time, events):
     """检测出发线，只做计时，不修改 cp 体系。"""
-    x, y = car['x'], car['y']
-    fl = car['finish_line']
+    x, y = car["x"], car["y"]
+    fl = car["finish_line"]
     if not in_checkpoint(x, y, fl):
         return
 
-    if not car['lap_started']:
+    if not car["lap_started"]:
         # 首次过线：比赛开始
-        car['lap_started'] = True
-        car['lap_start_time'] = sim_time
-        car['finish_line_armed'] = False
-        events.append({
-            "type": "lap_start",
-            "team_id": car['team_id'],
-            "sim_time": round(sim_time, 3),
-        })
+        car["lap_started"] = True
+        car["lap_start_time"] = sim_time
+        car["finish_line_armed"] = False
+        events.append(
+            {
+                "type": "lap_start",
+                "team_id": car["team_id"],
+                "sim_time": round(sim_time, 3),
+            }
+        )
 
-    elif car.get('finish_line_armed'):
+    elif car.get("finish_line_armed"):
         # 完成一圈（必须 armed）
-        prev = car.get('last_lap_end_time') or car['lap_start_time']
+        prev = car.get("last_lap_end_time") or car["lap_start_time"]
         lap_time = sim_time - prev
-        car['laps_data'].append(lap_time)
-        if car['best_lap_time'] is None or lap_time < car['best_lap_time']:
-            car['best_lap_time'] = lap_time
-        car['lap'] += 1
-        car['last_lap_end_time'] = sim_time
-        car['lap_progress'] = 0.0
-        car['finish_line_armed'] = False
+        car["laps_data"].append(lap_time)
+        if car["best_lap_time"] is None or lap_time < car["best_lap_time"]:
+            car["best_lap_time"] = lap_time
+        car["lap"] += 1
+        car["last_lap_end_time"] = sim_time
+        car["lap_progress"] = 0.0
+        car["finish_line_armed"] = False
 
-        events.append({
-            "type": "lap_complete",
-            "team_id": car['team_id'],
-            "lap_number": car['lap'],
-            "lap_time": round(lap_time, 3),
-            "best_lap_time": round(car['best_lap_time'], 3),
-        })
+        events.append(
+            {
+                "type": "lap_complete",
+                "team_id": car["team_id"],
+                "lap_number": car["lap"],
+                "lap_time": round(lap_time, 3),
+                "best_lap_time": round(car["best_lap_time"], 3),
+            }
+        )
 
         # 完赛检查
-        if car['lap'] >= total_laps and car['finish_time'] is None:
-            car['finish_time'] = sim_time
-            events.append({
-                "type": "car_finished",
-                "team_id": car['team_id'],
-                "finish_time": round(sim_time, 3),
-                "total_laps": car['lap'],
-            })
+        if car["lap"] >= total_laps and car["finish_time"] is None:
+            car["finish_time"] = sim_time
+            events.append(
+                {
+                    "type": "car_finished",
+                    "team_id": car["team_id"],
+                    "finish_time": round(sim_time, 3),
+                    "total_laps": car["lap"],
+                }
+            )
             if session_type in ("qualifying", "placement"):
                 send_cmd_to_car(car, {"cmd": "stop", "duration": 9999})
-                car['status'] = 'stopped'
+                car["status"] = "stopped"
+
 
 # ---------------------------------------------------------------------------
 # Collision detection
 # ---------------------------------------------------------------------------
 
+
 def check_car_collisions(cars, sim_time, events):
     """Distance-based pairwise collision check."""
-    active = [c for c in cars if c['status'] != 'disqualified']
+    active = [c for c in cars if c["status"] != "disqualified"]
     for i in range(len(active)):
         for j in range(i + 1, len(active)):
             ca, cb = active[i], active[j]
-            dist = math.sqrt((ca['x'] - cb['x']) ** 2 + (ca['y'] - cb['y']) ** 2)
+            dist = math.sqrt((ca["x"] - cb["x"]) ** 2 + (ca["y"] - cb["y"]) ** 2)
             if dist < 0.5:
-                rel_speed = abs(ca['speed'] - cb['speed'])
+                rel_speed = abs(ca["speed"] - cb["speed"])
                 severity = "major" if rel_speed >= 3.0 else "minor"
-                events.append({
-                    "type": "collision",
-                    "severity": severity,
-                    "team_ids": [ca['team_id'], cb['team_id']],
-                    "distance": round(dist, 3),
-                    "rel_speed": round(rel_speed, 2),
-                    "sim_time": round(sim_time, 3),
-                })
+                events.append(
+                    {
+                        "type": "collision",
+                        "severity": severity,
+                        "team_ids": [ca["team_id"], cb["team_id"]],
+                        "distance": round(dist, 3),
+                        "rel_speed": round(rel_speed, 2),
+                        "sim_time": round(sim_time, 3),
+                    }
+                )
                 if severity == "major":
                     for car in (ca, cb):
-                        if car['status'] == 'disqualified':
+                        if car["status"] == "disqualified":
                             continue
                         # Don't penalise a car that has already finished
-                        if car['finish_time'] is not None:
+                        if car["finish_time"] is not None:
                             continue
-                        car['collision_major_count'] += 1
-                        if car['collision_major_count'] >= 3:
-                            events.append(disqualify_car(car, "major_collision_threshold", sim_time))
+                        car["collision_major_count"] += 1
+                        if car["collision_major_count"] >= 3:
+                            events.append(
+                                disqualify_car(
+                                    car, "major_collision_threshold", sim_time
+                                )
+                            )
                         else:
-                            car['status'] = 'stopped'
-                            car['stop_end_time'] = sim_time + 2.0
+                            car["status"] = "stopped"
+                            car["stop_end_time"] = sim_time + 2.0
                             send_cmd_to_car(car, {"cmd": "stop", "duration": 2.0})
 
     # TODO: add car vs obstacle collision detection
@@ -287,118 +387,131 @@ def check_car_collisions(cars, sim_time, events):
 # Rankings
 # ---------------------------------------------------------------------------
 
+
 def compute_final_rankings(cars):
     def adjusted_finish(c):
         # 赛程起点统一为 0，结束时间即车辆最后一次通过 CP0 的时间
-        return c['finish_time']
+        return c["finish_time"]
 
-    finished   = sorted([c for c in cars if c['finish_time'] is not None],
-                        key=adjusted_finish)
-    unfinished = sorted([c for c in cars if c['finish_time'] is None],
-                        key=lambda c: (-c['lap'], -c['lap_progress']))
+    finished = sorted(
+        [c for c in cars if c["finish_time"] is not None], key=adjusted_finish
+    )
+    unfinished = sorted(
+        [c for c in cars if c["finish_time"] is None],
+        key=lambda c: (-c["lap"], -c["lap_progress"]),
+    )
     ranked = finished + unfinished
     return [
         {
-            "rank":       i + 1,
-            "team_id":    c['team_id'],
-            "team_name":  c['team_name'],
-            "laps":       c['lap'],
-            "best_lap":   round(c['best_lap_time'], 3) if c['best_lap_time'] is not None else None,
-            "total_time": round(adjusted_finish(c), 3) if c['finish_time'] is not None else None,
-            "status":     c['status'],
-            "collision_major_count": c['collision_major_count'],
+            "rank": i + 1,
+            "team_id": c["team_id"],
+            "team_name": c["team_name"],
+            "laps": c["lap"],
+            "best_lap": round(c["best_lap_time"], 3)
+            if c["best_lap_time"] is not None
+            else None,
+            "total_time": round(adjusted_finish(c), 3)
+            if c["finish_time"] is not None
+            else None,
+            "status": c["status"],
+            "collision_major_count": c["collision_major_count"],
         }
         for i, c in enumerate(ranked)
     ]
+
 
 # ---------------------------------------------------------------------------
 # Telemetry
 # ---------------------------------------------------------------------------
 
 os.makedirs(recording_path, exist_ok=True)
-telemetry_path = os.path.join(recording_path, 'telemetry.jsonl')
-tel_file = open(telemetry_path, 'a', encoding='utf-8')
+telemetry_path = os.path.join(recording_path, "telemetry.jsonl")
+tel_file = open(telemetry_path, "a", encoding="utf-8")
 frame_count = 0
 
 # DEBUG log file
-_debug_log = os.path.join(recording_path, '_debug_supervisor.log')
-with open(_debug_log, 'w') as _df:
-    _df.write(f"INIT: session={session_id}, cars={len(cars_config)}, checkpoints={len(CHECKPOINTS)}\n")
+_debug_log = os.path.join(recording_path, "_debug_supervisor.log")
+with open(_debug_log, "w") as _df:
+    _df.write(
+        f"INIT: session={session_id}, cars={len(cars_config)}, checkpoints={len(CHECKPOINTS)}\n"
+    )
     for i, cp in enumerate(CHECKPOINTS):
-        _df.write(f"  CP{i}: ({cp['cx']},{cp['cy']}) hw={cp['half_w']} hh={cp['half_h']} th={cp['track_heading']}\n")
+        _df.write(
+            f"  CP{i}: ({cp['cx']},{cp['cy']}) hw={cp['half_w']} hh={cp['half_h']} th={cp['track_heading']}\n"
+        )
     for c in cars:
-        _df.write(f"  CAR: slot={c['car_slot']} team={c['team_id']} node={'OK' if c['node'] else 'NONE'}\n")
+        _df.write(
+            f"  CAR: slot={c['car_slot']} team={c['team_id']} node={'OK' if c['node'] else 'NONE'}\n"
+        )
 
 # Overhead camera — rotate among active cars every 20 seconds, fixed height above track
 _overhead_cam = robot.getDevice("overhead_cam")
 _overhead_cam_node = robot.getFromDef("OVERHEAD_CAM")
-_cam_height = 25.0              # meters above track surface
-_cam_switch_interval = 20.0     # seconds between camera switches
-_cam_last_switch_time = 0.0   # first switch at t=10s
+_cam_height = 25.0  # meters above track surface
+_cam_switch_interval = 20.0  # seconds between camera switches
+_cam_last_switch_time = 0.0  # first switch at t=10s
 _cam_active_index = 0
 if _overhead_cam:
     _overhead_cam.enable(timestep * 2)
 _FRAME_SAVE_INTERVAL = 2
-_live_view_path = os.path.join(recording_path, 'live_view.jpg')
+_live_view_path = os.path.join(recording_path, "live_view.jpg")
 
 
 def snapshot(car):
     return {
-        "team_id":             car['team_id'],
-        "x":                   round(car['x'], 3),
-        "y":                   round(car['y'], 3),
-        "heading":             round(car['heading'], 4),
-        "speed":               round(car['speed'], 2),
-        "lap":                 car['lap'],
-        "lap_progress":        car['lap_progress'],
-        "checkpoints_passed":  car['checkpoints_passed'],
-        "status":              car['status'],
-        "boost_remaining":     round(car['boost_remaining'], 2),
+        "team_id": car["team_id"],
+        "x": round(car["x"], 3),
+        "y": round(car["y"], 3),
+        "heading": round(car["heading"], 4),
+        "speed": round(car["speed"], 2),
+        "lap": car["lap"],
+        "lap_progress": car["lap_progress"],
+        "checkpoints_passed": car["checkpoints_passed"],
+        "status": car["status"],
+        "boost_remaining": round(car["boost_remaining"], 2),
     }
 
 
 def write_telemetry_frame(sim_time, cars, events):
     global frame_count
     frame = {
-        "t":      round(sim_time, 3),
-        "cars":   [snapshot(c) for c in cars],
+        "t": round(sim_time, 3),
+        "cars": [snapshot(c) for c in cars],
         "events": events,
     }
-    tel_file.write(json.dumps(frame, ensure_ascii=False) + '\n')
+    tel_file.write(json.dumps(frame, ensure_ascii=False) + "\n")
     tel_file.flush()
     frame_count += 1
 
 
 def write_metadata(finish_reason, final_rankings):
     meta = {
-        "session_id":     session_id,
-        "session_type":   session_type,
-        "total_laps":     total_laps,
+        "session_id": session_id,
+        "session_type": session_type,
+        "total_laps": total_laps,
         "recording_path": recording_path,
-        "recorded_at":    datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "duration_sim":   round(robot.getTime(), 3),
-        "total_frames":   frame_count,
-        "teams": [
-            {"team_id": c['team_id'], "team_name": c['team_name']}
-            for c in cars
-        ],
-        "finish_reason":   finish_reason,
-        "final_rankings":  final_rankings,
+        "recorded_at": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "duration_sim": round(robot.getTime(), 3),
+        "total_frames": frame_count,
+        "teams": [{"team_id": c["team_id"], "team_name": c["team_name"]} for c in cars],
+        "finish_reason": finish_reason,
+        "final_rankings": final_rankings,
     }
-    meta_path = os.path.join(recording_path, 'metadata.json')
-    with open(meta_path, 'w', encoding='utf-8') as mf:
+    meta_path = os.path.join(recording_path, "metadata.json")
+    with open(meta_path, "w", encoding="utf-8") as mf:
         json.dump(meta, mf, ensure_ascii=False, indent=2)
+
 
 # ---------------------------------------------------------------------------
 # Grace period / race-end state
 # ---------------------------------------------------------------------------
 
-grace_started    = False
+grace_started = False
 grace_start_time = 0.0
-leader_team_id   = None
-race_finished    = False
-finish_reason    = "supervisor_stop"
-final_rankings   = []
+leader_team_id = None
+race_finished = False
+finish_reason = "supervisor_stop"
+final_rankings = []
 
 
 def check_race_end(cars, sim_time, events):
@@ -407,71 +520,94 @@ def check_race_end(cars, sim_time, events):
 
     # Detect newly finished cars
     for car in cars:
-        if car['lap'] >= total_laps and car['finish_time'] is not None:
-            car['status'] = 'finished'  # 明确标记完赛
+        if car["lap"] >= total_laps and car["finish_time"] is not None:
+            car["status"] = "finished"  # 明确标记完赛
             if not grace_started and session_type != "qualifying":
-                grace_started    = True
-                grace_start_time = car['finish_time']
-                leader_team_id   = car['team_id']
-                events.append({
-                    "type":         "leader_finished",
-                    "team_id":      car['team_id'],
-                    "finish_time":  round(car['finish_time'], 3),
-                    "grace_end_time": round(car['finish_time'] + 60.0, 3),
-                })
+                grace_started = True
+                grace_start_time = car["finish_time"]
+                leader_team_id = car["team_id"]
+                events.append(
+                    {
+                        "type": "leader_finished",
+                        "team_id": car["team_id"],
+                        "finish_time": round(car["finish_time"], 3),
+                        "grace_end_time": round(car["finish_time"] + 60.0, 3),
+                    }
+                )
 
     # Group race: end after 60-second grace period, or after 120 s global timeout
     if session_type != "qualifying" and session_type != "placement" and grace_started:
         if sim_time - grace_start_time >= 60.0:
             final_rankings = compute_final_rankings(cars)
-            events.append({
-                "type":            "race_end",
-                "reason":          "grace_period_expired",
-                "final_rankings":  final_rankings,
-            })
+            events.append(
+                {
+                    "type": "race_end",
+                    "reason": "grace_period_expired",
+                    "final_rankings": final_rankings,
+                }
+            )
             finish_reason = "grace_period_expired"
             race_finished = True
 
     # Non-qualifying: global timeout (120 s) in case no car ever finishes
-    if session_type not in ("qualifying", "placement") and session_type != "test" and not grace_started:
+    if (
+        session_type not in ("qualifying", "placement")
+        and session_type != "test"
+        and not grace_started
+    ):
         if sim_time >= 120.0:
             final_rankings = compute_final_rankings(cars)
-            events.append({
-                "type":            "race_end",
-                "reason":          "global_timeout",
-                "final_rankings":  final_rankings,
-            })
+            events.append(
+                {
+                    "type": "race_end",
+                    "reason": "global_timeout",
+                    "final_rankings": final_rankings,
+                }
+            )
             finish_reason = "global_timeout"
             race_finished = True
 
     # 所有车型（qualifying / placement / test）：所有小车均已完成、违规、停止或未提交代码时结束
     # 或超时结束时
-    timeout_s = 600.0
+    # 动态超时: 1 圈 10 分钟, 每多 1 圈 +6 分钟
+    timeout_s = 600.0 + (total_laps - 1) * 360.0
     timed_out = sim_time >= timeout_s
     # 小车无效状态: finished, disqualified, stopped (已完赛被停), idle (未提交代码)
     all_done = all(
-        c['finish_time'] is not None or c['status'] in ('finished', 'stopped', 'disqualified', 'idle')
+        c["finish_time"] is not None
+        or c["status"] in ("finished", "stopped", "disqualified", "idle")
         for c in cars
     )
     # DEBUG: log car states every 200 frames
     if frame_count % 200 == 0:
         for c in cars:
-            print(f"[DEBUG RACE_END] {c['team_id']} lap={c['lap']} ft={'SET' if c['finish_time'] is not None else 'NONE'} status={c['status']} all_done={all_done} sim_time={sim_time:.1f}/{timeout_s}")
+            print(
+                f"[DEBUG RACE_END] {c['team_id']} lap={c['lap']} ft={'SET' if c['finish_time'] is not None else 'NONE'} status={c['status']} all_done={all_done} sim_time={sim_time:.1f}/{timeout_s}"
+            )
     if all_done or timed_out:
-        print(f"[DEBUG] RACE END: all_done={all_done} timed_out={timed_out} sim_time={sim_time:.1f}")
+        print(
+            f"[DEBUG] RACE END: all_done={all_done} timed_out={timed_out} sim_time={sim_time:.1f}"
+        )
         # 标记完赛但status还没改的小车
         for c in cars:
-            if c['finish_time'] is not None and c['status'] not in ('finished', 'stopped', 'disqualified'):
-                c['status'] = 'finished'
+            if c["finish_time"] is not None and c["status"] not in (
+                "finished",
+                "stopped",
+                "disqualified",
+            ):
+                c["status"] = "finished"
         final_rankings = compute_final_rankings(cars)
         reason = "all_cars_done" if all_done else "timeout"
-        events.append({
-            "type":           "race_end",
-            "reason":         reason,
-            "final_rankings": final_rankings,
-        })
+        events.append(
+            {
+                "type": "race_end",
+                "reason": reason,
+                "final_rankings": final_rankings,
+            }
+        )
         finish_reason = reason
         race_finished = True
+
 
 # ---------------------------------------------------------------------------
 # Main loop
@@ -484,39 +620,48 @@ try:
 
         # --- Update car states ---
         for car in cars:
-            node = car.get('node')
+            node = car.get("node")
             if node is None:
                 continue
             # 退赛小车节点已删除，坐标已冻结，跳过
-            if car['status'] == 'disqualified':
+            if car["status"] == "disqualified":
                 continue
             pos = node.getPosition()
-            car['x'], car['y'] = pos[0], pos[1]          # x/y ground plane in ENU
+            car["x"], car["y"] = pos[0], pos[1]  # x/y ground plane in ENU
 
-            ori = node.getOrientation()                   # row-major 3x3 rotation matrix
-            car['heading'] = math.atan2(-ori[3], ori[0])
+            ori = node.getOrientation()  # row-major 3x3 rotation matrix
+            car["heading"] = math.atan2(-ori[3], ori[0])
 
-            vel = node.getVelocity()                      # [vx, vy, vz, wx, wy, wz]
-            car['speed'] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
+            vel = node.getVelocity()  # [vx, vy, vz, wx, wy, wz]
+            car["speed"] = math.sqrt(vel[0] ** 2 + vel[1] ** 2)
 
             # Expire stop penalty (only for cars that haven't finished yet)
-            if car['status'] == 'stopped' and car['stop_end_time'] is not None and car['finish_time'] is None:
-                if sim_time >= car['stop_end_time']:
-                    car['status'] = 'normal'
-                    car['stop_end_time'] = None
+            if (
+                car["status"] == "stopped"
+                and car["stop_end_time"] is not None
+                and car["finish_time"] is None
+            ):
+                if sim_time >= car["stop_end_time"]:
+                    car["status"] = "normal"
+                    car["stop_end_time"] = None
                     clear_cmd(car)
 
             # Drain boost timer
-            if car['boost_remaining'] > 0:
-                car['boost_remaining'] = max(0.0, car['boost_remaining'] - timestep / 1000.0)
+            if car["boost_remaining"] > 0:
+                car["boost_remaining"] = max(
+                    0.0, car["boost_remaining"] - timestep / 1000.0
+                )
 
         # --- Move overhead camera to follow active car, rotate every 20s ---
         if _overhead_cam_node and len(cars) > 0:
             # Collect participating cars (has code, not disqualified, not finished)
-            active_cars = [c for c in cars
-                           if c.get('has_code')
-                           and c['node'] is not None
-                           and c['status'] not in ('disqualified', 'finished')]
+            active_cars = [
+                c
+                for c in cars
+                if c.get("has_code")
+                and c["node"] is not None
+                and c["status"] not in ("disqualified", "finished")
+            ]
             if active_cars:
                 # Guard: reset index if the active list shrank (e.g. a car finished)
                 if _cam_active_index >= len(active_cars):
@@ -526,24 +671,32 @@ try:
                     _cam_active_index = (_cam_active_index + 1) % len(active_cars)
                     _cam_last_switch_time = sim_time
                 target = active_cars[_cam_active_index]
-                car_pos = target['node'].getPosition()
-                _overhead_cam_node.getField('translation').setSFVec3f(
+                car_pos = target["node"].getPosition()
+                _overhead_cam_node.getField("translation").setSFVec3f(
                     [car_pos[0], car_pos[1], _cam_height]
                 )
 
         # --- Checkpoint detection (skip disqualified AND finished cars) ---
         for car in cars:
-            if car['status'] != 'disqualified' and car['finish_time'] is None:
-                check_checkpoints(car, sim_time)                          # CP 序列
-                check_finish_line(car, sim_time, events_this_frame)       # 出发线计时
+            if car["status"] != "disqualified" and car["finish_time"] is None:
+                check_checkpoints(car, sim_time)  # CP 序列
+                check_finish_line(car, sim_time, events_this_frame)  # 出发线计时
 
         # --- 60秒无检查点违规检测 ---
         STUCK_TIMEOUT = 60.0
         for car in cars:
-            if car['status'] in ('normal',) and car['finish_time'] is None and car['lap_started']:
-                if sim_time - car['last_cp_time'] >= STUCK_TIMEOUT:
-                    events_this_frame.append(disqualify_car(car, "checkpoint_timeout", sim_time))
-                    print(f"[DQ] {car['team_id']} disqualified: 60s without checkpoint (last_cp={car['last_cp_time']:.1f}, now={sim_time:.1f})")
+            if (
+                car["status"] in ("normal",)
+                and car["finish_time"] is None
+                and car["lap_started"]
+            ):
+                if sim_time - car["last_cp_time"] >= STUCK_TIMEOUT:
+                    events_this_frame.append(
+                        disqualify_car(car, "checkpoint_timeout", sim_time)
+                    )
+                    print(
+                        f"[DQ] {car['team_id']} disqualified: 60s without checkpoint (last_cp={car['last_cp_time']:.1f}, now={sim_time:.1f})"
+                    )
 
         # --- Collision detection ---
         check_car_collisions(cars, sim_time, events_this_frame)
@@ -580,16 +733,17 @@ try:
                 pass
 
         # Admin graceful-stop signal
-        if not race_finished and os.path.exists(os.path.join(recording_path, 'STOP')):
+        if not race_finished and os.path.exists(os.path.join(recording_path, "STOP")):
             final_rankings = compute_final_rankings(cars)
-            finish_reason  = "admin_stop"
-            race_finished  = True
+            finish_reason = "admin_stop"
+            race_finished = True
 
         if race_finished:
             break
 
 except Exception as exc:
     import traceback
+
     print(f"[FATAL] Supervisor crashed: {exc}")
     traceback.print_exc()
     if not final_rankings:

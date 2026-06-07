@@ -8,8 +8,8 @@ import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional
 
-from simnode.telemetry_observer import TelemetryObserver
 from simnode.config.config import Config
+from simnode.telemetry_observer import TelemetryObserver
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +19,25 @@ class RaceRunner:
 
     def __init__(
         self,
-        race_id:      str,
+        race_id: str,
         session_type: str,
-        total_laps:   int,
-        cars:         List[Dict[str, Any]],
-        observer:     TelemetryObserver,
+        total_laps: int,
+        cars: List[Dict[str, Any]],
+        observer: TelemetryObserver,
     ) -> None:
-        self.race_id      = race_id
+        self.race_id = race_id
         self.session_type = session_type
-        self.total_laps   = total_laps
-        self.cars         = cars   # [{"car_slot", "team_id", "team_name", "code_b64"}]
-        self._observer    = observer
+        self.total_laps = total_laps
+        self.cars = cars  # [{"car_slot", "team_id", "team_name", "code_b64"}]
+        self._observer = observer
 
         self._webots_proc: Optional[subprocess.Popen] = None
-        self._tmp_dir:     Optional[tempfile.TemporaryDirectory] = None
-        self._aborted      = False
+        self._tmp_dir: Optional[tempfile.TemporaryDirectory] = None
+        self._aborted = False
 
-        self._recordings_dir = str(pathlib.Path(Config.get("RECORDINGS_DIR", "./recordings")).resolve())
+        self._recordings_dir = str(
+            pathlib.Path(Config.get("RECORDINGS_DIR", "./recordings")).resolve()
+        )
         self._race_dir = pathlib.Path(self._recordings_dir) / race_id
 
     # ------------------------------------------------------------------
@@ -43,10 +45,13 @@ class RaceRunner:
     # ------------------------------------------------------------------
 
     def run_race(self) -> Dict[str, Any]:
-        self._observer.make_snapshot("race_event", {
-            "type":    "RaceStart",
-            "race_id": self.race_id,
-        })
+        self._observer.make_snapshot(
+            "race_event",
+            {
+                "type": "RaceStart",
+                "race_id": self.race_id,
+            },
+        )
 
         try:
             car_configs = self._decode_car_codes()
@@ -59,9 +64,9 @@ class RaceRunner:
             logger.exception(f"比赛 {self.race_id} 执行异常: {e}")
             self._abort(str(e))
             return {
-                "race_id":        self.race_id,
-                "finish_reason":  "error",
-                "error":          str(e),
+                "race_id": self.race_id,
+                "finish_reason": "error",
+                "error": str(e),
                 "final_rankings": [],
             }
         finally:
@@ -79,25 +84,27 @@ class RaceRunner:
         car_configs = []
 
         for car in self.cars:
-            team_id   = car["team_id"]
+            team_id = car["team_id"]
             team_name = car.get("team_name", team_id)
-            car_slot  = car.get("car_slot", team_id)
-            code_b64  = car.get("code_b64", "")
+            car_slot = car.get("car_slot", team_id)
+            code_b64 = car.get("code_b64", "")
 
             if not code_b64:
                 # 队伍未提交代码 — 不写入代码文件，car_controller 会使小车静止不动
-                car_configs.append({
-                    "car_slot":  car_slot,
-                    "team_id":   team_id,
-                    "team_name": team_name,
-                    "code_path": "",   # 空路径 → car_controller 找不到，fallback 为静止
-                })
+                car_configs.append(
+                    {
+                        "car_slot": car_slot,
+                        "team_id": team_id,
+                        "team_name": team_name,
+                        "code_path": "",  # 空路径 → car_controller 找不到，fallback 为静止
+                    }
+                )
                 logger.info(f"队伍 {team_id} 未提交代码，小车将静止不动")
                 continue
 
             try:
                 code_bytes = base64.b64decode(code_b64)
-                code_str   = code_bytes.decode("utf-8")
+                code_str = code_bytes.decode("utf-8")
             except Exception as e:
                 raise ValueError(f"队伍 {team_id} 代码 Base64 解码失败: {e}")
 
@@ -105,12 +112,14 @@ class RaceRunner:
             with open(code_path, "w", encoding="utf-8") as f:
                 f.write(code_str)
 
-            car_configs.append({
-                "car_slot":  car_slot,
-                "team_id":   team_id,
-                "team_name": team_name,
-                "code_path": code_path,
-            })
+            car_configs.append(
+                {
+                    "car_slot": car_slot,
+                    "team_id": team_id,
+                    "team_name": team_name,
+                    "code_path": code_path,
+                }
+            )
 
             logger.debug(f"队伍 {team_id} 代码已写入: {code_path}")
 
@@ -122,12 +131,12 @@ class RaceRunner:
 
     def _write_race_config(self, car_configs: List[Dict]) -> str:
         config = {
-            "race_id":        self.race_id,
-            "session_type":   self.session_type,
-            "total_laps":     self.total_laps,
+            "race_id": self.race_id,
+            "session_type": self.session_type,
+            "total_laps": self.total_laps,
             "recording_path": str(self._race_dir),
-            "cars":           car_configs,
-            "created_at":     datetime.datetime.now().isoformat(),
+            "cars": car_configs,
+            "created_at": datetime.datetime.now().isoformat(),
         }
 
         self._race_dir.mkdir(parents=True, exist_ok=True)
@@ -150,9 +159,11 @@ class RaceRunner:
     # ------------------------------------------------------------------
 
     def _launch_webots(self, config_path: str) -> None:
-        webots_bin  = Config.get("WEBOTS_BINARY", "/usr/bin/webots")
-        world_file  = Config.get("WEBOTS_WORLD",  "./simnode/webots/worlds/track_complex.wbt")
-        headless    = Config.get("WEBOTS_HEADLESS", True)
+        webots_bin = Config.get("WEBOTS_BINARY", "/usr/bin/webots")
+        world_file = Config.get(
+            "WEBOTS_WORLD", "./simnode/webots/worlds/track_complex.wbt"
+        )
+        headless = Config.get("WEBOTS_HEADLESS", True)
 
         env = os.environ.copy()
         env["RACE_CONFIG_PATH"] = config_path
@@ -160,7 +171,7 @@ class RaceRunner:
         # Use --minimize on Windows (headless=false) so the overhead Camera can render.
         # --batch disables ALL GPU rendering → Camera.saveImage() produces black frames.
         if headless:
-            args = [webots_bin, "--batch", "--no-sandbox", world_file]
+            args = [webots_bin, "--batch", world_file]
         else:
             args = [webots_bin, "--minimize", world_file]
 
@@ -173,18 +184,23 @@ class RaceRunner:
             stderr=subprocess.DEVNULL,
         )
 
-        self._observer.make_snapshot("race_event", {
-            "type":    "WebotsLaunched",
-            "pid":     self._webots_proc.pid,
-            "race_id": self.race_id,
-        })
+        self._observer.make_snapshot(
+            "race_event",
+            {
+                "type": "WebotsLaunched",
+                "pid": self._webots_proc.pid,
+                "race_id": self.race_id,
+            },
+        )
 
     # ------------------------------------------------------------------
     # 等待 Webots 结束
     # ------------------------------------------------------------------
 
     def _wait_for_webots(self) -> int:
-        timeout = Config.get("RACE_TIMEOUT_SECONDS", 600)
+        # 动态超时: 1 圈 10 分钟, 每多 1 圈 +6 分钟
+        # 公式: 600 + (laps - 1) * 360 秒
+        timeout = 600 + (self.total_laps - 1) * 360
 
         try:
             exit_code = self._webots_proc.wait(timeout=timeout)
@@ -205,8 +221,10 @@ class RaceRunner:
 
         if not metadata_path.exists():
             return {
-                "race_id":        self.race_id,
-                "finish_reason":  "no_metadata" if webots_exit_code == 0 else "webots_crash",
+                "race_id": self.race_id,
+                "finish_reason": "no_metadata"
+                if webots_exit_code == 0
+                else "webots_crash",
                 "final_rankings": [],
             }
 
@@ -216,8 +234,8 @@ class RaceRunner:
         except Exception as e:
             logger.error(f"读取结果文件失败 ({self.race_id}): {e}")
             return {
-                "race_id":        self.race_id,
-                "finish_reason":  "read_error",
+                "race_id": self.race_id,
+                "finish_reason": "read_error",
                 "final_rankings": [],
             }
 
@@ -227,10 +245,13 @@ class RaceRunner:
 
     def _abort(self, reason: str) -> None:
         self._aborted = True
-        self._observer.make_snapshot("race_error", {
-            "error_type": "runner_abort",
-            "message":    reason,
-        })
+        self._observer.make_snapshot(
+            "race_error",
+            {
+                "error_type": "runner_abort",
+                "message": reason,
+            },
+        )
         self.force_stop()
 
     def graceful_stop(self, timeout: float = 15.0) -> bool:
