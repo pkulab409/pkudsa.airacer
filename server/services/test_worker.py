@@ -293,13 +293,18 @@ def _finish_race(
             if not team_id:
                 continue
             if entry.get("total_time") is not None:
+                rank = finished_rank
                 points = _POINTS_TABLE.get(finished_rank, 1)
-                db_upsert_rp(
-                    conn,
-                    race_id,
-                    team_id,
-                    finished_rank,
-                    points,
-                    best_lap_time=entry.get("best_lap"),
-                )
                 finished_rank += 1
+            else:
+                # 未完赛也拿 1 分
+                rank = 99
+                points = 1
+            db_upsert_rp(
+                conn,
+                race_id,
+                team_id,
+                rank,
+                points,
+                best_lap_time=entry.get("best_lap"),
+            )

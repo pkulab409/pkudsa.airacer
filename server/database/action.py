@@ -124,20 +124,66 @@ def db_get_zone_teams(conn, zone_id: str) -> List[Dict]:
 
 
 def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
+    """优先从 race_sessions.result 计算积分，fallback 到 race_points。"""
+    # 先从 race_sessions 直接计算
     rows = conn.execute(
-        """SELECT rp.team_id, t.name,
-                  SUM(rp.points) AS total_score,
-                  MIN(rp.best_lap_time) AS best_lap_time,
-                  COUNT(DISTINCT rp.session_id) AS finished_sessions
-           FROM race_points rp
-           JOIN teams t ON rp.team_id = t.id
-           JOIN race_sessions rs ON rp.session_id = rs.id
-           WHERE rs.zone_id = ?
-           GROUP BY rp.team_id
-           ORDER BY total_score DESC""",
+        """SELECT id, type, result FROM race_sessions
+           WHERE zone_id=? AND phase IN ('recording_ready', 'finished')
+           AND result IS NOT NULL""",
         (zone_id,),
     ).fetchall()
-    return [dict(r) for r in rows]
+
+    scores: dict[str, dict] = {}  # team_id → {points, best_lap, sessions}
+    POINTS = {1: 10, 2: 7, 3: 5, 4: 3}
+
+    for sid, stype, result_json in rows:
+        data = (
+            json.loads(result_json)
+            if isinstance(result_json, str)
+            else (result_json or {})
+        )
+        rankings = data.get("final_rankings", [])
+        finished_rank = 1
+        for entry in rankings:
+            tid = entry.get("team_id")
+            if not tid:
+                continue
+            if entry.get("total_time") is not None:
+                pts = POINTS.get(finished_rank, 1)
+                finished_rank += 1
+            else:
+                pts = 1
+            bt = entry.get("best_lap") or entry.get("best_lap_time")
+            rec = scores.get(tid)
+            if rec is None:
+                rec = {
+                    "team_id": tid,
+                    "name": "",
+                    "total_score": 0,
+                    "best_lap_time": bt,
+                    "finished_sessions": 0,
+                }
+                scores[tid] = rec
+            rec["total_score"] += pts
+            if bt is not None and (
+                rec["best_lap_time"] is None or bt < rec["best_lap_time"]
+            ):
+                rec["best_lap_time"] = bt
+            rec["finished_sessions"] += 1
+
+    # 补上队伍名称
+    team_ids = list(scores.keys())
+    if team_ids:
+        placeholders = ",".join("?" * len(team_ids))
+        teams = conn.execute(
+            f"SELECT id, name FROM teams WHERE id IN ({placeholders})", team_ids
+        ).fetchall()
+        for t in teams:
+            if scores.get(t["id"]):
+                scores[t["id"]]["name"] = t["name"]
+
+    result = sorted(scores.values(), key=lambda x: x["total_score"], reverse=True)
+    return result
 
 
 def db_resource_exists(conn, table: str, id_value: str) -> bool:
