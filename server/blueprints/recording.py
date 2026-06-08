@@ -67,37 +67,39 @@ async def list_recordings():
 
     results.sort(key=lambda r: r.get("recorded_at") or "", reverse=True)
 
-    # 逐个查 DB 获取可读名称
+    # 逐个查 DB 获取可读名称 和 zone_id
     try:
         with get_db(DB_PATH) as conn:
             for r in results:
-                if r.get("name"):
-                    continue  # metadata.json 已有名称，跳过
+                if r.get("name") and r.get("zone_id"):
+                    continue  # 已有完整信息，跳过
                 sid = r["session_id"]
-                # 处理旧录像目录名 race_XXXXXXXX → 匹配 UUID 前缀
                 lookup_id = sid
                 if sid.startswith("race_"):
-                    lookup_id = sid[5:] + "%"  # race_044f3d9e → 044f3d9e%
+                    lookup_id = sid[5:] + "%"
                     row = conn.execute(
-                        "SELECT name FROM race_sessions WHERE id LIKE ? LIMIT 1",
+                        "SELECT name, zone_id FROM race_sessions WHERE id LIKE ? LIMIT 1",
                         (lookup_id,),
                     ).fetchone()
                     if not row:
                         row = conn.execute(
-                            "SELECT name FROM races WHERE id LIKE ? LIMIT 1",
+                            "SELECT name, zone_id FROM races WHERE id LIKE ? LIMIT 1",
                             (lookup_id,),
                         ).fetchone()
                 else:
                     row = conn.execute(
-                        "SELECT name FROM race_sessions WHERE id = ?",
+                        "SELECT name, zone_id FROM race_sessions WHERE id = ?",
                         (sid,),
                     ).fetchone()
                     if not row:
                         row = conn.execute(
-                            "SELECT name FROM races WHERE id = ?",
+                            "SELECT name, zone_id FROM races WHERE id = ?",
                             (sid,),
                         ).fetchone()
-                r["name"] = (row["name"] if row and row["name"] else None) or sid
+                if row:
+                    r["name"] = row["name"] or sid
+                    if not r.get("zone_id") and row["zone_id"]:
+                        r["zone_id"] = row["zone_id"]
     except Exception as ex:
         import logging
 
