@@ -755,16 +755,31 @@
                                 </select>
                             </div>
                             <div class="mb-2">
-                                <label class="form-label">参赛队伍</label>
+                                <label class="form-label"
+                                    >参赛队伍
+                                    <span
+                                        class="text-muted"
+                                        style="
+                                            font-weight: normal;
+                                            font-size: 0.75rem;
+                                        "
+                                        >(勾选后拖拽或点按钮调整顺序)</span
+                                    ></label
+                                >
                                 <div
                                     id="cr-teams"
                                     style="
-                                        max-height: 120px;
+                                        max-height: 200px;
                                         overflow-y: auto;
                                         font-size: 0.82rem;
                                     "
                                 >
-                                    <div class="text-muted">请先选择赛区</div>
+                                    <div
+                                        class="text-muted"
+                                        style="padding: 4px 0"
+                                    >
+                                        请先选择赛区
+                                    </div>
                                 </div>
                             </div>
                             <div class="mb-2">
@@ -3075,6 +3090,26 @@
             }
 
             // ── Manual create race ──
+            function _moveCrTeam(idx, dir) {
+                var div = document.getElementById("cr-teams");
+                var items = div.querySelectorAll(".cr-team-row");
+                if (idx < 0 || idx >= items.length) return;
+                var target = idx + dir;
+                if (target < 0 || target >= items.length) return;
+                if (dir < 0) {
+                    items[target].parentNode.insertBefore(
+                        items[idx],
+                        items[target],
+                    );
+                } else {
+                    items[target].parentNode.insertBefore(
+                        items[idx],
+                        items[target].nextSibling,
+                    );
+                }
+                _refreshCrIndices();
+            }
+
             async function loadCreateRaceTeams() {
                 if (!currentZone) return;
                 var div = document.getElementById("cr-teams");
@@ -3087,25 +3122,104 @@
                     var teams = r.ok ? await r.json() : [];
                     if (!teams.length) {
                         div.innerHTML =
-                            '<div class="text-muted" style="font-size:.82rem;">该赛区暂无队伍</div>';
+                            '<div class="text-muted" style="font-size:.82rem;padding:4px 0">该赛区暂无队伍</div>';
                         return;
                     }
                     div.innerHTML = teams
-                        .map(function (t) {
-                            return (
-                                '<label class="form-check" style="font-size:.82rem">' +
-                                '<input type="checkbox" class="form-check-input cr-team-cb" value="' +
-                                esc(t.id) +
-                                '" /> ' +
-                                esc(t.name || t.id) +
-                                "</label>"
-                            );
+                        .map(function (t, i) {
+                            return [
+                                '<div class="cr-team-row d-flex align-items-center gap-1 py-1" style="border-bottom:1px solid #eee;cursor:default" draggable="true">',
+                                '  <span class="text-muted cr-idx" style="min-width:1.2rem;text-align:right;font-size:0.72rem">' +
+                                    (i + 1) +
+                                    "</span>",
+                                '  <span class="text-muted" style="cursor:move;font-size:0.7rem">⠿</span>',
+                                '  <input type="checkbox" class="cr-team-cb form-check-input" value="' +
+                                    esc(t.id) +
+                                    '" style="margin:0">',
+                                '  <span class="flex-grow-1">' +
+                                    esc(t.name || t.id) +
+                                    "</span>",
+                                '  <button class="btn btn-sm p-0 border-0 text-muted cr-up" onclick="_moveCrTeam(' +
+                                    i +
+                                    ',-1)" style="line-height:1;font-size:0.7rem" title="上移">▲</button>',
+                                '  <button class="btn btn-sm p-0 border-0 text-muted cr-down" onclick="_moveCrTeam(' +
+                                    i +
+                                    ',+1)" style="line-height:1;font-size:0.7rem" title="下移">▼</button>',
+                                "</div>",
+                            ].join("\n");
                         })
                         .join("");
+                    _wireCrDrag();
+                    _refreshCrIndices();
                 } catch (e) {
                     div.innerHTML =
-                        '<div class="text-danger" style="font-size:.82rem;">加载失败</div>';
+                        '<div class="text-danger" style="font-size:.82rem;padding:4px 0">加载失败</div>';
                 }
+            }
+
+            function _refreshCrIndices() {
+                var div = document.getElementById("cr-teams");
+                var rows = div.querySelectorAll(".cr-team-row");
+                rows.forEach(function (r, i) {
+                    var idxEl = r.querySelector(".cr-idx");
+                    if (idxEl) idxEl.textContent = i + 1;
+                    var upBtn = r.querySelector(".cr-up");
+                    var dnBtn = r.querySelector(".cr-down");
+                    if (upBtn)
+                        upBtn.setAttribute(
+                            "onclick",
+                            "_moveCrTeam(" + i + ",-1)",
+                        );
+                    if (dnBtn)
+                        dnBtn.setAttribute(
+                            "onclick",
+                            "_moveCrTeam(" + i + ",+1)",
+                        );
+                });
+            }
+
+            function _wireCrDrag() {
+                var div = document.getElementById("cr-teams");
+                var dragSrc = null;
+                div.querySelectorAll(".cr-team-row").forEach(function (row) {
+                    row.addEventListener("dragstart", function (e) {
+                        dragSrc = this;
+                        e.dataTransfer.effectAllowed = "move";
+                        this.style.opacity = "0.4";
+                    });
+                    row.addEventListener("dragend", function (e) {
+                        this.style.opacity = "1";
+                    });
+                    row.addEventListener("dragover", function (e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                    });
+                    row.addEventListener("drop", function (e) {
+                        e.preventDefault();
+                        if (dragSrc && dragSrc !== this) {
+                            var parent = this.parentNode;
+                            var siblings =
+                                parent.querySelectorAll(".cr-team-row");
+                            var dropIdx = Array.prototype.indexOf.call(
+                                siblings,
+                                this,
+                            );
+                            var srcIdx = Array.prototype.indexOf.call(
+                                siblings,
+                                dragSrc,
+                            );
+                            if (srcIdx < dropIdx) {
+                                this.parentNode.insertBefore(
+                                    dragSrc,
+                                    this.nextSibling,
+                                );
+                            } else {
+                                this.parentNode.insertBefore(dragSrc, this);
+                            }
+                            _refreshCrIndices();
+                        }
+                    });
+                });
             }
 
             async function doCreateRace() {

@@ -7,13 +7,19 @@ Race bracket (tournament format) auto-computation based on team count.
   3. 分组赛 (group_stage)   — 每批 6 车 × 2 组，每组前 4 晋级 → 8 队
   4. 半决赛 (semi)          — 每批 4 车 × 2 场，每场前 2 晋级 → 4 队
   5. 决赛 (final)           — 4 车同时跑，决出排名
+
+小赛区（13-14 队版本）：
+  1. 排位赛 (placement)     — 每批最多 5 车 × 3 批，综合成绩取前 12 晋级
+  2. 分组赛 (group_stage)   — 每批 6 车 × 2 组，每组前 4 晋级 → 8 队
+  3. 半决赛 (semi)          — 每批 4 车 × 2 场，每场前 2 晋级 → 4 队
+  4. 决赛 (final)           — 4 车同时跑，决出排名
 """
 
 import math
 
 # ── 固定配置（25 队专用） ──────────────────────────────────────────
 
-CARS = {
+_CARS_25 = {
     "qualification": 1,
     "placement": 6,
     "group_stage": 6,
@@ -21,18 +27,13 @@ CARS = {
     "final": 4,
 }
 
-LAPS = {
+_LAPS_25 = {
     "qualification": 1,
     "placement": 1,
     "group_stage": 3,
     "semi": 3,
     "final": 5,
 }
-
-_TEAM_CAP = 25  # 此赛制支持的队伍数上限
-
-
-# ── 各阶段晋级数（不含 qualification，管理员手动淘汰） ────────
 
 _ADVANCEMENT: dict[str, int] = {
     "placement": 12,
@@ -40,23 +41,27 @@ _ADVANCEMENT: dict[str, int] = {
     "semi": 4,
 }
 
+# ── 小赛区配置（11-14 队，按规则文档 v2.8） ────────────────────
 
-# ── 当队伍数较少时的降级赛制 ─────────────────────────────────
-
-_FALLBACK_CARS = {
-    "qualification": 1,
-    "placement": 4,
-    "group_stage": 4,
+_CARS_SMALL = {
+    "placement": 5,  # 每批最多 5 辆
+    "group_stage": 6,
     "semi": 4,
     "final": 4,
 }
 
-_FALLBACK_LAPS = {
-    "qualification": 1,
+_LAPS_SMALL = {
     "placement": 1,
     "group_stage": 3,
     "semi": 3,
     "final": 5,
+}
+
+_SESSIONS_SMALL = {
+    "placement": 3,  # 3 批
+    "group_stage": 2,  # 2 组
+    "semi": 2,
+    "final": 1,
 }
 
 
@@ -82,42 +87,41 @@ def compute_bracket(team_count: int) -> dict:
             "sessions_per_stage": {},
         }
 
-    # ── 正式赛制（25 队满配） ────────────────────────────────
+    # ── 25 队满配赛制 ────────────────────────────────────────
     if team_count >= 20:
         stages = ["qualification", "placement", "group_stage", "semi", "final"]
-        cars = dict(CARS)
-        laps = dict(LAPS)
+        cars = dict(_CARS_25)
+        laps = dict(_LAPS_25)
         adv = dict(_ADVANCEMENT)
         sessions = _compute_sessions_25(team_count)
 
-    # ── 中间赛制（去掉资格赛） ──────────────────────────────
-    elif team_count >= 10:
+    # ── 小赛区（13-14 队专用，规则文档 v2.8） ────────────────
+    elif team_count >= 11:
         stages = ["placement", "group_stage", "semi", "final"]
-        cars = {k: _FALLBACK_CARS[k] for k in stages}
-        laps = {k: _FALLBACK_LAPS[k] for k in stages}
+        cars = dict(_CARS_SMALL)
+        laps = dict(_LAPS_SMALL)
+        adv = dict(_ADVANCEMENT)
+        sessions = dict(_SESSIONS_SMALL)
+
+    # ── 其他（< 11 队，保持基本结构由助教手动调整） ──────────
+    elif team_count >= 5:
+        stages = ["placement", "group_stage", "semi", "final"]
+        cars = {"placement": 4, "group_stage": 4, "semi": 4, "final": 4}
+        laps = {"placement": 1, "group_stage": 3, "semi": 3, "final": 5}
         adv = {}
         sessions = {}
         current = team_count
         for stage in stages:
             sessions[stage] = max(1, math.ceil(current / cars[stage]))
-            if stage in _ADVANCEMENT:
-                # 按比例缩放晋级数
-                ratio = _ADVANCEMENT[stage] / _TEAM_CAP
-                adv[stage] = max(1, min(current - 1, round(team_count * ratio)))
+            if stage == "placement":
+                adv[stage] = min(team_count, 12)
+            elif stage == "group_stage":
+                adv[stage] = min(adv.get("placement", team_count), 8)
+            elif stage == "semi":
+                adv[stage] = min(adv.get("group_stage", 0), 4)
             current = adv.get(stage, 2)
 
-    # ── 小队赛制（placement → semi → final） ────────────────
-    elif team_count >= 5:
-        stages = ["placement", "semi", "final"]
-        cars = {"placement": 4, "semi": 4, "final": 4}
-        laps = {"placement": 1, "semi": 3, "final": 5}
-        sessions = {"placement": max(1, math.ceil(team_count / 4))}
-        adv = {"placement": min(team_count, 4)}
-        sessions["semi"] = max(1, math.ceil(adv["placement"] / 4))
-        adv["semi"] = sessions["semi"] * 2
-        sessions["final"] = 1
-
-    # ── 超小队（placement → final） ─────────────────────────
+    # ── 极小队（直接决赛） ───────────────────────────────────
     else:
         stages = ["placement", "final"]
         cars = {"placement": 4, "final": 4}

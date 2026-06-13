@@ -522,6 +522,15 @@ async def generate_stage(
         all_teams = db_get_zone_team_ids(conn, zone_id)
 
         # ── 阶段条件检查 ─────────────────────────
+        has_qualification = "qualification" in bracket["stages"]
+
+        # 检查该阶段是否在当前赛制的赛程中
+        if stage_name not in bracket["stages"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"本赛区队伍数({team_count}队)无需{stage_prefix[stage_name]}阶段",
+            )
+
         if stage_name == "qualification":
             # 资格赛：不能有已完成的正赛
             history = db_get_race_history(conn, zone_id, limit=1)
@@ -532,20 +541,23 @@ async def generate_stage(
                 )
 
         elif stage_name == "placement":
-            _check_stage_done(conn, zone_id, "qualification", bracket, "资格赛")
-            eliminate_team = body_dict.get("eliminate_team_id", "")
-            if not eliminate_team:
-                raise HTTPException(
-                    status_code=409,
-                    detail="need_elimination",
-                    headers={"X-Need-Elimination": "true"},
-                )
-            if eliminate_team not in all_teams:
-                raise HTTPException(
-                    status_code=400, detail=f"队伍 {eliminate_team} 不在本赛区"
-                )
-            all_teams = [t for t in all_teams if t != eliminate_team]
-            bracket = compute_bracket(len(all_teams))  # 重新计算 24 队 bracket
+            if has_qualification:
+                # 25 队赛制：先资格赛再排位，需淘汰1队
+                _check_stage_done(conn, zone_id, "qualification", bracket, "资格赛")
+                eliminate_team = body_dict.get("eliminate_team_id", "")
+                if not eliminate_team:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="need_elimination",
+                        headers={"X-Need-Elimination": "true"},
+                    )
+                if eliminate_team not in all_teams:
+                    raise HTTPException(
+                        status_code=400, detail=f"队伍 {eliminate_team} 不在本赛区"
+                    )
+                all_teams = [t for t in all_teams if t != eliminate_team]
+                bracket = compute_bracket(len(all_teams))  # 重新计算 24 队 bracket
+            # else: 小赛区（11-14队），排位赛即为第一轮，无资格赛，不需要手动淘汰
 
         elif stage_name == "group_stage":
             _check_stage_done(conn, zone_id, "placement", bracket, "排位赛")
@@ -699,11 +711,19 @@ def _build_stage_sessions(
             sessions.append({"team_ids": [tid], "total_laps": laps})
 
     elif stage == "placement":
-        # 排位赛：按资格赛成绩蛇形分 4 批，每批 6 车
-        ranked = _get_qualification_rankings(conn, zone_id, all_teams)
-        groups = snake_draft_group(ranked, total_sessions)
-        for g in groups:
-            sessions.append({"team_ids": g, "total_laps": laps})
+        has_qualification = "qualification" in bracket["stages"]
+        if has_qualification:
+            # 25 队赛制：按资格赛成绩蛇形分 4 批，每批 6 车
+            ranked = _get_qualification_rankings(conn, zone_id, all_teams)
+            groups = snake_draft_group(ranked, total_sessions)
+            for g in groups:
+                sessions.append({"team_ids": g, "total_laps": laps})
+        else:
+            # 小赛区（11-14队）：按组号顺序分批，每批最多 cars_per 辆
+            for i in range(total_sessions):
+                chunk = all_teams[i * cars_per : (i + 1) * cars_per]
+                if chunk:
+                    sessions.append({"team_ids": chunk, "total_laps": laps})
 
     elif stage == "group_stage":
         # 排位赛取前 12 名，蛇形分 2 组
