@@ -46,8 +46,13 @@ def on_race_ended(race_id: str, result: Dict[str, Any]) -> None:
             for entry in final_rankings:
                 rank = entry.get("rank", 99)
                 team_id = entry.get("team_id")
+                status = entry.get("status", "")
                 if team_id:
-                    points = _POINTS_TABLE.get(rank, 1)
+                    # 未完赛队伍一律只给 1 分，不按具体排名给分
+                    if status == "finished":
+                        points = _POINTS_TABLE.get(rank, 1)
+                    else:
+                        points = 1
                     action.upsert_race_points(conn, race_id, team_id, rank, points)
     except Exception as e:
         logger.error(f"写入比赛结果失败 ({race_id}): {e}")
