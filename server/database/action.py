@@ -124,7 +124,11 @@ def db_get_zone_teams(conn, zone_id: str) -> List[Dict]:
 
 
 def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
-    """从 race_sessions.result 读取排名计算积分（仅分组赛 + 半决赛）。"""
+    """从 race_sessions.result 读取排名计算积分（仅排位赛+分组赛+半决赛+决赛）。
+
+    计分规则：只有 status=="finished" 的队伍才按排名给分 (10/7/5/3)；
+    未完成的队伍统一只给 1 分。
+    """
     rows = conn.execute(
         "SELECT result FROM race_sessions WHERE zone_id=? AND type IN ('group_stage','semi','final') AND result IS NOT NULL",
         (zone_id,),
@@ -143,8 +147,13 @@ def db_get_zone_standings(conn, zone_id: str) -> List[Dict]:
             tid = entry.get("team_id")
             if not tid:
                 continue
-            rank = entry.get("rank", 99)
-            pts = POINTS.get(rank, 1)
+            status = entry.get("status", "")
+            # 未完赛队伍一律只给 1 分，不按具体排名给分
+            if status == "finished":
+                rank = entry.get("rank", 99)
+                pts = POINTS.get(rank, 1)
+            else:
+                pts = 1
             bt = entry.get("best_lap") or entry.get("best_lap_time")
             rec = scores.get(tid)
             if rec is None:
